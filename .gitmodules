@@ -1,3 +1,3 @@
-[submodule "stm32f4xx-hal-driver"]
-	path = stm32f4xx-hal-driver
-	url = https://github.com/STMicroelectronics/stm32f4xx-hal-driver.git
+[submodule "c_src/STM32CubeF4"]
+	path = c_src/STM32CubeF4
+	url = https://github.com/STMicroelectronics/STM32CubeF4.git
