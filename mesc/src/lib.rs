@@ -1,9 +1,11 @@
 #![no_std]
 
-use crate::bindings::{MESC_motor_typedef, MESCfoc_Init};
+pub mod c_bind;
 
-mod bindings;
+use c_bind::MESC_motor_typedef;
 
-pub fn mesc_init() {
-    // TODO: make it run a C function that initializes everything that is needed
+pub fn mesc_start(motor: *mut MESC_motor_typedef) {
+    unsafe {
+        c_bind::ul_mesc_start(motor);
+    }
 }

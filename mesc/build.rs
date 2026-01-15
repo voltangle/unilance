@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 
 fn main() {
     println!("cargo:rerun-if-changed=c_src");
@@ -109,6 +109,9 @@ fn main() {
         .file("c_src/MESC_Common/Src/MESCmeasure.c")
         .file("c_src/MESC_Common/Src/MESCinput.c")
         .flag("-Wno-unused-parameter")
+
+        // UniLANCE code
+        .file("c_src/mesc_wrap.c")
         .compile("MESC");
 
     // Bindings to MESC
@@ -126,6 +129,7 @@ fn main() {
         .clang_arg("-DSTM32F405xx")
         .header("c_src/mesc_wrap.h")
         .use_core()
+        .derive_default(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         // Finish the builder and generate the bindings.
         .generate()
@@ -138,5 +142,5 @@ fn main() {
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
 
-    return
+    return;
 }
