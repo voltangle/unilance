@@ -1969,7 +1969,7 @@ void houseKeeping(MESC_motor_typedef *_motor){
 	}
 
 	//Speed tracker
-	if(abs(_motor->FOC.PLL_int)>10000.0f){
+	if(fabs(_motor->FOC.PLL_int)>10000.0f){
 		//The PLL has run away locking on to aliases; 10000 implies 6.5 pwm periods per sin wave, which is ~3000eHz, 180kerpm at 20kHz PWM frequency.
 		//While it IS possible to run faster than this, it is not a sensible use case and will not be supported.
 		_motor->FOC.PLL_int = 0;
