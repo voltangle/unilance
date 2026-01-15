@@ -6,6 +6,6 @@ use c_bind::MESC_motor_typedef;
 
 pub fn mesc_start(motor: *mut MESC_motor_typedef) {
     unsafe {
-        c_bind::ul_mesc_start(motor);
+        // c_bind::ul_mesc_start(motor);
     }
 }

@@ -1,8 +1,5 @@
-//First, include the header specific to your board, which includes hardware parameters like ABS MAX, shunts, potential divdiders
-//Ensure only one board's header file is uncommented!
 #include <math.h>
 
-// FIXME: Add hardware config
 #include "bg_etmax.h"
 
 //#include "Wheely.h"
@@ -88,10 +85,6 @@
 										//Also, incompatible with flux linkage observer for now...
 #define NON_LINEAR_CENTERING_GAIN 5000.0f
 #define USE_CLAMPED_OBSERVER_CENTERING //Pick one of the two centering methods... preferably this one
-
-/////////////////////Related to COMMs INTERFACE//////////////////////////////
-#define MESC_UART_USB 		MESC_USB
-#define HW_UART huart3
 
 /////////////////////Prototype stuff that does not really work nicely//////////////////////////////
 

@@ -8,9 +8,9 @@
 #ifndef INC_STM32FXXX_HAL_H_
 #define INC_STM32FXXX_HAL_H_
 
-#include "stm32f4xx_hal.h"
+#include "../../hal_types.h"
 #include "MESC_F405.h"
-// TODO move all the 405 specific defines (STM32F405xx) into this from:
+// TODO: move all the 405 specific defines (STM32F405xx) into this from:
 // MESCfoc.c
 // MESC_Comms.c
 
@@ -18,17 +18,18 @@
 Hardware identifiers
 */
 
-#define MESC_GPIO_HALL GPIOC
-
-extern TIM_HandleTypeDef htim7;
-extern SPI_HandleTypeDef hspi3;
-#define debugtim htim7
+// #define MESC_GPIO_HALL GPIOC
+//
+// extern TIM_HandleTypeDef htim7;
+// extern SPI_HandleTypeDef hspi3;
+// #define debugtim htim7
 
 /*
 Function prototypes
 */
 
-#define getHallState(...) ((MESC_GPIO_HALL->IDR >> 6) & 0x7)
+// FIXME: Implement in Rust
+// #define getHallState(...) ((MESC_GPIO_HALL->IDR >> 6) & 0x7)
 
 /*
 Profile defaults

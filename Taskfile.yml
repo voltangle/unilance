@@ -1,0 +1,7 @@
+version: '3'
+
+tasks:
+  # FIXME: add ability to add custom cargo attributes at the end
+  build-bg-etmax:
+    cmds:
+      - cargo build -p port_stm32f40x --target thumbv7em-none-eabi --features board_bg_etmax

@@ -860,7 +860,7 @@ void tle5012(MESC_motor_typedef *_motor);
 void HallFluxMonitor(MESC_motor_typedef *_motor);
 void getIncEncAngle(MESC_motor_typedef *_motor);
 void logVars(MESC_motor_typedef *_motor);
-void printSamples(UART_HandleTypeDef *uart, DMA_HandleTypeDef *dma);
+// void printSamples(UART_HandleTypeDef *uart, DMA_HandleTypeDef *dma);
 void RunMTPA(MESC_motor_typedef *_motor);
 void safeStart(MESC_motor_typedef *_motor);
 
