@@ -19,17 +19,6 @@ Hardware identifiers
 */
 
 #define MESC_GPIO_HALL GPIOC
-//
-// extern TIM_HandleTypeDef htim7;
-// extern SPI_HandleTypeDef hspi3;
-// #define debugtim htim7
-
-/*
-Function prototypes
-*/
-
-// TODO: figure out what the fuck is this and how to make it work
-#define getHallState(...) ((MESC_GPIO_HALL->IDR >> 6) & 0x7)
 
 /*
 Profile defaults

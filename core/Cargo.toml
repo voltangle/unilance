@@ -4,6 +4,6 @@ name = "unilance_core"
 version = "0.1.0"
 
 [dependencies]
-unilance_mesc = { path = "../mesc" }
+mesc = { path = "../mesc" }
 
 embedded-hal = "1.0.0"

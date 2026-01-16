@@ -3,7 +3,7 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 use embassy_time::Duration;
-use unilance_mesc::c_bind::{
+use mesc::{
     HAL_StatusTypeDef, HAL_StatusTypeDef_HAL_ERROR, HAL_StatusTypeDef_HAL_OK,
     HAL_TIM_StateTypeDef_HAL_TIM_STATE_BUSY, TIM_HandleTypeDef,
 };

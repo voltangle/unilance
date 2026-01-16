@@ -25,7 +25,6 @@ fn main() {
         .file("c_src/MESC_Common/Src/MESCmotor_state.c")
         .file("c_src/MESC_Common/Src/MESCfoc.c")
         .file("c_src/MESC_Common/Src/MESCmotor.c")
-        .file("c_src/MESC_Common/Src/MESCBLDC.c")
         .file("c_src/MESC_Common/Src/MESCposition.c")
         .file("c_src/MESC_Common/Src/MESCsin_lut.c")
         .file("c_src/MESC_Common/Src/MESClrobs.c")

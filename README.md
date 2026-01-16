@@ -21,9 +21,11 @@ MESC by itself depends on ST HAL, but its usage of it is limited to literately
 `hperiph->Instance->REG`. At this point it can just abandon the HAL and use just CMSIS,
 but here we are. This allow me to make a thin HAL implementation that only has definitions
 for some peripherals MESC uses, and then those are passed to MESC by UniLANCE initialization
-code. Nice.
+code. This is exactly what I did, for example in port_stm32f4/src/sthal_embassy.rs
 
 ## Current tasks
 
 - [x] Figure out ports for different MCUs and boards
 - [ ] Make MESC work (no linker errors, all functions properly start)
+- [ ] Implement some kind of bootloader with embassy_boot
+- [ ] Properly do the ET Max config

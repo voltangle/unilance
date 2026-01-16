@@ -31,8 +31,6 @@
 
 foc_measurement_t measurement_buffers;
 
-extern TIM_HandleTypeDef htim1;
-
 MESCBLDCVars_s BLDCVars;
 MESCBLDCState_e BLDCState;
 

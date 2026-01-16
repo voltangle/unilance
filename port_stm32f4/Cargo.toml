@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-unilance_mesc = { path = "../mesc" }
+mesc = { path = "../mesc" }
 unilance_core = { path = "../core" }
 
 embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac", "memory-x", "time-driver-tim4", "exti", "chrono"] }
@@ -34,7 +34,7 @@ static_cell = "2"
 chrono = { version = "^0.4", default-features = false}
 
 [features]
-board_begode_etmax = ["unilance_mesc/stm32f4_begode_etmax", "embassy-stm32/stm32f405rg"]
+board_begode_etmax = ["mesc/stm32f4_begode_etmax", "embassy-stm32/stm32f405rg"]
 
 [build-dependencies]
 bindgen = "0.72.0"

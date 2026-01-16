@@ -62,8 +62,6 @@
 #include <stdio.h>
 #endif
 
-extern TIM_HandleTypeDef htim4;
-
 float one_on_sqrt3 = 0.577350f;
 float one_on_sqrt2 = 0.707107f;
 float sqrt2 = 1.41421f;
@@ -367,7 +365,7 @@ while(_motor->MotorState == MOTOR_STATE_INITIALISING){
 	  __HAL_TIM_ENABLE_IT(_motor->stimer, TIM_IT_UPDATE);
 	  MESCinput_Init(_motor);
 
-  	  //htim1.Instance->BDTR |=TIM_BDTR_MOE;
+  	  //_motor->mtimer.Instance->BDTR |=TIM_BDTR_MOE;
 	  // initialising the comparators triggers the break state,
 	  // so turn it back on
 	  // At this point we just let the whole thing run off into interrupt land, and

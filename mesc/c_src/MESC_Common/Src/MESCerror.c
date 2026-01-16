@@ -102,10 +102,6 @@ const char * error_string[32] = {
 //#define ERROR_STARTUP 28
 //#define ERROR_APP 29
 
-
-//externs
-extern TIM_HandleTypeDef htim1;
-
 //Variables
  struct MESC_log_vars error_log;
  uint32_t MESC_errors; //This is a bitwise uint32_t representation of the errors that have occurred.
@@ -144,7 +140,7 @@ void clearBRK(MESC_motor_typedef *_motor){
 	//Generate a break, and set the mode to tracking to enable a chance of safe restart and recovery
 		MESCpwm_generateBreak(_motor);
 		//Need to set the MOE bit high to re-enable the timer
-		htim1.Instance->BDTR |= (0b01);
+		_motor->mtimer->Instance->BDTR |= (0b01);
 		_motor->MotorState = MOTOR_STATE_TRACKING;
 	}
 
