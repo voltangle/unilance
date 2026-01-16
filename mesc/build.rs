@@ -4,19 +4,20 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rerun-if-changed=c_src");
 
+    let target_port = std::env::var("TARGET_PORT")
+        .expect("TARGET_PORT is not defined. Are you using task build-<target-name>?");
     let target_name = std::env::var("TARGET_NAME")
         .expect("TARGET_NAME is not defined. Are you using task build-<target-name>?");
 
     // FIXME: all these fixed paths to arm-none-eabi are stupid
     cc::Build::new()
-        .define("STM32F405xx", None)
         .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include")
         .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include-fixed")
         .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/include")
         .include("c_src/")
         .include("c_src/STM32CubeF4/Drivers/CMSIS/Device/ST/STM32F4xx/Include")
         .include("c_src/STM32CubeF4/Drivers/CMSIS/Include")
-        .include(format!("c_src/hardware_conf/{}", target_name))
+        .include(format!("c_src/hardware_conf/{}_{}", target_port, target_name))
         // MESC sources
         .include("c_src/MESC_Common/Inc")
         .file("c_src/MESC_Common/Src/MESChfi.c")
@@ -44,11 +45,10 @@ fn main() {
         .clang_arg("-I/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/include")
         .clang_arg("-I./c_src/")
         .clang_arg("-I./c_src/MESC_Common/Inc")
-        .clang_arg(format!("-I./c_src/hardware_conf/{}", target_name))
+        .clang_arg(format!("-I./c_src/hardware_conf/{}_{}", target_port, target_name))
         .clang_arg("-I./c_src/STM32CubeF4/Drivers/CMSIS/Device/ST/STM32F4xx/Include")
         .clang_arg("-I./c_src/STM32CubeF4/Drivers/CMSIS/Include")
-        .clang_arg("-DSTM32F405xx")
-        .header("c_src/hal_types.h")
+        .header(format!("c_src/hardware_conf/{}_{}/hal_types.h", target_port, target_name))
         .header("c_src/mesc_wrap.h")
         .use_core()
         .derive_default(true)

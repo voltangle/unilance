@@ -2,10 +2,9 @@ version: '3'
 
 tasks:
   all_targets: task --list-all | grep --color=never build
-  # FIXME: add ability to add custom cargo attributes at the end
   build_stm32f4_begode_etmax:
     desc: "(STM32F405RG) Begode ET Max"
     cmds:
       # Yes, this is not ideal in terms of not being automatic. But consider this, the
       # build script in the mesc crate becomes much more compact and simple :)
-      - TARGET_NAME=stm32f4_begode_etmax cargo build -p port_stm32f4 --features board_begode_etmax --target thumbv7em-none-eabi 
+      - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo build -p port_stm32f4 --features board_begode_etmax --target thumbv7em-none-eabi {{.CLI_ARGS}}
