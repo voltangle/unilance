@@ -1,6 +1,6 @@
 [package]
 edition = "2024"
-name = "port_stm32f40x"
+name = "port_stm32f4"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
 publish = false
@@ -9,7 +9,7 @@ publish = false
 unilance_mesc = { path = "../mesc" }
 unilance_core = { path = "../core" }
 
-embassy-stm32 = { version = "0.5.0", features = ["defmt", "stm32f405rg", "unstable-pac", "memory-x", "time-driver-tim4", "exti", "chrono"] }
+embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac", "memory-x", "time-driver-tim4", "exti", "chrono"] }
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
 embassy-executor = { version = "0.9.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
 embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
@@ -34,7 +34,7 @@ static_cell = "2"
 chrono = { version = "^0.4", default-features = false}
 
 [features]
-board_bg_etmax = []
+board_begode_etmax = ["unilance_mesc/stm32f4_begode_etmax", "embassy-stm32/stm32f405rg"]
 
 [build-dependencies]
 bindgen = "0.72.0"

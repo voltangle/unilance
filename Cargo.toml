@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["mesc", "core", "port_stm32f40x"]
+members = ["mesc", "core", "port_stm32f4"]
 
 [profile.release]
 debug = 2

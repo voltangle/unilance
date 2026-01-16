@@ -5,7 +5,7 @@ use core::{
 use embassy_time::Duration;
 use unilance_mesc::c_bind::{
     HAL_StatusTypeDef, HAL_StatusTypeDef_HAL_ERROR, HAL_StatusTypeDef_HAL_OK,
-    TIM_HandleTypeDef,
+    HAL_TIM_StateTypeDef_HAL_TIM_STATE_BUSY, TIM_HandleTypeDef,
 };
 
 // Set from main
@@ -23,6 +23,7 @@ pub extern "C" fn HAL_RCC_GetHCLKFreq() -> u32 {
     HCLK_HZ.load(Ordering::Relaxed)
 }
 
+// TODO: Verify that this function doesn't interfere with Embassy
 #[unsafe(no_mangle)]
 pub extern "C" fn HAL_TIM_Base_Start(htim: *mut TIM_HandleTypeDef) -> HAL_StatusTypeDef {
     if htim.is_null() {
@@ -30,6 +31,8 @@ pub extern "C" fn HAL_TIM_Base_Start(htim: *mut TIM_HandleTypeDef) -> HAL_Status
     }
 
     unsafe {
+        (*htim).State = HAL_TIM_StateTypeDef_HAL_TIM_STATE_BUSY;
+
         let tim = (*htim).Instance;
         if tim.is_null() {
             return HAL_StatusTypeDef_HAL_ERROR;

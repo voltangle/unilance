@@ -8,7 +8,7 @@
 #ifndef INC_STM32FXXX_HAL_H_
 #define INC_STM32FXXX_HAL_H_
 
-#include "../../hal_types.h"
+#include "hal_types.h"
 #include "MESC_F405.h"
 // TODO: move all the 405 specific defines (STM32F405xx) into this from:
 // MESCfoc.c

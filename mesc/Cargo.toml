@@ -10,10 +10,7 @@ embedded-hal = "1.0.0"
 
 [build-dependencies]
 bindgen = "0.72.1"
-cc = "1.2.52"
+cc = { version = "1.2.52", features = ["parallel"] }
 
 [features]
-# "Targets"
-board_bg_etmax = []
-
-# Features for "targets"
+stm32f4_begode_etmax = []

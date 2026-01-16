@@ -2,6 +2,8 @@ version: '3'
 
 tasks:
   # FIXME: add ability to add custom cargo attributes at the end
-  build-bg-etmax:
+  build_stm32f4_begode_etmax:
     cmds:
-      - cargo build -p port_stm32f40x --target thumbv7em-none-eabi --features board_bg_etmax
+      # Yes, this is not ideal in terms of not being automatic. But consider this, the
+      # build script in the mesc crate becomes much more compact and simple :)
+      - TARGET_NAME=stm32f4_begode_etmax cargo build -p port_stm32f4 --features board_begode_etmax --target thumbv7em-none-eabi 
