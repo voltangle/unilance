@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["mesc", "core", "port_stm32f4"]
+members = ["mesc", "core", "port_stm32f4", "proto"]
 
 [profile.release]
 # lto = true

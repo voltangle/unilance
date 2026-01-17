@@ -3,6 +3,7 @@
 
 MEMORY
 {
+/* FIXME: when the bootloader is implemented, adjust this one so it matches its layout */
   FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 1024K
 
   /* Main SRAM */

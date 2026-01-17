@@ -2,7 +2,7 @@
 #![no_main]
 
 mod bsp;
-mod sthal_embassy;
+mod sthal;
 
 use core::sync::atomic::Ordering;
 
@@ -26,7 +26,7 @@ async fn main(_spawner: Spawner) -> ! {
     configure_mesc();
 
     let clocks = embassy_stm32::rcc::clocks(&p.RCC);
-    sthal_embassy::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
+    sthal::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
 
     loop {
         info!("Hello World!");
