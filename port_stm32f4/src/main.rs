@@ -2,36 +2,71 @@
 #![no_main]
 
 mod bsp;
+mod role;
 mod sthal;
 
-use core::sync::atomic::Ordering;
-
-use embassy_stm32::Peripherals;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_stm32::Config;
+use embassy_stm32::Peripherals;
 use embassy_time::Timer;
-use mesc::set_motor;
 use mesc::MESC_motor_typedef;
-use mesc::hw_setup_s;
 use mesc::TIM_HandleTypeDef;
 use mesc::TIM_TypeDef;
+use mesc::hw_setup_s;
+use mesc::set_motor;
+#[cfg(any(feature = "role_control", feature = "role_supervisor"))]
+use crate::role::{CanBusCoreLink, MemChannelCoreLink, CoreChannel};
+#[cfg(all(feature = "role_control", feature = "role_supervisor"))]
+use embassy_sync::channel::Channel;
+
 use {defmt_rtt as _, panic_probe as _};
+
+static CTRL_TO_SUPV_CHANNEL: CoreChannel = Channel::new();
+static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {
     let config = Config::default();
     let p = embassy_stm32::init(config);
 
-    configure_mesc();
+    let supervisor_core_link = make_core_link(true);
+    let control_core_link = make_core_link(false);
 
-    let clocks = embassy_stm32::rcc::clocks(&p.RCC);
-    sthal::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
+    /*
+     * Supervisor init
+     */
 
-    loop {
-        info!("Hello World!");
-        Timer::after_secs(1).await;
+    role::supervisor::init_periph(&p);
+    role::supervisor::start(&supervisor_core_link);
+
+    /*
+     * Control init
+     */
+
+    role::control::init_periph(&p);
+    role::control::start(&control_core_link);
+
+    // Park indefinitely, so all other tasks can just, uhh, run
+    core::future::pending::<()>().await;
+    unreachable!();
+}
+
+#[cfg(all(feature = "role_control", feature = "role_supervisor"))]
+fn make_core_link(is_for_supervisor: bool) -> MemChannelCoreLink<'static> {
+    if is_for_supervisor {
+        MemChannelCoreLink::new(&SUPV_TO_CTRL_CHANNEL, &CTRL_TO_SUPV_CHANNEL)
+    } else {
+        MemChannelCoreLink::new(&CTRL_TO_SUPV_CHANNEL, &SUPV_TO_CTRL_CHANNEL)
     }
+}
+
+#[cfg(all(
+    any(feature = "role_control", feature = "role_supervisor"),
+    not(all(feature = "role_control", feature = "role_supervisor"))
+))]
+fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
+    unimplemented!()
 }
 
 /// Can only be called ONCE at firmware init

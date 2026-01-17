@@ -1,6 +1,6 @@
 [package]
 edition = "2024"
-name = "unilance_core"
+name = "core_control"
 version = "0.1.0"
 
 [dependencies]

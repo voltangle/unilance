@@ -8,5 +8,5 @@ tasks:
       # Yes, this is not ideal in terms of not being automatic. But consider this, the
       # build script in the mesc crate becomes much more compact and simple :)
       - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo build -p port_stm32f4
-        --features "board_begode_etmax role_control role_supervisor"
+        --no-default-features --features board_begode_etmax
         --target thumbv7em-none-eabi {{.CLI_ARGS}}

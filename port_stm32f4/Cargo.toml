@@ -7,7 +7,9 @@ publish = false
 
 [dependencies]
 mesc = { path = "../mesc" }
-unilance_core = { path = "../core" }
+proto = { path = "../proto" }
+core_control = { path = "../core_control", optional = true }
+core_supervisor = { path = "../core_supervisor", optional = true }
 
 embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac", "memory-x", "time-driver-tim4", "exti", "chrono"] }
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
@@ -34,15 +36,21 @@ static_cell = "2"
 chrono = { version = "^0.4", default-features = false}
 
 [features]
+default = ["role_control", "role_supervisor"]
 # Roles
 role_control = []
 role_supervisor = []
 
 # BSP definitions
 board_begode_etmax = [
+    "role_supervisor",
+    "role_control",
+    "dep:core_control",
+    "dep:core_supervisor",
     "mesc/stm32f4_begode_etmax",
-    "unilance_core/stm32f4_begode_etmax",
-    "embassy-stm32/stm32f405rg"
+    "core_control/stm32f4_begode_etmax",
+    "core_supervisor/stm32f4_begode_etmax",
+    "embassy-stm32/stm32f405rg",
 ]
 
 [build-dependencies]

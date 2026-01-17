@@ -1,7 +1,6 @@
 use embassy_stm32::Peripherals;
-use embassy_stm32::timer::AdvancedInstance4Channel;
-use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
+use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use mesc::MESC_motor_typedef;
 use mesc::hw_setup_s;
 

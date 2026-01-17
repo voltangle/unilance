@@ -1,0 +1,10 @@
+[package]
+edition = "2024"
+name = "core_supervisor"
+version = "0.1.0"
+
+[dependencies]
+mesc = { path = "../mesc" }
+
+[features]
+stm32f4_begode_etmax = []
