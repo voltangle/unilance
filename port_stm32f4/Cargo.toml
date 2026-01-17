@@ -34,7 +34,11 @@ static_cell = "2"
 chrono = { version = "^0.4", default-features = false}
 
 [features]
-board_begode_etmax = ["mesc/stm32f4_begode_etmax", "embassy-stm32/stm32f405rg"]
+board_begode_etmax = [
+    "mesc/stm32f4_begode_etmax",
+    "unilance_core/stm32f4_begode_etmax",
+    "embassy-stm32/stm32f405rg"
+]
 
 [build-dependencies]
 bindgen = "0.72.0"

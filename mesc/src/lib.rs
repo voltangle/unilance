@@ -5,3 +5,13 @@
 #![allow(dead_code)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+pub fn set_motor(motor: MESC_motor_typedef) {
+    unsafe { mtr[0] = motor; }
+}
+
+pub fn get_motor() -> &'static mut MESC_motor_typedef {
+    unsafe {
+        &mut mtr[0]
+    }
+}

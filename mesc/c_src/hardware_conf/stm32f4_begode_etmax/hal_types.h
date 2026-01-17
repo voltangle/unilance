@@ -6,9 +6,7 @@
 #include "stm32f405xx.h"
 #include "core_cm4.h"
 
-#ifndef HAL_TYPES_H
-#define HAL_TYPES_H
-
+#pragma once
 
 /* ########################################
  * ST HAL stm32f4xx.h
@@ -429,10 +427,7 @@ typedef struct {
  * ########################################
  */
 
-// FIXME: These are not implemented in Rust yet.
-
 void HAL_Delay(volatile uint32_t Delay);
 uint32_t HAL_RCC_GetHCLKFreq(void);
 HAL_StatusTypeDef HAL_TIM_Base_Start(TIM_HandleTypeDef *htim);
 
-#endif // HAL_TYPES_H

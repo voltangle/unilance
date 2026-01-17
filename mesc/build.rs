@@ -17,6 +17,7 @@ fn main() {
         .include("c_src/")
         .include("c_src/STM32CubeF4/Drivers/CMSIS/Device/ST/STM32F4xx/Include")
         .include("c_src/STM32CubeF4/Drivers/CMSIS/Include")
+        .include("c_src/hardware_conf")
         .include(format!("c_src/hardware_conf/{}_{}", target_port, target_name))
         // MESC sources
         .include("c_src/MESC_Common/Inc")
@@ -32,7 +33,6 @@ fn main() {
         .file("c_src/MESC_Common/Src/MESCerror.c")
         .file("c_src/MESC_Common/Src/MESCtemp.c")
         .file("c_src/MESC_Common/Src/MESCmeasure.c")
-        .file("c_src/MESC_Common/Src/MESCinput.c")
         .flag("-Wno-unused-parameter")
         .compile("MESC");
 
@@ -47,6 +47,7 @@ fn main() {
         .clang_arg(format!("-I./c_src/hardware_conf/{}_{}", target_port, target_name))
         .clang_arg("-I./c_src/STM32CubeF4/Drivers/CMSIS/Device/ST/STM32F4xx/Include")
         .clang_arg("-I./c_src/STM32CubeF4/Drivers/CMSIS/Include")
+        .clang_arg("-I./c_src/hardware_conf")
         .header(format!("c_src/hardware_conf/{}_{}/hal_types.h", target_port, target_name))
         .header("c_src/mesc_wrap.h")
         .use_core()

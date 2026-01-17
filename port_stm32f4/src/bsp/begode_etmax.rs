@@ -1,8 +1,13 @@
 use embassy_stm32::Peripherals;
 use embassy_stm32::timer::AdvancedInstance4Channel;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
+use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use mesc::MESC_motor_typedef;
 use mesc::hw_setup_s;
+
+// Peripheral table
+pub const MOTOR_TIM: TimAdv = embassy_stm32::pac::TIM8;
+pub const MESC_SLOW_LOOP_TIM: TimGp16 = embassy_stm32::pac::TIM3;
 
 // NOTE: ideally this default init should be in the mesc crate
 #[unsafe(export_name = "g_hw_setup")]

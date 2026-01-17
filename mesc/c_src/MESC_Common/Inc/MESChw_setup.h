@@ -90,8 +90,6 @@ typedef struct {
   float measure_voltage;
 } motor_s;
 
-extern motor_s motor;
-
 /*
 Hardware-specific implementation
 
