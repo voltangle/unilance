@@ -45,6 +45,11 @@ configurations of the same port for different target hardware. Each BSP has:
 ## Current tasks
 
 - [x] Figure out ports for different MCUs and boards
+- [x] Implement support for both single and dual MCU boards
 - [ ] Make MESC work (no linker errors, all functions (at least theoretically) properly start)
+- [ ] Balance loop (at least preliminary)
+    - [x] PI2D (Progressive + Integral + Double (sided) Derivative)
+    - [ ] Tiltback algorithm
+    - [ ] Ride Assist
 - [ ] Implement some kind of bootloader with embassy_boot
 - [ ] Properly do the ET Max config

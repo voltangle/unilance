@@ -17,14 +17,14 @@ pub type CoreChannel = Channel<CriticalSectionRawMutex, CoreLinkMessage, 8>;
 pub struct CanBusCoreLink;
 pub struct MemChannelCoreLink<'a> {
     send_channel: &'a CoreChannel,
-    recv_channel: &'a CoreChannel
+    recv_channel: &'a CoreChannel,
 }
 
 // TODO: Make CAN bus impl work
 
 impl CanBusCoreLink {
     pub fn new() -> Self {
-        CanBusCoreLink { }
+        CanBusCoreLink {}
     }
 }
 
@@ -42,7 +42,7 @@ impl<'a> MemChannelCoreLink<'a> {
     pub fn new(send: &'a CoreChannel, recv: &'a CoreChannel) -> Self {
         MemChannelCoreLink {
             send_channel: &send,
-            recv_channel: &recv
+            recv_channel: &recv,
         }
     }
 }

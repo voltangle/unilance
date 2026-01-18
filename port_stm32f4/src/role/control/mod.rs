@@ -1,3 +1,6 @@
+#[cfg(feature = "role_control")]
+pub(crate) mod isr;
+#[cfg(feature = "role_control")]
 pub(crate) mod real;
 pub(crate) mod stub;
 

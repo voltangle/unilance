@@ -5,20 +5,20 @@ mod bsp;
 mod role;
 mod sthal;
 
+#[cfg(any(feature = "role_control", feature = "role_supervisor"))]
+use crate::role::{CanBusCoreLink, CoreChannel, MemChannelCoreLink};
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_stm32::Config;
 use embassy_stm32::Peripherals;
+#[cfg(all(feature = "role_control", feature = "role_supervisor"))]
+use embassy_sync::channel::Channel;
 use embassy_time::Timer;
 use mesc::MESC_motor_typedef;
 use mesc::TIM_HandleTypeDef;
 use mesc::TIM_TypeDef;
 use mesc::hw_setup_s;
 use mesc::set_motor;
-#[cfg(any(feature = "role_control", feature = "role_supervisor"))]
-use crate::role::{CanBusCoreLink, MemChannelCoreLink, CoreChannel};
-#[cfg(all(feature = "role_control", feature = "role_supervisor"))]
-use embassy_sync::channel::Channel;
 
 use {defmt_rtt as _, panic_probe as _};
 

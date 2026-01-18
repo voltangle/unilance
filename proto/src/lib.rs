@@ -6,7 +6,7 @@ use core::error::Error;
 
 #[derive(Debug, Copy, Clone)]
 pub enum CoreLinkMessage {
-    Heartbeat
+    Heartbeat,
 }
 
 /// Link between two core modules, control and supervisor
