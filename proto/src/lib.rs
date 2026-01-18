@@ -1,9 +1,5 @@
 #![no_std]
 
-use core::error::Error;
-
-// TODO: Add shit
-
 #[derive(Debug, Copy, Clone)]
 pub enum CoreLinkMessage {
     Heartbeat,

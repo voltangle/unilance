@@ -1,41 +1,41 @@
 mod algo;
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct BalanceState {
     pub config: BalanceConfig,
-    dt_secs: f32,
+    pub(crate) dt_sec: f32,
 
-    /*
-     * PID stuff
-     */
-    setpoint: f32,
-    integral_accum: f32,
+    pub(crate) setpoint: f32,
+    pub(crate) pid_integral_accum: f32,
 
-    /*
-     * Ride Assist
-     */
-    pub(crate) rideassist_prev_state: RideAssistState,
-    pub(crate) rideassist_state: RideAssistState,
-    pub(crate) rideassist_accel_hysteresis_state: HysteresisState,
+    pub(crate) rideassist: RideAssistState,
 }
 
-/// Which hysteresis threshold is considered active
-#[derive(Default, Debug, Clone, Copy)]
-enum HysteresisState {
-    #[default]
-    Upper,
-    Lower,
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub(crate) struct RideAssistState {
+    pub(crate) prev_state: RideAssistCoreState,
+    pub(crate) state: RideAssistCoreState,
+    pub(crate) accel_state: RideAssistAccelerationState,
+    /// When transitioning states, this serves as the "starting point" for interpolation.
+    pub(crate) state_transition_start_setpoint: f32,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-enum RideAssistState {
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub(crate) enum RideAssistCoreState {
     Acceleration,
     #[default]
     Idle,
     Braking,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub(crate) enum RideAssistAccelerationState {
+    #[default]
+    Slight,
+    Hard,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct BalanceConfig {
     pub kp: u16,
     pub kp_expo: f32,
@@ -62,19 +62,19 @@ pub struct BalanceConfig {
     pub out_max: u16,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct RideAssistConfig {
     /// If disabled, Ride Assist calculations will be skipped in iterate().
     pub enable: bool,
-    /// What's the differentiation point between "slight" and "hard" acceleration.
-    pub(crate) acceleration_power_threshold: f32,
-    /// Threshold at which it transitions states to and from acceleration.
-    pub(crate) acceleration_state_threshold: f32,
-    /// Threshold at which it transitions states to and from braking.
+    /// What's the differentiation point between "slight" and "hard" acceleration. m/s^2
+    pub(crate) accel_power_threshold: f32,
+    /// Threshold at which it transitions states to and from acceleration. m/s^2
+    pub(crate) accel_state_threshold: f32,
+    /// Threshold at which it transitions states to and from braking. m/s^2
     pub(crate) braking_state_threshold: f32,
     /// Thresholds are nice, but being right on them is not. This hysteresis applies
-    /// to both state thresholds by adding and subtracting it from the threshold.
-    /// For example if hysteresis is 5 and threshold is 15, upper and lower thresholds
+    /// to all state thresholds by adding and subtracting it from the threshold.
+    /// For example, if hysteresis is 5 and threshold is 15, upper and lower thresholds
     /// will now be 10 and 20.
     pub(crate) state_hysteresis: u8,
 }

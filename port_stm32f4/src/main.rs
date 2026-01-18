@@ -68,10 +68,9 @@ fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
 fn configure_mesc() {
     let mut mtimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
     let mut stimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
-    unsafe {
-        mtimer.Instance = bsp::MOTOR_TIM.as_ptr() as *mut TIM_TypeDef;
-        stimer.Instance = bsp::MESC_SLOW_LOOP_TIM.as_ptr() as *mut TIM_TypeDef;
-    }
+
+    mtimer.Instance = bsp::MOTOR_TIM.as_ptr() as *mut TIM_TypeDef;
+    stimer.Instance = bsp::MESC_SLOW_LOOP_TIM.as_ptr() as *mut TIM_TypeDef;
 
     let mut motor = MESC_motor_typedef::default();
     motor.mtimer = &mut mtimer;

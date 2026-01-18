@@ -1,3 +1,12 @@
+/// Processed IMU data.
+///
+/// Pitch and roll are absolute positions in space, *_rate ones are self-explanatory,
+/// and *_accel are acceleration values in different directions. These acceleration values
+/// are rotated in space to be always relative to the direction of gravity, e.g. not
+/// dependent on the current orientation of the vehicle. For example, even if the vehicle
+/// is tilted forward a lot, acceleration forward will always be on one axis, and not
+/// split between multiple. The X axis always denotes front/back acceleration, Y axis is
+/// left/right, and Z axis is up/down.
 pub struct IMUData {
     /// Radians
     pub pitch: f32,

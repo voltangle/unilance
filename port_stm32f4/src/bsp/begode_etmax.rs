@@ -30,12 +30,14 @@ pub unsafe fn init_1(_motor: &mut MESC_motor_typedef) {}
 
 pub unsafe fn init_2(_motor: &mut MESC_motor_typedef) {}
 
-pub unsafe fn init_3(_motor: &mut MESC_motor_typedef) { unsafe {
-    let _p = Peripherals::steal();
-    // let mut tim = ComplementaryPwm::new(p.TIM8);
+pub unsafe fn init_3(_motor: &mut MESC_motor_typedef) {
+    unsafe {
+        let _p = Peripherals::steal();
+        // let mut tim = ComplementaryPwm::new(p.TIM8);
 
-    // TODO: Implement
-}}
+        // TODO: Implement
+    }
+}
 
 pub unsafe fn hw_init(_motor: &mut MESC_motor_typedef) {
     // TODO: Implement

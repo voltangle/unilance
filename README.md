@@ -42,7 +42,7 @@ configurations of the same port for different target hardware. Each BSP has:
 - Its own module in `src/bsp` of its port, named `<bsp_name>.rs` if a single file or just
 `<bsp_name>` if it's a folder.
 
-## Current tasks
+## Tasks
 
 - [x] Figure out ports for different MCUs and boards
 - [x] Implement support for both single and dual MCU boards
@@ -53,3 +53,8 @@ configurations of the same port for different target hardware. Each BSP has:
     - [ ] Ride Assist
 - [ ] Implement some kind of bootloader with embassy_boot
 - [ ] Properly do the ET Max config
+- [ ] Testing
+    - [ ] Basic unit testing
+    - [ ] Performance testing
+        - [ ] On real hardware
+        - [ ] On an emulator (Unicorn)
