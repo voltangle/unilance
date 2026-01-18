@@ -26,17 +26,17 @@ pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
     RawVoltLim: 0,
 };
 
-pub unsafe fn init_1(motor: &mut MESC_motor_typedef) {}
+pub unsafe fn init_1(_motor: &mut MESC_motor_typedef) {}
 
-pub unsafe fn init_2(motor: &mut MESC_motor_typedef) {}
+pub unsafe fn init_2(_motor: &mut MESC_motor_typedef) {}
 
-pub unsafe fn init_3(motor: &mut MESC_motor_typedef) {
-    let mut p = Peripherals::steal();
+pub unsafe fn init_3(_motor: &mut MESC_motor_typedef) { unsafe {
+    let _p = Peripherals::steal();
     // let mut tim = ComplementaryPwm::new(p.TIM8);
 
     // TODO: Implement
-}
+}}
 
-pub unsafe fn hw_init(motor: &mut MESC_motor_typedef) {
+pub unsafe fn hw_init(_motor: &mut MESC_motor_typedef) {
     // TODO: Implement
 }

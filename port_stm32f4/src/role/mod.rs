@@ -33,7 +33,7 @@ impl CoreLink for CanBusCoreLink {
         unimplemented!()
     }
 
-    async fn core_send(&mut self, msg: &CoreLinkMessage) {
+    async fn core_send(&mut self, _msg: &CoreLinkMessage) {
         unimplemented!()
     }
 }

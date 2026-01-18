@@ -10,3 +10,11 @@ tasks:
       - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo build -p port_stm32f4
         --no-default-features --features board_begode_etmax
         --target thumbv7em-none-eabi {{.CLI_ARGS}}
+  fix_stm32f4_begode_etmax:
+    desc: "cargo fix for the stm32f4_begode_etmax target"
+    cmds:
+      # Yes, this is not ideal in terms of not being automatic. But consider this, the
+      # build script in the mesc crate becomes much more compact and simple :)
+      - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo fix -p port_stm32f4
+        --no-default-features --features board_begode_etmax
+        --target thumbv7em-none-eabi {{.CLI_ARGS}}

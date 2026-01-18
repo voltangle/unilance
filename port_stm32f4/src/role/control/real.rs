@@ -1,6 +1,6 @@
 use crate::sthal;
 use core::sync::atomic::Ordering;
-use embassy_stm32::{Peripherals, rcc};
+use embassy_stm32::Peripherals;
 use proto::CoreLink;
 
 pub fn init_periph(p: &Peripherals) {
@@ -10,4 +10,4 @@ pub fn init_periph(p: &Peripherals) {
 
 /// Start all supervisor stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
-pub fn start<T: CoreLink>(link: &T) {}
+pub fn start<T: CoreLink>(_link: &T) {}
