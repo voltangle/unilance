@@ -96,9 +96,7 @@ impl BalanceState {
         // And now actually execute the iteration
         match self.rideassist.state {
             RideAssistCoreState::Acceleration => todo!(),
-            RideAssistCoreState::Idle => {
-
-            },
+            RideAssistCoreState::Idle => todo!(),
             RideAssistCoreState::Braking => todo!(),
         }
     }

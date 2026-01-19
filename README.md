@@ -49,12 +49,10 @@ configurations of the same port for different target hardware. Each BSP has:
 - [ ] Make MESC work (no linker errors, all functions (at least theoretically) properly start)
 - [ ] Balance loop (at least preliminary)
     - [x] PI2D (Progressive + Integral + Double (sided) Derivative)
+    - [ ] PI2D endstops
     - [ ] Tiltback algorithm
     - [ ] Ride Assist
 - [ ] Implement some kind of bootloader with embassy_boot
 - [ ] Properly do the ET Max config
+- [ ] CPU usage - total percentage and per-task/ISR breakdown
 - [ ] Testing
-    - [ ] Basic unit testing
-    - [ ] Performance testing
-        - [ ] On real hardware
-        - [ ] On an emulator (Unicorn)

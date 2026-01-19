@@ -1,8 +1,15 @@
-use embassy_stm32::Peripherals;
+use embassy_stm32::{Config, Peripherals};
+use embassy_stm32::rcc::{Hse, HseMode};
+use embassy_stm32::time::Hertz;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use mesc::MESC_motor_typedef;
 use mesc::hw_setup_s;
+use super::PlatformConfig;
+
+/*
+ * MESC configuration
+ */
 
 // Peripheral table
 pub const MOTOR_TIM: TimAdv = embassy_stm32::pac::TIM8;
@@ -40,5 +47,39 @@ pub unsafe fn init_3(_motor: &mut MESC_motor_typedef) {
 }
 
 pub unsafe fn hw_init(_motor: &mut MESC_motor_typedef) {
-    // TODO: Implement
+    unimplemented!()
 }
+
+/*
+ * Clock configurations
+ */
+
+// NOTE: No idea if it actually makes sense to do an extension trait, but shit, it looks
+// nice when used
+
+impl PlatformConfig for Config {
+    fn for_control() -> Self {
+        todo!()
+    }
+
+    fn for_supervisor() -> Self {
+        todo!()
+    }
+
+    fn for_combined() -> Self {
+        let mut config = Config::default();
+
+        config.rcc.hsi = false;
+        config.rcc.hse = Some(Hse {
+            freq: Hertz::mhz(8),
+            mode: HseMode::Bypass
+        });
+        config
+    }
+}
+
+/*
+ * Interrupts
+ */
+
+

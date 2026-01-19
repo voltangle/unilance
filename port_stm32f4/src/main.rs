@@ -2,12 +2,16 @@
 #![no_main]
 
 mod bsp;
-mod role;
+mod roles;
 mod sthal;
 
+use crate::roles::RoleConfig;
 #[cfg(any(feature = "role_control", feature = "role_supervisor"))]
-use crate::role::{CoreChannel, MemChannelCoreLink};
+use crate::roles::{CoreChannel, MemChannelCoreLink};
 use embassy_executor::Spawner;
+use embassy_stm32::rcc::Hse;
+use embassy_stm32::rcc::HseMode;
+use embassy_stm32::time::Hertz;
 use embassy_stm32::Config;
 #[cfg(all(feature = "role_control", feature = "role_supervisor"))]
 use embassy_sync::channel::Channel;
@@ -22,8 +26,7 @@ static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {
-    let config = Config::default();
-    let p = embassy_stm32::init(config);
+    let p = embassy_stm32::init(Config::for_current_role());
 
     let supervisor_core_link = make_core_link(true);
     let control_core_link = make_core_link(false);
@@ -32,15 +35,15 @@ async fn main(_spawner: Spawner) -> ! {
      * Supervisor init
      */
 
-    role::supervisor::init_periph(&p);
-    role::supervisor::start(&supervisor_core_link);
+    roles::supervisor::init_periph(&p);
+    roles::supervisor::start(&supervisor_core_link);
 
     /*
      * Control init
      */
 
-    role::control::init_periph(&p);
-    role::control::start(&control_core_link);
+    roles::control::init_periph(&p);
+    roles::control::start(&control_core_link);
 
     // Park indefinitely, so all other tasks can just, uhh, run
     core::future::pending::<()>().await;

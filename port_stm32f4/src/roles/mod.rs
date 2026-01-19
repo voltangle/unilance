@@ -9,8 +9,11 @@ pub mod supervisor;
 
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
+use embassy_stm32::Config;
 use proto::CoreLink;
 use proto::CoreLinkMessage;
+use crate::bsp::PlatformConfig;
+use proc_macros::for_role;
 
 pub type CoreChannel = Channel<CriticalSectionRawMutex, CoreLinkMessage, 8>;
 
@@ -54,5 +57,30 @@ impl CoreLink for MemChannelCoreLink<'_> {
 
     async fn core_recv(&mut self) -> CoreLinkMessage {
         self.recv_channel.receive().await
+    }
+}
+
+pub trait RoleConfig {
+    fn for_current_role() -> Self;
+}
+
+#[for_role("control")]
+impl RoleConfig for Config {
+    fn for_current_role() -> Self {
+        Config::for_control()
+    }
+}
+
+#[for_role("supervisor")]
+impl RoleConfig for Config {
+    fn for_current_role() -> Self {
+        Config::for_supervisor()
+    }
+}
+
+#[for_role("combined")]
+impl RoleConfig for Config {
+    fn for_current_role() -> Self {
+        Config::for_combined()
     }
 }

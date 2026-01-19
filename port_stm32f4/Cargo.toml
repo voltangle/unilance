@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 mesc = { path = "../mesc" }
 proto = { path = "../proto" }
+proc_macros = { path = "../proc_macros" }
 core_control = { path = "../core_control", optional = true }
 core_supervisor = { path = "../core_supervisor", optional = true }
 
@@ -35,17 +36,18 @@ static_cell = "2"
 chrono = { version = "^0.4", default-features = false}
 
 [features]
-default = ["role_control", "role_supervisor"]
+# These only exist here for LSP ease-of-use. When building, ALWAYS use
+# --no-default-features, and ideally, just use pre-configured build commands in the
+# Taskfile.
+default = ["role_control", "role_supervisor", "embassy-stm32/stm32f405rg"]
 # Roles
-role_control = []
-role_supervisor = []
+role_control = ["dep:core_control"]
+role_supervisor = ["dep:core_supervisor"]
 
 # BSP definitions
 board_begode_etmax = [
     "role_supervisor",
     "role_control",
-    "dep:core_control",
-    "dep:core_supervisor",
     "mesc/stm32f4_begode_etmax",
     "core_control/stm32f4_begode_etmax",
     "core_supervisor/stm32f4_begode_etmax",
