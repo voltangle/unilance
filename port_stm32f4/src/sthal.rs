@@ -8,6 +8,15 @@ use mesc::{
     HAL_TIM_StateTypeDef_HAL_TIM_STATE_BUSY, TIM_HandleTypeDef,
 };
 
+#[cfg(for_role("control"))]
+pub fn init() {
+    let clocks = embassy_stm32::rcc::clocks(&p.RCC);
+    HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
+}
+
+#[cfg(not(for_role("control")))]
+pub fn init() { }
+
 // Set from main
 pub static HCLK_HZ: AtomicU32 = AtomicU32::new(0);
 

@@ -3,9 +3,39 @@ use embassy_stm32::rcc::{Hse, HseMode};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
+use embassy_stm32::gpio;
+use embassy_stm32::interrupt;
 use mesc::MESC_motor_typedef;
 use mesc::hw_setup_s;
+use mesc::MESC_PWM_IRQ_handler;
 use super::PlatformConfig;
+use proc_macros::for_role;
+use embassy_sync::mutex::Mutex;
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use static_cell::StaticCell;
+
+// TODO: Figure out how to do "input methods". Some wheels will have controls like Begode,
+// where there is just a power button and a park button, some wheels will have something
+// like LeaperKim, with power + headlight + OK + next, etc etc. I have to figure out
+// how to make it all coexist
+
+pub const STARTUP_DELAY_MS: u64 = 1500;
+
+pub struct BspPeripherals<'a> {
+    poweron: gpio::Output<'a>,
+    power_button: gpio::Input<'a>,
+    park_button: gpio::Input<'a>,
+}
+
+// Gather all peripherals required for opereration and initialize anything that
+// needs to be initialized at this point. This function has to be called ONCE on boot.
+pub fn init<'a>(p: Peripherals) -> BspPeripherals<'a> {
+    BspPeripherals {
+        poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
+        power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
+        park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
+    }
+}
 
 /*
  * MESC configuration
@@ -58,15 +88,7 @@ pub unsafe fn hw_init(_motor: &mut MESC_motor_typedef) {
 // nice when used
 
 impl PlatformConfig for Config {
-    fn for_control() -> Self {
-        todo!()
-    }
-
-    fn for_supervisor() -> Self {
-        todo!()
-    }
-
-    fn for_combined() -> Self {
+    fn for_platform() -> Self {
         let mut config = Config::default();
 
         config.rcc.hsi = false;
@@ -82,4 +104,15 @@ impl PlatformConfig for Config {
  * Interrupts
  */
 
+#[interrupt]
+fn TIM8_UP_TIM13() {
+    unsafe {
+        MESC_PWM_IRQ_handler(mesc::get_motor());
+        // Clear update flag
+        MOTOR_TIM.sr().modify(|w| w.set_uif(false));
+    }
+}
 
+pub fn startup_successful(periph: &mut BspPeripherals) {
+    periph.poweron.set_high();
+}

@@ -60,27 +60,3 @@ impl CoreLink for MemChannelCoreLink<'_> {
     }
 }
 
-pub trait RoleConfig {
-    fn for_current_role() -> Self;
-}
-
-#[for_role("control")]
-impl RoleConfig for Config {
-    fn for_current_role() -> Self {
-        Config::for_control()
-    }
-}
-
-#[for_role("supervisor")]
-impl RoleConfig for Config {
-    fn for_current_role() -> Self {
-        Config::for_supervisor()
-    }
-}
-
-#[for_role("combined")]
-impl RoleConfig for Config {
-    fn for_current_role() -> Self {
-        Config::for_combined()
-    }
-}

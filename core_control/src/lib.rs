@@ -11,6 +11,6 @@ pub enum State {
     Disarmed,
     Armed,
     Running,
-    Fault,
+    CriticalFault,
     ShuttingDown,
 }

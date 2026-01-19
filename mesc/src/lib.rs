@@ -6,12 +6,14 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+#[inline(always)]
 pub fn set_motor(motor: MESC_motor_typedef) {
     unsafe {
         mtr[0] = motor;
     }
 }
 
+#[inline(always)]
 pub fn get_motor() -> &'static mut MESC_motor_typedef {
     unsafe { &mut mtr[0] }
 }

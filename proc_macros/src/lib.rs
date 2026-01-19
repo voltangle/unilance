@@ -44,7 +44,7 @@ pub fn for_role(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Prepend a #[cfg(...)] attribute to the item.
     let expanded = quote! {
-        #[cfg(#cfg_expr)]
+        #cfg_expr
         #item
     };
 
