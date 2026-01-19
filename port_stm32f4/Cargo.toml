@@ -14,14 +14,14 @@ core_supervisor = { path = "../core_supervisor", optional = true }
 
 embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac", "memory-x", "time-driver-tim4", "exti", "chrono"] }
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
-embassy-executor = { version = "0.9.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
 embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
 embassy-futures = "0.1.2"
 
 defmt = "1.0.1"
-defmt-rtt = "1.0.0"
+defmt-rtt = "1.1.0"
 
-cortex-m = { version = "0.7.6", features = ["inline-asm", "critical-section-single-core"] }
+cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
 cortex-m-rt = "0.7.5"
 embedded-hal = "1.0.0"
 embedded-hal-bus = { version = "0.3", features = ["async"] }

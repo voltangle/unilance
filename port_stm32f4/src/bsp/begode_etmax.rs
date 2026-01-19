@@ -1,17 +1,17 @@
-use embassy_stm32::{Config, Peripherals};
-use embassy_stm32::rcc::{Hse, HseMode};
-use embassy_stm32::time::Hertz;
-use embassy_stm32::pac::timer::{TimAdv, TimGp16};
-use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
+use super::PlatformConfig;
 use embassy_stm32::gpio;
 use embassy_stm32::interrupt;
+use embassy_stm32::pac::timer::{TimAdv, TimGp16};
+use embassy_stm32::rcc::{Hse, HseMode};
+use embassy_stm32::time::Hertz;
+use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
+use embassy_stm32::{Config, Peripherals};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::mutex::Mutex;
+use mesc::MESC_PWM_IRQ_handler;
 use mesc::MESC_motor_typedef;
 use mesc::hw_setup_s;
-use mesc::MESC_PWM_IRQ_handler;
-use super::PlatformConfig;
 use proc_macros::for_role;
-use embassy_sync::mutex::Mutex;
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use static_cell::StaticCell;
 
 // TODO: Figure out how to do "input methods". Some wheels will have controls like Begode,
@@ -94,7 +94,7 @@ impl PlatformConfig for Config {
         config.rcc.hsi = false;
         config.rcc.hse = Some(Hse {
             freq: Hertz::mhz(8),
-            mode: HseMode::Bypass
+            mode: HseMode::Bypass,
         });
         config
     }
@@ -112,6 +112,10 @@ fn TIM8_UP_TIM13() {
         MOTOR_TIM.sr().modify(|w| w.set_uif(false));
     }
 }
+
+/*
+ * Platform functions
+ */
 
 pub fn startup_successful(periph: &mut BspPeripherals) {
     periph.poweron.set_high();

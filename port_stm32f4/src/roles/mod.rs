@@ -7,13 +7,13 @@ pub mod supervisor;
 // NOTE: Ideally, at least the traits should NOT be part of the port, and be split off,
 // but I don't care enough to do that until a need for that will come
 
+use crate::bsp::PlatformConfig;
+use embassy_stm32::Config;
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
-use embassy_stm32::Config;
+use proc_macros::for_role;
 use proto::CoreLink;
 use proto::CoreLinkMessage;
-use crate::bsp::PlatformConfig;
-use proc_macros::for_role;
 
 pub type CoreChannel = Channel<CriticalSectionRawMutex, CoreLinkMessage, 8>;
 
@@ -59,4 +59,3 @@ impl CoreLink for MemChannelCoreLink<'_> {
         self.recv_channel.receive().await
     }
 }
-

@@ -51,12 +51,13 @@ impl BalanceState {
 
     /// Doesn't output anything, because its output is actually the internal setpoint.
     fn iterate_ride_assist(&mut self, pos_state: &IMUData, current_out: f32) {
-
         // Check for current state and if any changes are in order
         match self.rideassist.state {
             RideAssistCoreState::Acceleration => {
-                let threshold_idle = self.config.rideassist.accel_state_threshold - self.config.rideassist.state_hysteresis as f32;
-                let threshold_braking = self.config.rideassist.braking_state_threshold - self.config.rideassist.state_hysteresis as f32;
+                let threshold_idle = self.config.rideassist.accel_state_threshold
+                    - self.config.rideassist.state_hysteresis as f32;
+                let threshold_braking = self.config.rideassist.braking_state_threshold
+                    - self.config.rideassist.state_hysteresis as f32;
 
                 // Allow to skip idle and go directly to braking, although no idea if that
                 // will ever happen
@@ -65,7 +66,7 @@ impl BalanceState {
                 } else if pos_state.x_accel < threshold_idle {
                     self.rideassist_switch_states(RideAssistCoreState::Idle);
                 }
-            },
+            }
             RideAssistCoreState::Idle => {
                 let upper_threshold = self.config.rideassist.accel_state_threshold
                     + self.config.rideassist.state_hysteresis as f32;
@@ -80,8 +81,10 @@ impl BalanceState {
                 }
             }
             RideAssistCoreState::Braking => {
-                let threshold_idle = self.config.rideassist.braking_state_threshold + self.config.rideassist.state_hysteresis as f32;
-                let threshold_accel = self.config.rideassist.accel_state_threshold + self.config.rideassist.state_hysteresis as f32;
+                let threshold_idle = self.config.rideassist.braking_state_threshold
+                    + self.config.rideassist.state_hysteresis as f32;
+                let threshold_accel = self.config.rideassist.accel_state_threshold
+                    + self.config.rideassist.state_hysteresis as f32;
 
                 // Allow to skip idle and go directly to acceleration, although no idea if
                 // that will ever happen
@@ -90,7 +93,7 @@ impl BalanceState {
                 } else if pos_state.x_accel > threshold_idle {
                     self.rideassist_switch_states(RideAssistCoreState::Idle);
                 }
-            },
+            }
         }
 
         // And now actually execute the iteration

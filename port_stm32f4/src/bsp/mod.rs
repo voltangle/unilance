@@ -7,4 +7,3 @@ pub use begode_etmax::*;
 pub trait PlatformConfig {
     fn for_platform() -> Self;
 }
-

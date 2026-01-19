@@ -2,20 +2,17 @@ use core::{
     ptr,
     sync::atomic::{AtomicU32, Ordering},
 };
+use embassy_stm32::Peripherals;
 use embassy_time::Duration;
 use mesc::{
     HAL_StatusTypeDef, HAL_StatusTypeDef_HAL_ERROR, HAL_StatusTypeDef_HAL_OK,
     HAL_TIM_StateTypeDef_HAL_TIM_STATE_BUSY, TIM_HandleTypeDef,
 };
 
-#[cfg(for_role("control"))]
-pub fn init() {
+pub fn init(p: &Peripherals) {
     let clocks = embassy_stm32::rcc::clocks(&p.RCC);
     HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
 }
-
-#[cfg(not(for_role("control")))]
-pub fn init() { }
 
 // Set from main
 pub static HCLK_HZ: AtomicU32 = AtomicU32::new(0);

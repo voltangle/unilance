@@ -5,20 +5,21 @@ mod bsp;
 mod roles;
 mod sthal;
 
-#[cfg(any(feature = "role_control", feature = "role_supervisor"))]
+use crate::bsp::PlatformConfig;
+#[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
 use embassy_executor::Spawner;
+use embassy_stm32::Config;
 use embassy_stm32::rcc::Hse;
 use embassy_stm32::rcc::HseMode;
 use embassy_stm32::time::Hertz;
-use embassy_stm32::Config;
-#[cfg(all(feature = "role_control", feature = "role_supervisor"))]
+#[for_role("combined")]
 use embassy_sync::channel::Channel;
 use embassy_time::Timer;
 use mesc::MESC_motor_typedef;
 use mesc::TIM_HandleTypeDef;
 use mesc::TIM_TypeDef;
-use crate::bsp::PlatformConfig;
+use proc_macros::for_role;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -28,10 +29,10 @@ static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_stm32::init(Config::for_platform());
+    sthal::init(&p);
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
 
     let mut bsp_periph = bsp::init(p);
-    sthal::init();
 
     let supervisor_core_link = make_core_link(true);
     let control_core_link = make_core_link(false);
@@ -48,7 +49,7 @@ async fn main(_spawner: Spawner) -> ! {
     unreachable!();
 }
 
-#[cfg(all(feature = "role_control", feature = "role_supervisor"))]
+#[for_role("combined")]
 fn make_core_link(is_for_supervisor: bool) -> MemChannelCoreLink<'static> {
     if is_for_supervisor {
         MemChannelCoreLink::new(&SUPV_TO_CTRL_CHANNEL, &CTRL_TO_SUPV_CHANNEL)
@@ -57,10 +58,7 @@ fn make_core_link(is_for_supervisor: bool) -> MemChannelCoreLink<'static> {
     }
 }
 
-#[cfg(all(
-    any(feature = "role_control", feature = "role_supervisor"),
-    not(all(feature = "role_control", feature = "role_supervisor"))
-))]
+#[for_role("either")]
 fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
     unimplemented!()
 }
