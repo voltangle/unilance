@@ -2,6 +2,7 @@
 #![no_main]
 
 mod bsp;
+mod reg_flags;
 mod roles;
 mod sthal;
 
@@ -68,7 +69,7 @@ fn configure_mesc() {
     let mut mtimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
     let mut stimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
 
-    mtimer.Instance = bsp::MOTOR_TIM.as_ptr() as *mut TIM_TypeDef;
+    mtimer.Instance = bsp::MESC_MOTOR_TIM.as_ptr() as *mut TIM_TypeDef;
     stimer.Instance = bsp::MESC_SLOW_LOOP_TIM.as_ptr() as *mut TIM_TypeDef;
 
     let mut motor = MESC_motor_typedef::default();
@@ -76,34 +77,4 @@ fn configure_mesc() {
     motor.stimer = &mut stimer;
 
     mesc::set_motor(motor);
-}
-
-// MESC hooks
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mesc_init_1(motor: &mut MESC_motor_typedef) {
-    unsafe {
-        bsp::init_1(motor);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mesc_init_2(motor: &mut MESC_motor_typedef) {
-    unsafe {
-        bsp::init_2(motor);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn mesc_init_3(motor: &mut MESC_motor_typedef) {
-    unsafe {
-        bsp::init_3(motor);
-    }
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn hw_init(motor: &mut MESC_motor_typedef) {
-    unsafe {
-        bsp::hw_init(motor);
-    }
 }

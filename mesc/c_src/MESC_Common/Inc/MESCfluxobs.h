@@ -19,15 +19,17 @@
  *do NOT have the right to take sections of this code for other projects
  *without attribution and credit to the source. Specifically, if you copy into
  *copyleft licenced code without attribution and retention of the permissive BSD
- *3 clause licence, you grant a perpetual licence to do the same regarding turning sections of your code
- *permissive, and lose any rights to use of this code previously granted or assumed.
+ *3 clause licence, you grant a perpetual licence to do the same regarding turning
+ * sections of your code permissive, and lose any rights to use of this code previously
+ * granted or assumed.
  *
  *This code is intended to remain permissively licensed wherever it goes,
- *maintaining the freedom to distribute compiled binaries WITHOUT a requirement to supply source.
+ *maintaining the freedom to distribute compiled binaries WITHOUT a requirement to supply
+ * source.
  *
- *This is to ensure this code can at any point be used commercially, on products that may require
- *such restriction to meet regulatory requirements, or to avoid damage to hardware, or to ensure
- *warranties can reasonably be honoured.
+ *This is to ensure this code can at any point be used commercially, on products that may
+ * require such restriction to meet regulatory requirements, or to avoid damage to
+ * hardware, or to ensure warranties can reasonably be honoured.
  ******************************************************************************
  */
 
@@ -36,7 +38,7 @@
 
 #include "MESCfoc.h"
 
-void MESCfluxobs_run(MESC_motor_typedef *_motor);
-void MESCfluxobs_v2_run(MESC_motor_typedef *_motor);
+void MESCfluxobs_run(MESC_motor_typedef* _motor);
+void MESCfluxobs_v2_run(MESC_motor_typedef* _motor);
 
 #endif /* INC_MESCFLUXOBS_H_ */

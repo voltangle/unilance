@@ -10,8 +10,8 @@
 
 #include "MESCfoc.h"
 
-void MESClrobs_Run(MESC_motor_typedef *_motor);
-void MESClrobs_Collect(MESC_motor_typedef *_motor);
-void MESClrobs_Init(MESC_motor_typedef *_motor);
+void MESClrobs_Run(MESC_motor_typedef* _motor);
+void MESClrobs_Collect(MESC_motor_typedef* _motor);
+void MESClrobs_Init(MESC_motor_typedef* _motor);
 
 #endif /* INC_MESCLROBS_H_ */

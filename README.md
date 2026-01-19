@@ -47,12 +47,15 @@ configurations of the same port for different target hardware. Each BSP has:
 - [x] Figure out ports for different MCUs and boards
 - [x] Implement support for both single and dual MCU boards
 - [ ] Make MESC work (no linker errors, all functions (at least theoretically) properly start)
-- [ ] Balance loop (at least preliminary)
+- [ ] Balance algorithm (at least preliminary)
     - [x] PI2D (Progressive + Integral + Double (sided) Derivative)
     - [ ] PI2D endstops
     - [ ] Tiltback algorithm
+    - [ ] Angle cut out
     - [ ] Ride Assist
 - [ ] Implement some kind of bootloader with embassy_boot
 - [ ] Properly do the ET Max config
 - [ ] CPU usage - total percentage and per-task/ISR breakdown
+- [ ] Make MESC NOT use direct register access (or be dependent on hardware at all), and
+make it use functions defined in Rust instead
 - [ ] Testing

@@ -31,4 +31,3 @@ motor_error_type_e MotorError;
 motor_direction_e MotorDirection;
 motor_control_type_e MotorControlType;
 test_mode_e TestMode;
-

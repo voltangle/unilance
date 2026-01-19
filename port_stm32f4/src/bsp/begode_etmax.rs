@@ -2,17 +2,28 @@ use super::PlatformConfig;
 use embassy_stm32::gpio;
 use embassy_stm32::interrupt;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
+use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
 use embassy_stm32::rcc::{Hse, HseMode};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::{Config, Peripherals};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
+use mesc::MESC_ADC_IRQ_handler;
 use mesc::MESC_PWM_IRQ_handler;
 use mesc::MESC_motor_typedef;
 use mesc::hw_setup_s;
 use proc_macros::for_role;
 use static_cell::StaticCell;
+
+/*
+ * MESC OWNED PERIPHERALS:
+ * - TIM8
+ * - PB6, PB7, PB8
+ * - ADC1, ADC2, ADC3
+ * These are NOT to be interacted with from Embassy, IT WILL ALMOST DEFINITELY RESULT
+ * IN THE WHEEL MAKING EXPENSIVE SOUNDS
+ */
 
 // TODO: Figure out how to do "input methods". Some wheels will have controls like Begode,
 // where there is just a power button and a park button, some wheels will have something
@@ -42,7 +53,7 @@ pub fn init<'a>(p: Peripherals) -> BspPeripherals<'a> {
  */
 
 // Peripheral table
-pub const MOTOR_TIM: TimAdv = embassy_stm32::pac::TIM8;
+pub const MESC_MOTOR_TIM: TimAdv = embassy_stm32::pac::TIM8;
 pub const MESC_SLOW_LOOP_TIM: TimGp16 = embassy_stm32::pac::TIM3;
 
 // NOTE: ideally this default init should be in the mesc crate
@@ -63,11 +74,11 @@ pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
     RawVoltLim: 0,
 };
 
-pub unsafe fn init_1(_motor: &mut MESC_motor_typedef) {}
+pub fn init_1(_motor: &mut MESC_motor_typedef) {}
 
-pub unsafe fn init_2(_motor: &mut MESC_motor_typedef) {}
+pub fn init_2(_motor: &mut MESC_motor_typedef) {}
 
-pub unsafe fn init_3(_motor: &mut MESC_motor_typedef) {
+pub fn init_3(_motor: &mut MESC_motor_typedef) {
     unsafe {
         let _p = Peripherals::steal();
         // let mut tim = ComplementaryPwm::new(p.TIM8);
@@ -76,8 +87,13 @@ pub unsafe fn init_3(_motor: &mut MESC_motor_typedef) {
     }
 }
 
-pub unsafe fn hw_init(_motor: &mut MESC_motor_typedef) {
+pub fn hw_init(_motor: &mut MESC_motor_typedef) {
     unimplemented!()
+}
+
+// PB6, 7, 8
+pub fn get_hall_state() -> u8 {
+    ((GPIOB.idr().read().0 >> 6) & 0b111) as u8
 }
 
 /*
@@ -109,7 +125,15 @@ fn TIM8_UP_TIM13() {
     unsafe {
         MESC_PWM_IRQ_handler(mesc::get_motor());
         // Clear update flag
-        MOTOR_TIM.sr().modify(|w| w.set_uif(false));
+        MESC_MOTOR_TIM.sr().modify(|w| w.set_uif(false));
+    }
+}
+
+#[interrupt]
+fn ADC() {
+    unsafe {
+        MESC_ADC_IRQ_handler(mesc::get_motor());
+        // FIXME: ADC flags are NOT BEING RESET, IT WILL NOT FIRE AGAIN
     }
 }
 
@@ -119,4 +143,12 @@ fn TIM8_UP_TIM13() {
 
 pub fn startup_successful(periph: &mut BspPeripherals) {
     periph.poweron.set_high();
+}
+
+pub fn refresh_adc() {
+    unimplemented!()
+}
+
+pub fn refresh_adc_for_vphase() {
+    unimplemented!()
 }

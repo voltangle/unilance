@@ -1,10 +1,10 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
+    Error, Item, LitStr, Result, Token,
     parse::{Parse, ParseStream},
     parse_macro_input,
     punctuated::Punctuated,
-    Error, Item, LitStr, Result, Token,
 };
 
 struct Args {
@@ -15,7 +15,10 @@ impl Parse for Args {
     fn parse(input: ParseStream) -> Result<Self> {
         let roles: Punctuated<LitStr, Token![,]> = Punctuated::parse_terminated(input)?;
         if roles.is_empty() {
-            return Err(Error::new(input.span(), "Expected at least one role string literal."));
+            return Err(Error::new(
+                input.span(),
+                "Expected at least one role string literal.",
+            ));
         }
         Ok(Self {
             roles: roles.into_iter().collect(),
@@ -88,4 +91,3 @@ pub fn for_role(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     expanded.into()
 }
-
