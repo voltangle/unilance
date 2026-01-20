@@ -179,9 +179,9 @@ pub fn startup_successful(periph: &mut BspPeripherals) {
 
 #[allow(static_mut_refs)]
 pub fn refresh_adc() {
-    unsafe {
-        (&mut *MOTOR_TIM_DRIVER.as_mut_ptr()).set_high();
-    }
+    // unsafe {
+    //     (&mut *MOTOR_TIM_DRIVER.as_mut_ptr()).set_high();
+    // }
     unimplemented!()
 }
 
