@@ -3,6 +3,7 @@ mod algo;
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct BalanceState {
     pub config: BalanceConfig,
+    pub run_config: BalanceRuntimeConfig,
     pub(crate) dt_sec: f32,
 
     pub(crate) setpoint: f32,
@@ -36,6 +37,25 @@ pub(crate) enum RideAssistAccelerationState {
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub struct BalanceRuntimeConfig {
+    /// What is regarded as the "zero" of a setpoint. Usually translated to the
+    /// "pedal angle" setting for the user. Radians
+    pub setpoint_zero: f32,
+    pub rideassist: RideAssistRuntimeConfig
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub struct RideAssistRuntimeConfig {
+    /// If disabled, Ride Assist calculations will be skipped in iterate().
+    pub enable: bool,
+}
+
+// TODO: Figure out proper tuning settings
+// What I had in mind is to make it work with "slider" adjustment, aka pedal hardness
+// is not "hard, medium, soft", but rather a value from 0 to 100. Same for everything else
+// that is applicable.
+
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct BalanceConfig {
     pub kp: u16,
     pub kp_expo: f32,
@@ -43,9 +63,6 @@ pub struct BalanceConfig {
     pub kd_forward: u16,
     pub kd_backward: u16,
 
-    /// What is regarded as the "zero" of a setpoint. Usually translated to the
-    /// "pedal angle" setting for the user. Radians
-    pub setpoint_zero: f32,
     /// Delta time, or how much time passes between ISR triggers. Microseconds
     pub dt: u16,
 
@@ -64,17 +81,15 @@ pub struct BalanceConfig {
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct RideAssistConfig {
-    /// If disabled, Ride Assist calculations will be skipped in iterate().
-    pub enable: bool,
     /// What's the differentiation point between "slight" and "hard" acceleration. m/s^2
-    pub(crate) accel_power_threshold: f32,
+    pub accel_power_threshold: f32,
     /// Threshold at which it transitions states to and from acceleration. m/s^2
-    pub(crate) accel_state_threshold: f32,
+    pub accel_state_threshold: f32,
     /// Threshold at which it transitions states to and from braking. m/s^2
-    pub(crate) braking_state_threshold: f32,
+    pub braking_state_threshold: f32,
     /// Thresholds are nice, but being right on them is not. This hysteresis applies
     /// to all state thresholds by adding and subtracting it from the threshold.
     /// For example, if hysteresis is 5 and threshold is 15, upper and lower thresholds
     /// will now be 10 and 20.
-    pub(crate) state_hysteresis: u8,
+    pub state_hysteresis: u8,
 }

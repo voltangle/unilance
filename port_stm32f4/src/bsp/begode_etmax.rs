@@ -1,4 +1,8 @@
 use super::PlatformConfig;
+use crate::roles;
+use core::mem::MaybeUninit;
+use core_control::balance::BalanceConfig;
+use core_control::balance::RideAssistConfig;
 use embassy_stm32::gpio;
 use embassy_stm32::interrupt;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
@@ -31,6 +35,25 @@ use static_cell::StaticCell;
 // how to make it all coexist
 
 pub const STARTUP_DELAY_MS: u64 = 1500;
+// FIXME: NO BALANCE CONFIG, do at least a basic tune
+pub const BALANCE_CONF: BalanceConfig = BalanceConfig {
+    kp: 0,
+    kp_expo: 0.0,
+    ki: 0,
+    kd_forward: 0,
+    kd_backward: 0,
+    dt: 0,
+    rideassist: RideAssistConfig {
+        accel_power_threshold: 0.0,
+        accel_state_threshold: 0.0,
+        braking_state_threshold: 0.0,
+        state_hysteresis: 0
+    },
+    integral_min: 0.0,
+    integral_max: 0.0,
+    out_min: 0,
+    out_max: 0
+};
 
 pub struct BspPeripherals<'a> {
     poweron: gpio::Output<'a>,
@@ -40,6 +63,7 @@ pub struct BspPeripherals<'a> {
 
 // Gather all peripherals required for opereration and initialize anything that
 // needs to be initialized at this point. This function has to be called ONCE on boot.
+#[allow(static_mut_refs)]
 pub fn init<'a>(p: Peripherals) -> BspPeripherals<'a> {
     BspPeripherals {
         poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
@@ -54,7 +78,6 @@ pub fn init<'a>(p: Peripherals) -> BspPeripherals<'a> {
 
 // Peripheral table
 pub const MESC_MOTOR_TIM: TimAdv = embassy_stm32::pac::TIM8;
-pub const MESC_SLOW_LOOP_TIM: TimGp16 = embassy_stm32::pac::TIM3;
 
 // NOTE: ideally this default init should be in the mesc crate
 #[unsafe(export_name = "g_hw_setup")]
@@ -120,6 +143,7 @@ impl PlatformConfig for Config {
  * Interrupts
  */
 
+// FIXME: TIM8 is not configured
 #[interrupt]
 fn TIM8_UP_TIM13() {
     unsafe {
@@ -129,6 +153,14 @@ fn TIM8_UP_TIM13() {
     }
 }
 
+// FIXME: TIM3 is not configured
+/// The balance loop interrupt
+#[interrupt]
+fn TIM3() {
+    roles::control::balance_loop();
+}
+
+// FIXME: ADCs are not configured nor used
 #[interrupt]
 fn ADC() {
     unsafe {
@@ -145,7 +177,11 @@ pub fn startup_successful(periph: &mut BspPeripherals) {
     periph.poweron.set_high();
 }
 
+#[allow(static_mut_refs)]
 pub fn refresh_adc() {
+    unsafe {
+        (&mut *MOTOR_TIM_DRIVER.as_mut_ptr()).set_high();
+    }
     unimplemented!()
 }
 

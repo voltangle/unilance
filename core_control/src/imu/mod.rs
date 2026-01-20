@@ -7,6 +7,7 @@
 /// is tilted forward a lot, acceleration forward will always be on one axis, and not
 /// split between multiple. The X axis always denotes front/back acceleration, Y axis is
 /// left/right, and Z axis is up/down.
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 pub struct IMUData {
     /// Radians
     pub pitch: f32,

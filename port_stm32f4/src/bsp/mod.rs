@@ -15,30 +15,22 @@ mod mesc_hooks {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn mesc_init_1(motor: &mut MESC_motor_typedef) {
-        unsafe {
-            super::init_1(motor);
-        }
+        super::init_1(motor);
     }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn mesc_init_2(motor: &mut MESC_motor_typedef) {
-        unsafe {
-            super::init_2(motor);
-        }
+        super::init_2(motor);
     }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn mesc_init_3(motor: &mut MESC_motor_typedef) {
-        unsafe {
-            super::init_3(motor);
-        }
+        super::init_3(motor);
     }
 
     #[unsafe(no_mangle)]
     pub extern "C" fn hw_init(motor: &mut MESC_motor_typedef) {
-        unsafe {
-            super::hw_init(motor);
-        }
+        super::hw_init(motor);
     }
 
     #[allow(non_snake_case)]

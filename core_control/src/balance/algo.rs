@@ -7,14 +7,14 @@ use micromath::F32Ext;
 impl BalanceState {
     /// Call this right after setting up the config.
     pub fn init(&mut self) {
-        self.setpoint = self.config.setpoint_zero;
+        self.setpoint = self.run_config.setpoint_zero;
         self.dt_sec = self.config.dt as f32 / 1000000.0;
     }
 
     /// Main balance loop function. Has to be called in ISR, for real time guarantees.
     pub fn iterate(&mut self, imu_state: IMUData) -> f32 {
         let pid_out = self.iterate_pid(&imu_state);
-        if self.config.rideassist.enable {
+        if self.run_config.rideassist.enable {
             self.iterate_ride_assist(&imu_state, pid_out);
         }
         return pid_out;

@@ -9,6 +9,7 @@ mod sthal;
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
+use core_control::balance::BalanceState;
 use embassy_executor::Spawner;
 use embassy_stm32::Config;
 use embassy_stm32::rcc::Hse;
@@ -31,6 +32,8 @@ static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_stm32::init(Config::for_platform());
     sthal::init(&p);
+    roles::control::init();
+    roles::supervisor::init();
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
 
     let mut bsp_periph = bsp::init(p);
@@ -40,9 +43,9 @@ async fn main(_spawner: Spawner) -> ! {
     roles::supervisor::start(&supervisor_core_link);
     roles::control::start(&control_core_link);
 
-    startup_timer.await;
     // the timer starts "counting" right after it was created (it just saves a timestamp of
-    // when it's supposed to elapse), so .await will "let go" exactly after 2 seconds
+    // when it's supposed to elapse), so .await will "let go" exactly after STARTUP_DELAY_MS
+    startup_timer.await;
     bsp::startup_successful(&mut bsp_periph);
 
     // Park indefinitely, so all other tasks can just, uhh, run
@@ -64,17 +67,15 @@ fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
     unimplemented!()
 }
 
+// TODO: Try to figure out how to do the hardware config in Rust instead of a C header
+
 /// Can only be called ONCE at firmware init
 fn configure_mesc() {
     let mut mtimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
-    let mut stimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
-
     mtimer.Instance = bsp::MESC_MOTOR_TIM.as_ptr() as *mut TIM_TypeDef;
-    stimer.Instance = bsp::MESC_SLOW_LOOP_TIM.as_ptr() as *mut TIM_TypeDef;
 
     let mut motor = MESC_motor_typedef::default();
     motor.mtimer = &mut mtimer;
-    motor.stimer = &mut stimer;
 
     mesc::set_motor(motor);
 }
