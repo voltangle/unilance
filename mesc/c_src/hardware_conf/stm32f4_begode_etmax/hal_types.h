@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include "core_cm4.h"
 #include "stm32f405xx.h"
+#include "core_cm4.h"
 
 #pragma once
 
@@ -337,7 +337,7 @@ typedef struct {
     DMA_HandleTypeDef* hdma[7];    /*!< DMA Handlers array
                                         This array is accessed by a @ref DMA_Handle_index */
     HAL_LockTypeDef Lock; /*!< Locking object                                    */
-    __IO HAL_TIM_StateTypeDef State;                  /*!< TIM operation state                  */
+    __IO HAL_TIM_StateTypeDef State; /*!< TIM operation state                  */
     __IO HAL_TIM_ChannelStateTypeDef ChannelState[4]; /*!< TIM channel operation state */
     __IO HAL_TIM_ChannelStateTypeDef
         ChannelNState[4]; /*!< TIM complementary channel operation state         */
@@ -436,13 +436,14 @@ typedef struct {
                                   continuous mode is enabled, this parameter setting is
                                   discarded. This parameter can be set to ENABLE or
                                   DISABLE. */
-    uint32_t NbrOfDiscConversion;  /*!< Specifies the number of discontinuous conversions
-                                      in which the  main sequence of regular group
-                                      (parameter NbrOfConversion) will be subdivided.  If
-                                      parameter 'DiscontinuousConvMode' is disabled, this
-                                      parameter is discarded.  This parameter must be a
-                                      number between Min_Data = 1 and Max_Data = 8. */
-    uint32_t ExternalTrigConv;     /*!< Selects the external event used to trigger the
+    uint32_t NbrOfDiscConversion; /*!< Specifies the number of discontinuous conversions
+                                     in which the  main sequence of regular group
+                                     (parameter NbrOfConversion) will be subdivided.  If
+                                     parameter 'DiscontinuousConvMode' is disabled, this
+                                     parameter is discarded.  This parameter must be a
+                                     number between Min_Data = 1 and Max_Data = 8. */
+    uint32_t
+        ExternalTrigConv;          /*!< Selects the external event used to trigger the
                                       conversion start of regular group.     If set to
                                       ADC_SOFTWARE_START, external triggers are disabled.     If
                                       set to external trigger source, triggering is on event

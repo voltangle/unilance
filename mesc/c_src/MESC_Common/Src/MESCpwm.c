@@ -156,7 +156,7 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
     }
 
     switch (_motor->options.pwm_type) {
-        case PWM_SVPWM:
+        case MESC_PWM_SVPWM:
             mid_value = _motor->FOC.PWMmid -
                         0.5f * _motor->FOC.Vab_to_PWM * (top_value + bottom_value);
 
@@ -219,13 +219,13 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
 
 #endif
             break;
-        case PWM_SIN:
+        case MESC_PWM_SIN:
 
             // Fallthrough FOR NOW
-        case PWM_BOTTOM_CLAMP:
+        case MESC_PWM_BOTTOM_CLAMP:
 
             // Fallthrough FOR NOW
-        case PWM_SIN_BOTTOM:
+        case MESC_PWM_SIN_BOTTOM:
             // Threshold for turning on sinusoidal modulation
             if (_motor->FOC.Voltage < _motor->FOC.V_3Q_mag_max) {  // Sinusoidal
                 mid_value = _motor->FOC.PWMmid -
@@ -245,10 +245,10 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
 
                 //    			_motor->FOC.inverterVoltage[0] =
                 //    _motor->FOC.inverterVoltage[0]+
-                //    mid_value;//0.5*_motor->FOC.Vmag_max; 			_motor->FOC.inverterVoltage[1]
-                //    = _motor->FOC.inverterVoltage[1]+
-                //    mid_value;//0.5*_motor->FOC.Vmag_max; 			_motor->FOC.inverterVoltage[2]
-                //    = _motor->FOC.inverterVoltage[2]+
+                //    mid_value;//0.5*_motor->FOC.Vmag_max;
+                //    _motor->FOC.inverterVoltage[1] = _motor->FOC.inverterVoltage[1]+
+                //    mid_value;//0.5*_motor->FOC.Vmag_max;
+                //    _motor->FOC.inverterVoltage[2] = _motor->FOC.inverterVoltage[2]+
                 //    mid_value;//0.5*_motor->FOC.Vmag_max;
             } else {  // Bottom Clamp
                 _motor->FOC.inverterVoltage[0] =
@@ -274,29 +274,30 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
             // static int carryU, carryV, carryW;
 
             //    		_motor->mtimer->Instance->CCR1 =
-            //    _motor->mtimer->Instance->CCR1 - carryU; 		_motor->mtimer->Instance->CCR2
-            //    = 	_motor->mtimer->Instance->CCR2 - carryV;
-            //    		_motor->mtimer->Instance->CCR3 =
-            //    _motor->mtimer->Instance->CCR3 - carryW; 		carryU = 0; 		carryV = 0; 		carryW
-            //    = 0;
+            //    _motor->mtimer->Instance->CCR1 - carryU;
+            //    _motor->mtimer->Instance->CCR2 = 	_motor->mtimer->Instance->CCR2 -
+            //    carryV; 		_motor->mtimer->Instance->CCR3 =
+            //    _motor->mtimer->Instance->CCR3
+            //    - carryW; 		carryU = 0; 		carryV = 0;
+            //    carryW = 0;
 
             //    		if(_motor->mtimer->Instance->CCR1>(_motor->mtimer->Instance->ARR-OVERMOD_DT_COMP_THRESHOLD)){
             //    			carryU =
             //    _motor->mtimer->Instance->ARR-_motor->mtimer->Instance->CCR1; //Save the
-            //    amount we have overmodulated by 			_motor->mtimer->Instance->CCR1 =
-            //    _motor->mtimer->Instance->ARR;
+            //    amount we have overmodulated by
+            //    _motor->mtimer->Instance->CCR1 = _motor->mtimer->Instance->ARR;
             //    		}
             //    		if(_motor->mtimer->Instance->CCR2>(_motor->mtimer->Instance->ARR-OVERMOD_DT_COMP_THRESHOLD)){
             //    			carryV =
             //    _motor->mtimer->Instance->ARR-_motor->mtimer->Instance->CCR2; //Save the
-            //    amount we have overmodulated by 			_motor->mtimer->Instance->CCR2 =
-            //    _motor->mtimer->Instance->ARR;
+            //    amount we have overmodulated by
+            //    _motor->mtimer->Instance->CCR2 = _motor->mtimer->Instance->ARR;
             //    		}
             //    		if(_motor->mtimer->Instance->CCR3>(_motor->mtimer->Instance->ARR-OVERMOD_DT_COMP_THRESHOLD)){
             //    			carryW =
             //    _motor->mtimer->Instance->ARR-_motor->mtimer->Instance->CCR3; //Save the
-            //    amount we have overmodulated by 			_motor->mtimer->Instance->CCR3 =
-            //    _motor->mtimer->Instance->ARR;
+            //    amount we have overmodulated by
+            //    _motor->mtimer->Instance->CCR3 = _motor->mtimer->Instance->ARR;
             //    		}
 #endif
             break;

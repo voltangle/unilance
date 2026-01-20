@@ -163,7 +163,7 @@ typedef enum { MOTOR_CONTROL_TYPE_FOC, MOTOR_CONTROL_TYPE_BLDC } motor_control_t
 #define UNINITIALISED_KEY 1
 #define KILLSWITCH_KEY 2
 #define SAFESTART_KEY 4
-#define APP_KEY 8
+#define MESC_APP_KEY 8
 
 /* Function prototypes -----------------------------------------------*/
 

@@ -13,6 +13,10 @@
 // If there are voltage sensors on phases.
 // #define HAS_PHASE_SENSORS
 
+// Frequency at which the motor timer PWM will run. This is half the VESC zero vector
+// frequency; i.e. 20k is equivalent to VESC 40k
+// #define PWM_FREQUENCY 15000
+
 // Motor timer dead time, in nanoseconds.
 // #define CUSTOM_DEADTIME 0
 
@@ -25,6 +29,14 @@
 // Lower inverter input voltage threshold that trigger an error.
 // #define ABS_MIN_BUS_VOLTAGE 0.0f
 
+// ToDo need to define using a discrete opamp with resistors to set gain vs using one with
+// a specified gain
+//  TODO: figure out if it's needed or not
+#define OPGAIN 16.0f
+
+// Offset for ADC values, so negative current values can also be read.
+// #define ADC_OFFSET_DEFAULT 1870.0f;
+
 // Max current that can be requested in FOC.
 // #define MAX_IQ_REQUEST 30.0f
 
@@ -35,6 +47,21 @@
 // bottom clamp #define SEVEN_SECTOR
 
 // #define DEADTIME_COMP
+#define DEADTIME_COMP_V \
+    5  // Arbitrary value for now, needs parametising.
+       // Basically this is half the time between MOSoff and MOSon
+       // and needs determining experimentally, either with openloop
+       // sin wave drawing or by finding the zero current switching "power knee point"
+
+// Enable field weakening.
+// WARNING: Old (and sometimes unsafe) version, do not enable unless you know what you
+// are doing! Refer to MESC documentation for more details.
+// #define USE_FIELD_WEAKENING
+
+// Enable v2 field weakening. Refer to MESC documentation for more details.
+// NOTE: It's the better version compared to v1 field weakening. Use this unless you
+// absolutely know what you're doing!
+// #define USE_FIELD_WEAKENINGV2
 
 // Maximum available field weakening current.
 // #define FIELD_WEAKENING_CURRENT 0.0f
@@ -45,7 +72,20 @@
 // TODO: Add documentation
 // #define INTERPOLATE_V7_ANGLE
 
+// For more information about HFI, refer to MESC documentation. This comment applies to
+// all options related to HFI.
+// #define USE_HFI
+// #define HFI_VOLTAGE 4.0f
+// #define HFI_TEST_CURRENT 0.0f
+// #define HFI_THRESHOLD 2.5f
+// #define DEFAULT_HFI_TYPE HFI_TYPE_NONE
+// //#define DEFAULT_HFI_TYPE HFI_TYPE_45
+// //#define DEFAULT_HFI_TYPE HFI_TYPE_D
+// //#define DEFAULT_HFI_TYPE HFI_TYPE_SPECIAL
+// #define MAX_MODULATION 0.5f
+
 #define HALL_VOLTAGE_THRESHOLD 1.5f
+#define MIN_HALL_FLUX_VOLTS 5.0f
 
 // If not enabled, it assumes that Ld and Lq are equal, which is fine usually.
 // #define USE_SALIENT_OBSERVER
@@ -84,7 +124,7 @@
                                         // preferably this one
 
 /////////////////////Prototype stuff that does not really work
-///nicely//////////////////////////////
+/// nicely//////////////////////////////
 
 // #define USE_DEADSHORT //This can be used in place of the phase sensors for startup from
 // running. #define DEADSHORT_CURRENT 30.0f	//When recovering from tracking phase

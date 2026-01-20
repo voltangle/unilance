@@ -214,10 +214,10 @@ void MESCfluxobs_run(MESC_motor_typedef* _motor) {
             // Flux rate of changes
             float flux_a_dot = (_motor->FOC.Vab.a - _motor->m.R * _motor->FOC.Iab.a);
             //				+ _motor->FOC.ortega_gain * (_motor->FOC.flux_a -
-            //L_ia) * err);
+            // L_ia) * err);
             float flux_b_dot = (_motor->FOC.Vab.b - _motor->m.R * _motor->FOC.Iab.b);
             //				+ _motor->FOC.ortega_gain * (_motor->FOC.flux_b -
-            //L_ib) * err);
+            // L_ib) * err);
 
             // Integrate
             _motor->FOC.flux_a = _motor->FOC.flux_a + flux_a_dot * _motor->FOC.pwm_period;
@@ -243,8 +243,8 @@ void MESCfluxobs_run(MESC_motor_typedef* _motor) {
             // Calculate the angle
             if (_motor->HFI.inject == 0) {
                 //_motor->FOC.FOCAngle = (uint16_t)(32768.0f + 10430.0f *
-                //fast_atan2((_motor->FOC.flux_b - L_ib), _motor->FOC.flux_a - L_ia)) -
-                //32768;
+                // fast_atan2((_motor->FOC.flux_b - L_ib), _motor->FOC.flux_a - L_ia)) -
+                // 32768;
                 _motor->FOC.FOCAngle =
                     (_motor->FOC.FOC_advance * _motor->FOC.PLL_int) +
                     (uint16_t)(32768.0f +
@@ -271,7 +271,7 @@ void MESCfluxobs_run(MESC_motor_typedef* _motor) {
                 _motor->FOC.eHz * 6.28f *
                     (_motor->m.L_D * _motor->FOC.Idq.d);  // + _motor->m.flux_linkage);
             //	Aside: atan of the BEMF should result in a fixed angle, complete with
-            //noise... This angle should represent the flux integration error...
+            // noise... This angle should represent the flux integration error...
             _motor->FOC.BEMFdq_angle = fast_atan2(_motor->FOC.BEMFd, _motor->FOC.BEMFq);
             //_motor->FOC.FOCAngle = _motor->FOC.FOCAngle + 10430.0f *
             //_motor->FOC.BEMFdq_angle;

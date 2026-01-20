@@ -102,8 +102,8 @@ const char* error_string[32] = {"Overcurrent phase A",
 
 // Variables
 struct MESC_log_vars error_log;
-uint32_t MESC_errors;  // This is a bitwise uint32_t representation of the errors that
-                       // have occurred.
+uint32_t MESC_errors;      // This is a bitwise uint32_t representation of the errors that
+                           // have occurred.
 uint32_t MESC_all_errors;  // All the errors since startup
 
 void handleError(MESC_motor_typedef* _motor, uint32_t error_code) {

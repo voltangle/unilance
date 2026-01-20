@@ -91,6 +91,7 @@ static void ThrottleTemperature(MESC_motor_typedef* _motor);
 static void FWRampDown(MESC_motor_typedef* _motor);
 
 void MESCfoc_Init(MESC_motor_typedef* _motor) {
+    // FIXME: Platform dependency
 #ifdef STM32L4  // For some reason, ST have decided to have a different name for the L4
                 // timer DBG freeze...
     DBGMCU->APB2FZ |= DBGMCU_APB2FZ_DBG_TIM1_STOP;
@@ -136,6 +137,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
     _motor->MotorState = MOTOR_STATE_IDLE;
 
+    // FIXME: Platform dependency
     // enable cycle counter
     DEMCR |= DEMCR_TRCENA;
     DWT_CTRL |= CYCCNTENA;
@@ -193,9 +195,9 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 #endif
 
 #ifdef USE_MTPA
-    _motor->options.MTPA_mode = MTPA_MAG;
+    _motor->options.mtpa_mode = MESC_MTPA_MAG;
 #else
-    _motor->options.MTPA_mode = MTPA_NONE;
+    _motor->options.mtpa_mode = MESC_MTPA_NONE;
 #endif
 
 #ifdef USE_HIGHHOPES_PHASE_BALANCING
@@ -228,15 +230,15 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 #endif
 
     _motor->options.pwm_type =
-        PWM_SVPWM;  // Default to combined bottom clamp sinusoidal combinationPWM
+        MESC_PWM_SVPWM;  // Default to combined bottom clamp sinusoidal combinationPWM
     _motor->FOC.Modulation_max = MAX_MODULATION;
 #ifdef SIN_BOTTOM
-    _motor->options.pwm_type = PWM_SIN_BOTTOM;
+    _motor->options.pwm_type = MESC_PWM_SIN_BOTTOM;
 #endif
 
-    _motor->options.app_type = APP_NONE;  // Default to no app
-#ifdef APP_VEHICLE
-    _motor->options.app_type = APP_VEHICLE;
+    _motor->options.MESC_APP_type = MESC_APP_NONE;  // Default to no app
+#ifdef MESC_APP_VEHICLE
+    _motor->options.MESC_APP_type = MESC_APP_VEHICLE;
 #endif
 
     // PWM Encoder
@@ -315,8 +317,10 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
     mesc_init_1(_motor);
 
+#ifdef USE_INIT_DELAY
     HAL_Delay(1000);  // Give the everything else time to start up (e.g. throttle,
                       // controller, PWM source...)
+#endif
 
     mesc_init_2(_motor);
 
@@ -649,8 +653,10 @@ void fastLoop(MESC_motor_typedef* _motor) {
             break;
 
         case MOTOR_STATE_RECOVERING:
+#ifdef USE_DEADSHORT
             deadshort(
                 _motor);  // Function to startup motor from running without phase sensors
+#endif
             break;
 
         case MOTOR_STATE_SLAMBRAKE:
@@ -1452,23 +1458,23 @@ void slowLoop(MESC_motor_typedef* _motor) {
     houseKeeping(_motor);  // General dross that keeps things ticking over, like nudging
                            // the observer
     MESCinput_Collect(_motor);  // Get all the throttle inputs
-    switch (_motor->options.app_type) {
-        case APP_NONE:
-            _motor->key_bits &= ~APP_KEY;
+    switch (_motor->options.MESC_APP_type) {
+        case MESC_APP_NONE:
+            _motor->key_bits &= ~MESC_APP_KEY;
             No_app(_motor);  // No_app just sums the inputs
             break;
-        case APP_VEHICLE:
+        case MESC_APP_VEHICLE:
             Vehicle_app(_motor);
             break;
-        case APP_2:
+        case MESC_APP_2:
             break;
-        case APP_3:
+        case MESC_APP_3:
             break;
     }
 
     switch (_motor->ControlMode) {
         case MOTOR_CONTROL_MODE_TORQUE:
-            // Dealt with in APP_NONE
+            // Dealt with in MESC_APP_NONE
             break;
         case MOTOR_CONTROL_MODE_POSITION:
             RunPosControl(_motor);
@@ -1611,7 +1617,7 @@ void slowLoop(MESC_motor_typedef* _motor) {
             calculatePower(_motor);
             ThrottleTemperature(_motor);  // Gradually ramp down the Q current if motor or
                                           // FETs are getting hot
-            if (_motor->options.MTPA_mode) {
+            if (_motor->options.mtpa_mode) {
                 RunMTPA(_motor);  // Process MTPA
             }
 
@@ -1751,6 +1757,7 @@ float IacalcDS, IbcalcDS, VacalcDS, VbcalcDS, VdcalcDS, VqcalcDS, FLaDS, FLbDS, 
 uint16_t angleDS, angleErrorDSENC, angleErrorPhaseSENC, angleErrorPhaseDS,
     countdown_cycles;
 
+#ifdef USE_DEADSHORT
 void deadshort(MESC_motor_typedef* _motor) {
     // LICENCE NOTE:
     // This function deviates slightly from the BSD 3 clause licence.
@@ -1843,6 +1850,7 @@ void deadshort(MESC_motor_typedef* _motor) {
     }
     countdown--;
 }
+#endif
 
 uint8_t pkt_crc8(uint8_t crc /*CRC_SEED=0xFF*/, uint8_t* data, uint8_t length) {
     int16_t i, bit;
@@ -2028,24 +2036,24 @@ void RunMTPA(MESC_motor_typedef* _motor) {
     // Run MTPA (Field weakening seems to have to go in  the fast loop to be stable)
     float i_mag = 0;
     if (_motor->m.L_QD > 0.0f) {
-        switch (_motor->options.MTPA_mode) {
-            case MTPA_NONE:
+        switch (_motor->options.mtpa_mode) {
+            case MESC_MTPA_NONE:
                 // Nothing
                 break;
-            case MTPA_REQ:
+            case MESC_MTPA_REQ:
                 // MTPA equation
                 i_mag = _motor->FOC.Idq_prereq.q;
                 //			_motor->FOC.id_mtpa =
                 //_motor->m.flux_linkage/(4.0f*_motor->m.L_QD) -
-                //sqrtf((_motor->m.flux_linkage*_motor->m.flux_linkage/(16.0f*_motor->m.L_QD*_motor->m.L_QD))+_motor->FOC.Idq_prereq.q*_motor->FOC.Idq_prereq.q*0.5f);
+                // sqrtf((_motor->m.flux_linkage*_motor->m.flux_linkage/(16.0f*_motor->m.L_QD*_motor->m.L_QD))+_motor->FOC.Idq_prereq.q*_motor->FOC.Idq_prereq.q*0.5f);
                 break;
-            case MTPA_MAG:
+            case MESC_MTPA_MAG:
                 // Calculate magnitude of currents
                 i_mag = sqrtf(_motor->FOC.Idq_smoothed.q * _motor->FOC.Idq_smoothed.q +
                               _motor->FOC.Idq_smoothed.d * _motor->FOC.Idq_smoothed.d);
                 break;
 
-            case MTPA_Q:
+            case MESC_MTPA_Q:
                 i_mag = _motor->FOC.Idq_smoothed.q;
                 break;
         }  // End of switch
@@ -2106,7 +2114,7 @@ void LimitFWCurrent(MESC_motor_typedef* _motor) {
 void clampBatteryPower(MESC_motor_typedef* _motor) {
     /////// Clamp the max power taken from the battery
     /////// This assumes no MTPA and no FW active. There is no (simple) closed form for
-    ///FOC with D axis current.
+    /// FOC with D axis current.
     _motor->FOC.reqPower = 1.5f * fabsf(_motor->FOC.Vdq.q * _motor->FOC.Idq_prereq.q);
     float batt_power_max =
         _motor->m.IBatmax *

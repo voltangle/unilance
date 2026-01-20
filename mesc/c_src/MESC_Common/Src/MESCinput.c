@@ -103,9 +103,10 @@ void MESCinput_Init(MESC_motor_typedef* _motor) {
 void MESCinput_Collect(MESC_motor_typedef* _motor) {
     // This function should be called from a strong and well defined periodic interrupt or
     // thread. In many applications, this may be safety critical code, since it is the
-    // primary source of the signals that can generate torque/power. 	Expectation is that
-    //it is called with a typical period of 100Hz. This may need to be increased in case
-    //of servo control.
+    // primary source of the signals that can generate torque/power. 	Expectation is
+    // that
+    // it is called with a typical period of 100Hz. This may need to be increased in case
+    // of servo control.
 
     // Check if remote ADC timeouts. The remote ADC is set elsewhere from the CAN data
     // received.

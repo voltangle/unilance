@@ -41,11 +41,9 @@
 void MESC_PWM_IRQ_handler(MESC_motor_typedef* _motor);  // Put this into the PWM
                                                         // interrupt,
 void MESCpwm_Write(
-    MESC_motor_typedef*
-        _motor);  // Offset the PWM to voltage centred (0Vduty is 50% PWM) or
-                  // subtract lowest phase to always clamp one phase at 0V or
-                  // SVPWM
-                  // write CCR registers
+    MESC_motor_typedef* _motor);  // Offset the PWM to voltage centred (0Vduty is 50% PWM)
+                                  // or subtract lowest phase to always clamp one phase at
+                                  // 0V or SVPWM write CCR registers
 
 void MESCpwm_generateBreak(
     MESC_motor_typedef* _motor);  // Software break that does not stop the PWM timer but

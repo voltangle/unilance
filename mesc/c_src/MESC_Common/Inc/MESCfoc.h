@@ -70,8 +70,8 @@
 
 #ifndef DEADTIME_COMP_V
 #define DEADTIME_COMP_V \
-    0  // Arbitrary value for starting, needs determining through
-       // TEST_TYP_DEAD_TIME_IDENT.
+    0   // Arbitrary value for starting, needs determining through
+        // TEST_TYP_DEAD_TIME_IDENT.
 #endif  // Basically this is half the time between MOSoff and MOSon
         // and needs dtermining experimentally, either with openloop
         // sin wave drawing or by finding the zero current switching "power knee point"
@@ -358,9 +358,9 @@ typedef struct {
         Idq_req;  // The input to the PI controller. Load this with the values you want.
     MESCiq_s Idq_prereq2;
     MESCiq_s
-        Idq_prereq;  // Before we set the input to the current PI controller, we want to
-                     // run a series of calcs (collect variables, calculate MTPA... that
-                     // needs to be done without it putting jitter onto the PI input.
+        Idq_prereq;    // Before we set the input to the current PI controller, we want to
+                       // run a series of calcs (collect variables, calculate MTPA... that
+                       // needs to be done without it putting jitter onto the PI input.
     float T_rollback;  // Scale the input parameters by this amount when thermal
                        // throttling
     MESCiq_s currentPower;  // Power being consumed by the motor; this does not include
@@ -708,22 +708,34 @@ enum SQRT_CIRC {
     SQRT_CIRCLE_LIM_ON = 1,
     SQRT_CIRCLE_LIM_VD = 2
 };
-enum PWM_TYPE { PWM_SVPWM = 0, PWM_SIN = 1, PWM_BOTTOM_CLAMP = 2, PWM_SIN_BOTTOM = 3 };
-enum APP_TYPE { APP_NONE = 0, APP_VEHICLE = 1, APP_2, APP_3 };
+enum MESC_PWM_TYPE {
+    MESC_PWM_SVPWM = 0,
+    MESC_PWM_SIN = 1,
+    MESC_PWM_BOTTOM_CLAMP = 2,
+    MESC_PWM_SIN_BOTTOM = 3
+};
 
-enum MTPA_MODE { MTPA_NONE = 0, MTPA_REQ = 1, MTPA_MAG = 2, MTPA_Q = 3 };
+enum MESC_AppType { MESC_APP_NONE = 0, MESC_APP_VEHICLE = 1, MESC_APP_2, MESC_APP_3 };
+
+enum MESC_MTPAMode {
+    MESC_MTPA_NONE = 0,
+    MESC_MTPA_REQ = 1,
+    MESC_MTPA_MAG = 2,
+    MESC_MTPA_Q = 3
+};
+
 typedef struct {
     bool use_hall_start;
     bool use_lr_observer;
-    uint8_t MTPA_mode;
+    uint8_t mtpa_mode;
     bool use_phase_balancing;
     bool has_motor_temp_sensor;
     uint8_t field_weakening;
     uint8_t sqrt_circle_lim;
     uint8_t observer_type;
     uint8_t pwm_type;
-    uint8_t app_type;
-} MESCoptionFlags_s;
+    uint8_t MESC_APP_type;
+} MESC_OptionFlags_s;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////Main typedef for starting a motor instance////////////////////////
@@ -756,7 +768,7 @@ typedef struct {
     MESCtest_s test_vals;
     input_vars_t input_vars;
     MESClrobs_s lrobs;
-    MESCoptionFlags_s options;
+    MESC_OptionFlags_s options;
     bool conf_is_valid;
 } MESC_motor_typedef;
 

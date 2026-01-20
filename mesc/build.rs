@@ -1,6 +1,8 @@
 use std::env;
 use std::path::PathBuf;
 
+// TODO: Add some feature flags for USE_* defines in the hardware config and use that
+
 fn main() {
     println!("cargo:rerun-if-changed=c_src");
 

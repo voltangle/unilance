@@ -133,7 +133,7 @@
 #define HW_UART huart3
 
 /////////////////////Prototype stuff that does not really work
-///nicely//////////////////////////////
+/// nicely//////////////////////////////
 
 // #define USE_DEADSHORT //This can be used in place of the phase sensors for startup from
 // running.
