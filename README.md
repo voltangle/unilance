@@ -14,14 +14,17 @@ section.
 
 ## Resource sharing between the Rust and C sections
 
-The Rust section is the one owning almost all the peripherals (through Embassy), it's
-responsible for initialization, management, etc etc. Only exceptions are peripherals used
-by MESC (C section), like the advanced timer (TIM1/8 or whatever is on that platform).
-MESC by itself depends on ST HAL, but its usage of it is limited to literately
-`hperiph->Instance->REG`. At this point it can just abandon the HAL and use just CMSIS,
-but here we are. This allow me to make a thin HAL implementation that only has definitions
-for some peripherals MESC uses, and then those are passed to MESC by UniLANCE initialization
-code. This is exactly what I did, for example in port_stm32f4/src/sthal.rs
+MESC used here is a heavily modified version, which includes removal of ALL platform-dependent
+code, and replacement with equivalent MESChal functions. These functions are implemented
+on the Rust side with Embassy or direct register access, depending on performance requirements.
+Before that, the project had to include CMSIS and make a thin implementation of ST HAL
+that only implemented functionality that MESC was using. Fortunately, most of it
+devolved to `_motor->mtimer->Instance->REG`, so I was able to easily refactor it all out
+to MESChal variants.
+
+To summarize: MESC doesn't own any peripherals by itself, any usage of them is done in Rust
+code. Usage of those peripherals is done through MESChal functions, that are implemented
+by Rust consumer code.
 
 ## Ports and boards
 
