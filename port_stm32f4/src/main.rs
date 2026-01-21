@@ -5,6 +5,7 @@ mod bsp;
 mod reg_flags;
 mod roles;
 mod sthal;
+mod mesc_impl;
 
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
@@ -22,6 +23,7 @@ use mesc::MESC_motor_typedef;
 use mesc::TIM_HandleTypeDef;
 use mesc::TIM_TypeDef;
 use proc_macros::for_role;
+use core::sync::atomic::Ordering;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -31,7 +33,8 @@ static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_stm32::init(Config::for_platform());
-    sthal::init(&p);
+    let clocks = embassy_stm32::rcc::clocks(&p.RCC);
+    mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
     roles::control::init();
     roles::supervisor::init();
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
@@ -71,11 +74,8 @@ fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
 
 /// Can only be called ONCE at firmware init
 fn configure_mesc() {
-    let mut mtimer: TIM_HandleTypeDef = TIM_HandleTypeDef::default();
-    mtimer.Instance = bsp::MESC_MOTOR_TIM.as_ptr() as *mut TIM_TypeDef;
-
     let mut motor = MESC_motor_typedef::default();
-    motor.mtimer = &mut mtimer;
+    motor.id = 0;
 
     mesc::set_motor(motor);
 }

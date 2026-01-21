@@ -55,14 +55,14 @@ void MESC_PWM_IRQ_handler(MESC_motor_typedef* _motor) {
 #ifdef FASTLED
     FASTLED->BSRR = FASTLEDIO;
 #endif
-    uint32_t cycles = CPU_CYCLES;
-    if (_motor->mtimer->Instance->CR1 & 0x16) {  // Polling the DIR (direction) bit on the
-                                                 // motor counter DIR = 1 = downcounting
+    uint32_t cycles = MESChal_getCPUCycles();
+    // NOTE: Why is it 0x16, if we're checking for DIR? shouldn't it be 0x8 instead?
+    // I'm yet to figure out what in the name of all thats holy this thing is even doing'
+    // lol
+    if (MESChal_isTimerCountingDown(_motor)) {  // Polling the DIR (direction) bit on the
+                                                // motor counter DIR = 1 = downcounting
         MESCpwm_Write(_motor);
-    }
-    if (!(_motor->mtimer->Instance->CR1 &
-          0x16)) {  // Polling the DIR (direction) bit on the motor counter DIR = 0 =
-                    // upcounting
+    } else {
         MESChfi_Run(_motor);
         MESCpwm_Write(_motor);
     }
@@ -106,7 +106,7 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
     _motor->FOC.Vab.b =
         _motor->FOC.sincosangle.sin * Vd + _motor->FOC.sincosangle.cos * Vq;
 #ifdef STEPPER_MOTOR  // Skip inverse Clark
-
+    // TODO: make the HAL also work fot steppers
     _motor->mtimer->Instance->CCR1 =
         (uint16_t)(1.0f * _motor->FOC.Vab_to_PWM * (_motor->FOC.Vab.a) +
                    _motor->FOC.PWMmid);
@@ -162,15 +162,15 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
 
             ////////////////////////////////////////////////////////
             // Actually write the value to the timer registers
-            _motor->mtimer->Instance->CCR1 =
-                (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0] +
-                           mid_value);
-            _motor->mtimer->Instance->CCR2 =
-                (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1] +
-                           mid_value);
-            _motor->mtimer->Instance->CCR3 =
-                (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2] +
-                           mid_value);
+            MESChal_phA_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
+                                                       _motor->FOC.inverterVoltage[0] +
+                                                   mid_value));
+            MESChal_phB_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
+                                                       _motor->FOC.inverterVoltage[1] +
+                                                   mid_value));
+            MESChal_phC_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
+                                                       _motor->FOC.inverterVoltage[2] +
+                                                   mid_value));
 
             // Dead time compensation
 #ifdef DEADTIME_COMP
@@ -193,28 +193,28 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
             // when the current and voltage are close to zero, so no adverse performance
             // except the buzz.
             if (_motor->Conv.Iu < -0.030f) {
-                _motor->mtimer->Instance->CCR1 =
-                    _motor->mtimer->Instance->CCR1 - _motor->FOC.deadtime_comp;
+                MESChal_phA_setDuty(
+                    _motor, MESChal_phA_getDuty(_motor) - _motor->FOC.deadtime_comp);
             }
             if (_motor->Conv.Iv < -0.030f) {
-                _motor->mtimer->Instance->CCR2 =
-                    _motor->mtimer->Instance->CCR2 - _motor->FOC.deadtime_comp;
+                MESChal_phB_setDuty(
+                    _motor, MESChal_phB_getDuty(_motor) - _motor->FOC.deadtime_comp);
             }
             if (_motor->Conv.Iw < -0.030f) {
-                _motor->mtimer->Instance->CCR3 =
-                    _motor->mtimer->Instance->CCR3 - _motor->FOC.deadtime_comp;
+                MESChal_phC_setDuty(
+                    _motor, MESChal_phC_getDuty(_motor) - _motor->FOC.deadtime_comp);
             }
             if (_motor->Conv.Iu > -0.030f) {
-                _motor->mtimer->Instance->CCR1 =
-                    _motor->mtimer->Instance->CCR1 + _motor->FOC.deadtime_comp;
+                MESChal_phA_setDuty(
+                    _motor, MESChal_phA_getDuty(_motor) + _motor->FOC.deadtime_comp);
             }
             if (_motor->Conv.Iv > -0.030f) {
-                _motor->mtimer->Instance->CCR2 =
-                    _motor->mtimer->Instance->CCR2 + _motor->FOC.deadtime_comp;
+                MESChal_phB_setDuty(
+                    _motor, MESChal_phB_getDuty(_motor) + _motor->FOC.deadtime_comp);
             }
             if (_motor->Conv.Iw > -0.030f) {
-                _motor->mtimer->Instance->CCR3 =
-                    _motor->mtimer->Instance->CCR3 + _motor->FOC.deadtime_comp;
+                MESChal_phC_setDuty(
+                    _motor, MESChal_phC_getDuty(_motor) + _motor->FOC.deadtime_comp);
             }
 
 #endif
@@ -224,7 +224,6 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
             // Fallthrough FOR NOW
         case MESC_PWM_BOTTOM_CLAMP:
 
-            // Fallthrough FOR NOW
         case MESC_PWM_SIN_BOTTOM:
             // Threshold for turning on sinusoidal modulation
             if (_motor->FOC.Voltage < _motor->FOC.V_3Q_mag_max) {  // Sinusoidal
@@ -233,15 +232,18 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
 
                 ////////////////////////////////////////////////////////
                 // Actually write the value to the timer registers
-                _motor->mtimer->Instance->CCR1 =
+                MESChal_phA_setDuty(
+                    _motor,
                     (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0] +
-                               mid_value);
-                _motor->mtimer->Instance->CCR2 =
+                               mid_value));
+                MESChal_phB_setDuty(
+                    _motor,
                     (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1] +
-                               mid_value);
-                _motor->mtimer->Instance->CCR3 =
+                               mid_value));
+                MESChal_phC_setDuty(
+                    _motor,
                     (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2] +
-                               mid_value);
+                               mid_value));
 
                 //    			_motor->FOC.inverterVoltage[0] =
                 //    _motor->FOC.inverterVoltage[0]+
@@ -259,12 +261,12 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
                     _motor->FOC.inverterVoltage[2] - bottom_value;
 
                 // Write the timer registers
-                _motor->mtimer->Instance->CCR1 =
-                    (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0]);
-                _motor->mtimer->Instance->CCR2 =
-                    (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1]);
-                _motor->mtimer->Instance->CCR3 =
-                    (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2]);
+                MESChal_phA_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
+                                                       _motor->FOC.inverterVoltage[0]));
+                MESChal_phB_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
+                                                       _motor->FOC.inverterVoltage[1]));
+                MESChal_phC_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
+                                                       _motor->FOC.inverterVoltage[2]));
             }
 #ifdef OVERMOD_DT_COMP_THRESHOLD
             // Concept here is that if we are close to the VBus max, we just do not turn
@@ -314,26 +316,14 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
 // This function needs implementing and testing before any high current or
 // voltage is applied, otherwise... DeadFETs
 void MESCpwm_generateBreak(MESC_motor_typedef* _motor) {
-#ifdef INV_ENABLE_M1
-    INV_ENABLE_M1->BSRR = INV_ENABLE_M1_IO << 16U;  // Write the inverter enable pin low
-#endif
-#ifdef INV_ENABLE_M2
-    INV_ENABLE_M2->BSRR = INV_ENABLE_M2_IO << 16U;  // Write the inverter enable pin low
-#endif
-    MESCpwm_phU_Break(_motor);
-    MESCpwm_phV_Break(_motor);
-    MESCpwm_phW_Break(_motor);
+    MESChal_phA_break(_motor);
+    MESChal_phB_break(_motor);
+    MESChal_phC_break(_motor);
 }
 void MESCpwm_generateEnable(MESC_motor_typedef* _motor) {
-#ifdef INV_ENABLE_M1
-    INV_ENABLE_M1->BSRR = INV_ENABLE_M1_IO;  // Write the inverter enable pin high
-#endif
-#ifdef INV_ENABLE_M2
-    INV_ENABLE_M2->BSRR = INV_ENABLE_M2_IO;  // Write the inverter enable pin high
-#endif
-    MESCpwm_phU_Enable(_motor);
-    MESCpwm_phV_Enable(_motor);
-    MESCpwm_phW_Enable(_motor);
+    MESChal_phA_enable(_motor);
+    MESChal_phB_enable(_motor);
+    MESChal_phC_enable(_motor);
 }
 
 void MESCpwm_generateBreakAll() {
@@ -346,68 +336,4 @@ void MESCpwm_generateBreakAll() {
     for (int i = 0; i < NUM_MOTORS; i++) {
         MESCpwm_generateBreak(&mtr[i]);
     }
-}
-
-uint32_t tmpccmrx;  // Temporary buffer which is used to turn on/off phase PWMs
-
-// Turn all phase U FETs off, Tristate the HBridge output - For BLDC mode
-// mainly, but also used for measuring, software fault detection and recovery
-void MESCpwm_phU_Break(MESC_motor_typedef* _motor) {
-    tmpccmrx = _motor->mtimer->Instance->CCMR1;
-    tmpccmrx &= ~TIM_CCMR1_OC1M;
-    tmpccmrx &= ~TIM_CCMR1_CC1S;
-    tmpccmrx |= TIM_OCMODE_FORCED_INACTIVE;
-    _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-    _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC1E;   // disable
-    _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC1NE;  // disable
-}
-// Basically un-break phase U, opposite of above...
-void MESCpwm_phU_Enable(MESC_motor_typedef* _motor) {
-    tmpccmrx = _motor->mtimer->Instance->CCMR1;
-    tmpccmrx &= ~TIM_CCMR1_OC1M;
-    tmpccmrx &= ~TIM_CCMR1_CC1S;
-    tmpccmrx |= TIM_OCMODE_PWM1;
-    _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-    _motor->mtimer->Instance->CCER |= TIM_CCER_CC1E;   // enable
-    _motor->mtimer->Instance->CCER |= TIM_CCER_CC1NE;  // enable
-}
-
-void MESCpwm_phV_Break(MESC_motor_typedef* _motor) {
-    tmpccmrx = _motor->mtimer->Instance->CCMR1;
-    tmpccmrx &= ~TIM_CCMR1_OC2M;
-    tmpccmrx &= ~TIM_CCMR1_CC2S;
-    tmpccmrx |= TIM_OCMODE_FORCED_INACTIVE << 8;
-    _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-    _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC2E;   // disable
-    _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC2NE;  // disable
-}
-
-void MESCpwm_phV_Enable(MESC_motor_typedef* _motor) {
-    tmpccmrx = _motor->mtimer->Instance->CCMR1;
-    tmpccmrx &= ~TIM_CCMR1_OC2M;
-    tmpccmrx &= ~TIM_CCMR1_CC2S;
-    tmpccmrx |= TIM_OCMODE_PWM1 << 8;
-    _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-    _motor->mtimer->Instance->CCER |= TIM_CCER_CC2E;   // enable
-    _motor->mtimer->Instance->CCER |= TIM_CCER_CC2NE;  // enable
-}
-
-void MESCpwm_phW_Break(MESC_motor_typedef* _motor) {
-    tmpccmrx = _motor->mtimer->Instance->CCMR2;
-    tmpccmrx &= ~TIM_CCMR2_OC3M;
-    tmpccmrx &= ~TIM_CCMR2_CC3S;
-    tmpccmrx |= TIM_OCMODE_FORCED_INACTIVE;
-    _motor->mtimer->Instance->CCMR2 = tmpccmrx;
-    _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC3E;   // disable
-    _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC3NE;  // disable
-}
-
-void MESCpwm_phW_Enable(MESC_motor_typedef* _motor) {
-    tmpccmrx = _motor->mtimer->Instance->CCMR2;
-    tmpccmrx &= ~TIM_CCMR2_OC3M;
-    tmpccmrx &= ~TIM_CCMR2_CC3S;
-    tmpccmrx |= TIM_OCMODE_PWM1;
-    _motor->mtimer->Instance->CCMR2 = tmpccmrx;
-    _motor->mtimer->Instance->CCER |= TIM_CCER_CC3E;   // enable
-    _motor->mtimer->Instance->CCER |= TIM_CCER_CC3NE;  // enable
 }

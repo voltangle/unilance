@@ -34,7 +34,7 @@
 #include <stdint.h>
 
 #include "conversions.h"
-#include "stm32fxxx_hal.h"
+#include "mesc_hal.h"
 
 /*
 Schematic

@@ -57,5 +57,6 @@ void RunPosControl(MESC_motor_typedef* _motor) {
         _motor->FOC.Idq_prereq.q = _motor->input_vars.min_request_Idq.q;
     }
 
-    __NOP();
+    // NOTE: This was here for an unknown to me reason, so idk
+    // __NOP();
 }

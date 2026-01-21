@@ -72,8 +72,6 @@ float two_on_sqrt3 = 1.15470f;
 
 MESC_motor_typedef mtr[NUM_MOTORS];
 
-extern ADC_HandleTypeDef hadc1;
-
 // Debug
 #define DEMCR_TRCENA 0x01000000
 #define DEMCR (*((volatile uint32_t*)0xE000EDFC))
@@ -91,56 +89,9 @@ static void ThrottleTemperature(MESC_motor_typedef* _motor);
 static void FWRampDown(MESC_motor_typedef* _motor);
 
 void MESCfoc_Init(MESC_motor_typedef* _motor) {
-    // FIXME: Platform dependency
-#ifdef STM32L4  // For some reason, ST have decided to have a different name for the L4
-                // timer DBG freeze...
-    DBGMCU->APB2FZ |= DBGMCU_APB2FZ_DBG_TIM1_STOP;
-#else
-    DBGMCU->APB2FZ |= DBGMCU_APB2_FZ_DBG_TIM1_STOP;
-#endif
-#ifdef FASTLED
-    FASTLED->MODER |= 0x1 << (FASTLEDIONO * 2);
-    FASTLED->MODER &= ~(0x2 << (FASTLEDIONO * 2));
-#endif
-#ifdef SLOWLED
-    SLOWLED->MODER |= 0x1 << (SLOWLEDIONO * 2);
-    SLOWLED->MODER &= ~(0x2 << (SLOWLEDIONO * 2));
-#endif
-
-#ifdef ENABLE_PIN
-    ENABLE_PIN->MODER |= 0x1 << (ENABLE_PINIONO * 2);
-    ENABLE_PIN->MODER &= ~(0x2 << (ENABLE_PINIONO * 2));
-    SLOWLED->BSRR = ENABLE_PINIO;
-#endif
-
-#ifdef KILLSWITCH_GPIO
-    KILLSWITCH_GPIO->MODER &= ~(0b11 << (2 * KILLSWITCH_IONO));
-#endif
-
-#ifdef HANDBRAKE_GPIO
-    HANDBRAKE_GPIO->MODER &= ~(0b11 << (2 * HANDBRAKE_IONO));
-#endif
-
-#ifdef BRAKE_DIGITAL_GPIO
-    BRAKE_DIGITAL_GPIO->MODER &= ~(0b11 << (2 * BRAKE_DIGITAL_IONO));
-#endif
-
-#ifdef INV_ENABLE_M1
-    INV_ENABLE_M1->MODER |= 0x1 << (INV_ENABLE_M1_IONO * 2);
-    INV_ENABLE_M1->MODER &= ~(0x2 << (INV_ENABLE_M1_IONO * 2));
-#endif
-#ifdef INV_ENABLE_M2
-    INV_ENABLE_M2->MODER |= 0x1 << (INV_ENABLE_M2_IONO * 2);
-    INV_ENABLE_M2->MODER &= ~(0x2 << (INV_ENABLE_M2_IONO * 2));
-#endif
     _motor->safe_start[0] = SAFE_START_DEFAULT;
 
     _motor->MotorState = MOTOR_STATE_IDLE;
-
-    // FIXME: Platform dependency
-    // enable cycle counter
-    DEMCR |= DEMCR_TRCENA;
-    DWT_CTRL |= CYCCNTENA;
 
     _motor->offset.Iu = ADC_OFFSET_DEFAULT;
     _motor->offset.Iv = ADC_OFFSET_DEFAULT;
@@ -318,8 +269,8 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     mesc_init_1(_motor);
 
 #ifdef USE_INIT_DELAY
-    HAL_Delay(1000);  // Give the everything else time to start up (e.g. throttle,
-                      // controller, PWM source...)
+    MESChal_delayMs(1000);  // Give the everything else time to start up (e.g. throttle,
+                          // controller, PWM source...)
 #endif
 
     mesc_init_2(_motor);
@@ -329,23 +280,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 // Reconfigure dead times
 // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
 #ifdef CUSTOM_DEADTIME
-    uint32_t tempDT;
-    uint32_t tmpbdtr = 0U;
-    tmpbdtr = mtr->mtimer->Instance->BDTR;
-    tempDT = (uint32_t)(((float)CUSTOM_DEADTIME * (float)HAL_RCC_GetHCLKFreq()) /
-                        (float)1000000000.0f);
-    if (tempDT < 128) {
-        MODIFY_REG(tmpbdtr, TIM_BDTR_DTG, tempDT);
-    } else {
-        uint32_t deadtime = CUSTOM_DEADTIME;
-        deadtime =
-            deadtime - (uint32_t)(127.0f * 1000000000.0f / (float)HAL_RCC_GetHCLKFreq());
-        tempDT =
-            0b10000000 + (uint32_t)(((float)deadtime * (float)HAL_RCC_GetHCLKFreq()) /
-                                    (float)2000000000.0f);
-        MODIFY_REG(tmpbdtr, TIM_BDTR_DTG, tempDT);
-    }
-    mtr->mtimer->Instance->BDTR = tmpbdtr;
+    MESChal_setDeadtime(_motor, CUSTOM_DEADTIME);
 #endif
 
     // Start the PWM channels, reset the counter to zero each time to avoid
@@ -370,16 +305,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 #ifdef USE_SPI_ENCODER
     _motor->FOC.enc_offset = ENCODER_E_OFFSET;
 #endif
-    //  __HAL_TIM_ENABLE_IT(_motor->stimer, TIM_IT_UPDATE);
 
-    // Start the slowloop timer
-    HAL_TIM_Base_Start(_motor->stimer);
-    // Here we can auto set the prescaler to get the us input regardless of the main clock
-    __HAL_TIM_SET_PRESCALER(_motor->stimer, ((HAL_RCC_GetHCLKFreq()) / 1000000 - 1));
-    __HAL_TIM_SET_AUTORELOAD(
-        _motor->stimer,
-        (1000000 / SLOWTIM_SCALER) / SLOW_LOOP_FREQUENCY);  // Run slowloop at 100Hz
-    __HAL_TIM_ENABLE_IT(_motor->stimer, TIM_IT_UPDATE);
     MESCinput_Init(_motor);
 
     //_motor->mtimer.Instance->BDTR |=TIM_BDTR_MOE;
@@ -424,11 +350,11 @@ void initialiseInverter(MESC_motor_typedef* _motor) {
         if ((_motor->offset.Iu > 1500) && (_motor->offset.Iu < 2600) &&
             (_motor->offset.Iv > 1500) && (_motor->offset.Iv < 2600) &&
             (_motor->offset.Iw > 1500) && (_motor->offset.Iw < 2600)) {
-            // ToDo, do we want some safety checks here like offsets being roughly
+            // BUG: do we want some safety checks here like offsets being roughly
             // correct?
             _motor->MotorState = MOTOR_STATE_TRACKING;
             _motor->key_bits &= ~UNINITIALISED_KEY;
-            _motor->mtimer->Instance->BDTR |= TIM_BDTR_MOE;
+            MESChal_enableOutput(_motor);
         } else {
             handleError(_motor, ERROR_STARTUP);
             // Should just loop until this succeeds
@@ -692,10 +618,8 @@ void fastLoop(MESC_motor_typedef* _motor) {
                     if (abs(diff) > 16384) {
                         if (diff < 0) {
                             _motor->FOC.parkangle = _motor->FOC.FOCAngle + 16000;
-                            __NOP();
                         } else {
                             _motor->FOC.parkangle = _motor->FOC.FOCAngle - 16000;
-                            __NOP();
                         }
                     }
                     if (abs(diff) < 8000) {
@@ -777,8 +701,6 @@ void fastLoop(MESC_motor_typedef* _motor) {
                 _motor->logging.print_samples_now = 1;
                 _motor->logging.sample_now = false;
                 post_error_samples--;
-            } else {
-                __NOP();
             }
         }
     }
@@ -1316,21 +1238,21 @@ void calculateFlux(MESC_motor_typedef* _motor) {
 
 void calculateGains(MESC_motor_typedef* _motor) {
     _motor->FOC.pwm_period = 1.0f / _motor->FOC.pwm_frequency;
-    _motor->mtimer->Instance->ARR =
-        HAL_RCC_GetHCLKFreq() /
-        (((float)_motor->mtimer->Instance->PSC + 1.0f) * 2 * _motor->FOC.pwm_frequency);
-    _motor->mtimer->Instance->CCR4 =
-        _motor->mtimer->Instance->ARR - 5;  // Just short of dead center (dead center will
-                                            // not actually trigger the conversion)
+    MESChal_setMaxDuty(_motor, MESChal_getTimerHz(_motor) /
+                                   (((float)MESChal_getTimerPrescaler(_motor) + 1.0f) *
+                                    2 * _motor->FOC.pwm_frequency));
+    // Just short of dead center (dead center will
+    // not actually trigger the conversion)
+    MESChal_phD_setDuty(_motor, MESChal_getMaxDuty(_motor) - 5);
 #ifdef SINGLE_ADC
     _motor->mtimer->Instance->CCR4 =
         _motor->mtimer->Instance->ARR -
         80;  // If we only have one ADC, we need to convert early otherwise the data will
              // not be ready in time
 #endif
-    _motor->FOC.PWMmid = _motor->mtimer->Instance->ARR * 0.5f;
+    _motor->FOC.PWMmid = MESChal_getMaxDuty(_motor) * 0.5f;
 
-    _motor->FOC.ADC_duty_threshold = _motor->mtimer->Instance->ARR * 0.90f;
+    _motor->FOC.ADC_duty_threshold = MESChal_getMaxDuty(_motor) * 0.90f;
     _motor->m.pole_angle = 65536 / _motor->m.pole_pairs;
     calculateFlux(_motor);
 
@@ -1354,7 +1276,7 @@ void calculateGains(MESC_motor_typedef* _motor) {
 void calculateVoltageGain(MESC_motor_typedef* _motor) {
     // We need a number to convert between Va Vb and raw PWM register values
     // This number should be the bus voltage divided by the ARR register
-    _motor->FOC.Vab_to_PWM = _motor->mtimer->Instance->ARR / _motor->Conv.Vbus;
+    _motor->FOC.Vab_to_PWM = MESChal_getMaxDuty(_motor) / _motor->Conv.Vbus;
     // We also need a number to set the maximum voltage that can be effectively
     // used by the SVPWM This is equal to
     // 0.5*Vbus*MAX_MODULATION*SVPWM_MULTIPLIER*Vd_MAX_PROPORTION
@@ -1380,12 +1302,11 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
     _motor->FOC.FW_multiplier =
         1.0f / (_motor->FOC.Vmag_max * (1.0f - FIELD_WEAKENING_THRESHOLD));
 
-    switch (
-        _motor->HFI
-            .Type) {  // When running HFI we want the bandwidth low, so we calculate it
-                      // with each slow loop depending on whether we are HFIing or not
+    // When running HFI we want the bandwidth low, so we calculate it
+    // with each slow loop depending on whether we are HFIing or not
+    switch (_motor->HFI.Type) {
         case HFI_TYPE_NONE:
-            __NOP();
+            // fallthrough
         case HFI_TYPE_45:
             // fallthrough
         case HFI_TYPE_D:
@@ -1554,7 +1475,6 @@ void slowLoop(MESC_motor_typedef* _motor) {
             }
             break;
         default:
-            __NOP();
             break;
     }
     /////////////////Handle the safe startup
@@ -1666,7 +1586,6 @@ void slowLoop(MESC_motor_typedef* _motor) {
                     }
                     break;
                 case MOTOR_CONTROL_MODE_POSITION:
-                    __NOP();
                 default:
                     break;
             }  // end of ControlMode switch
@@ -1709,12 +1628,10 @@ void slowLoop(MESC_motor_typedef* _motor) {
             }
             break;
         case MOTOR_STATE_SLAMBRAKE:
-            __NOP();
             // We might want to do something if there is a handbrake state? Like exiting
             // this state?
             break;
         default:
-            __NOP();
             // This accounts for all the initialising, test, measuring... procedures.
             // We basically just want to do nothing and let them get on with their job.
             break;
@@ -1832,15 +1749,15 @@ void deadshort(MESC_motor_typedef* _motor) {
     }
     if (countdown > 10) {
         MESCpwm_generateBreak(_motor);
-        _motor->mtimer->Instance->CCR1 = 50;
-        _motor->mtimer->Instance->CCR2 = 50;
-        _motor->mtimer->Instance->CCR3 = 50;
+        MESChal_phA_setDuty(_motor, 50);
+        MESChal_phB_setDuty(_motor, 50);
+        MESChal_phC_setDuty(_motor, 50);
         // Preload the timer at mid
     }
     if (countdown <= 10 && countdown > 1) {
-        _motor->mtimer->Instance->CCR1 = 50;
-        _motor->mtimer->Instance->CCR2 = 50;
-        _motor->mtimer->Instance->CCR3 = 50;
+        MESChal_phA_setDuty(_motor, 50);
+        MESChal_phB_setDuty(_motor, 50);
+        MESChal_phC_setDuty(_motor, 50);
         MESCpwm_generateEnable(_motor);
     }
     if (countdown == 1) {
@@ -1956,22 +1873,28 @@ void HallFluxMonitor(MESC_motor_typedef* _motor) {
         _motor->FOC.hall_initialised = 1;
     }
 }
-void getIncEncAngle(MESC_motor_typedef* _motor) {
-    if (_motor->FOC.encoder_polarity_invert) {
-        _motor->FOC.enc_angle =
-            _motor->m.pole_pairs *
-                (65536 -
-                 (_motor->FOC.enc_ratio * (uint16_t)_motor->enctimer->Instance->CNT -
-                  _motor->FOC.enc_ratio * (uint16_t)_motor->enctimer->Instance->CCR3)) +
-            _motor->FOC.enc_offset;
 
-    } else {
-        _motor->FOC.enc_angle =
-            _motor->m.pole_pairs *
-                ((_motor->FOC.enc_ratio * (uint16_t)_motor->enctimer->Instance->CNT -
-                  _motor->FOC.enc_ratio * (uint16_t)_motor->enctimer->Instance->CCR3)) +
-            _motor->FOC.enc_offset;
-    }
+// FIXME: Make work with MESChal
+void getIncEncAngle(MESC_motor_typedef* _motor) {
+    //     if (_motor->FOC.encoder_polarity_invert) {
+    //         _motor->FOC.enc_angle =
+    //             _motor->m.pole_pairs *
+    //                 (65536 -
+    //                  (_motor->FOC.enc_ratio * (uint16_t)_motor->enctimer->Instance->CNT
+    //                  -
+    //                   _motor->FOC.enc_ratio *
+    //                   (uint16_t)_motor->enctimer->Instance->CCR3)) +
+    //             _motor->FOC.enc_offset;
+    //
+    //     } else {
+    //         _motor->FOC.enc_angle =
+    //             _motor->m.pole_pairs *
+    //                 ((_motor->FOC.enc_ratio * (uint16_t)_motor->enctimer->Instance->CNT
+    //                 -
+    //                   _motor->FOC.enc_ratio *
+    //                   (uint16_t)_motor->enctimer->Instance->CCR3)) +
+    //             _motor->FOC.enc_offset;
+    //     }
 }
 
 void logVars(MESC_motor_typedef* _motor) {
@@ -1984,10 +1907,12 @@ void logVars(MESC_motor_typedef* _motor) {
     _motor->logging.angle[_motor->logging.current_sample] = _motor->FOC.FOCAngle;
     _motor->logging.hallstate[_motor->logging.current_sample] =
         (uint16_t)_motor->hall.current_hall_state;
-    if (_motor->MotorSensorMode == MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER) {
-        _motor->logging.hallstate[_motor->logging.current_sample] =
-            (uint16_t)_motor->enctimer->Instance->CCR3;
-    }
+    // FIXME: was commented out when migrating to MESChal
+
+    // if (_motor->MotorSensorMode == MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER) {
+    //     _motor->logging.hallstate[_motor->logging.current_sample] =
+    //         (uint16_t)_motor->enctimer->Instance->CCR3;
+    // }
     _motor->logging.current_sample++;
     if (_motor->logging.current_sample >= LOGLENGTH) {
         _motor->logging.current_sample = 0;
@@ -2113,7 +2038,8 @@ void LimitFWCurrent(MESC_motor_typedef* _motor) {
 
 void clampBatteryPower(MESC_motor_typedef* _motor) {
     /////// Clamp the max power taken from the battery
-    /////// This assumes no MTPA and no FW active. There is no (simple) closed form for
+    /////// This assumes no MTPA and no FW active. There is no (simple) closed form
+    /// for
     /// FOC with D axis current.
     _motor->FOC.reqPower = 1.5f * fabsf(_motor->FOC.Vdq.q * _motor->FOC.Idq_prereq.q);
     float batt_power_max =
@@ -2143,16 +2069,16 @@ void houseKeeping(MESC_motor_typedef* _motor) {
         _motor->FOC.flux_a = 2.5f * _motor->FOC.flux_a;  //_motor->FOC.flux_observed;
         _motor->FOC.flux_b = 2.5f * _motor->FOC.flux_b;  //_motor->FOC.flux_observed;
         // This was altered because otherwise basing the flux on the observed flux
-        // causes issues a step change in direction, so at low speed - e.g. during hall
-        // sensor startup - it causes instability.
+        // causes issues a step change in direction, so at low speed - e.g. during
+        // hall sensor startup - it causes instability.
     }
 
     // Speed tracker
     if (fabs(_motor->FOC.PLL_int) > 10000.0f) {
-        // The PLL has run away locking on to aliases; 10000 implies 6.5 pwm periods per
-        // sin wave, which is ~3000eHz, 180kerpm at 20kHz PWM frequency. While it IS
-        // possible to run faster than this, it is not a sensible use case and will not be
-        // supported.
+        // The PLL has run away locking on to aliases; 10000 implies 6.5 pwm periods
+        // per sin wave, which is ~3000eHz, 180kerpm at 20kHz PWM frequency. While it
+        // IS possible to run faster than this, it is not a sensible use case and will
+        // not be supported.
         _motor->FOC.PLL_int = 0;
     }
     // Translate the eHz to eRPM
@@ -2161,9 +2087,9 @@ void houseKeeping(MESC_motor_typedef* _motor) {
     }
     // Shut down if we are burning the hall sensors //Legacy code, can probably be
     // removed...
-    //	if(MESC_getHallState()==0){//This happens when the hall sensors overheat it seems.
-    //	  	  if (MotorError == MOTOR_ERROR_NONE) {
-    //	  		    speed_motor_limiter();
+    //	if(MESC_getHallState()==0){//This happens when the hall sensors overheat
+    // it seems. 	  	  if (MotorError == MOTOR_ERROR_NONE) {
+    // speed_motor_limiter();
     //	  	  }
     //	  	  MotorError = MOTOR_ERROR_HALL0;
     //	    }else /*if(MESC_getHallState()==7){
@@ -2338,8 +2264,8 @@ void MESC_IC_IRQ_Handler(MESC_motor_typedef* _motor, uint32_t SR, uint32_t CCR1,
         if (CCR2 < 14 || CCR1 < 3500 || CCR1 > 4500) {
             // Handle the error?
         }
-        if (CCR2 <
-            16) {  // No error but need to stop it from underflowing the following math
+        if (CCR2 < 16) {  // No error but need to stop it from underflowing the
+                          // following math
             CCR2 = 16;
         }
         uint16_t temp_enc_ang;

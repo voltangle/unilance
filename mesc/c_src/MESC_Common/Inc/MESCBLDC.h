@@ -21,7 +21,7 @@
  *  Created on: 25 Jul 2020
  *      Author: David Molony
  */
-#include "stm32fxxx_hal.h"
+#include "mesc_hal.h"
 
 #ifndef INC_MESCBLDC_H_
 #define INC_MESCBLDC_H_

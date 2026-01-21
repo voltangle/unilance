@@ -80,7 +80,6 @@ void MESChfi_Run(MESC_motor_typedef* _motor) {
 
         switch (_motor->HFI.Type) {
             case HFI_TYPE_NONE:
-                __NOP();
                 break;
             /////////////////////////////////////////////////////////////////////////////////////////////////////////////
             case HFI_TYPE_45:
@@ -163,7 +162,6 @@ void MESChfi_Run(MESC_motor_typedef* _motor) {
                     _motor->FOC.d_polarity;
                 break;
             case HFI_TYPE_SPECIAL:
-                __NOP();
                 if (_motor->HFI.inject_high_low_now == 1) {
                     _motor->HFI.Vd_injectionV = _motor->HFI.special_injectionVd;
                     _motor->HFI.Vq_injectionV = _motor->HFI.special_injectionVq;

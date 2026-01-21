@@ -47,18 +47,8 @@ void MESCpwm_Write(
 
 void MESCpwm_generateBreak(
     MESC_motor_typedef* _motor);  // Software break that does not stop the PWM timer but
-                                  // disables the outputs, sum of phU,V,W_Break();
+                                  // disables the outputs, sum of phA,V,W_Break();
 void MESCpwm_generateEnable(MESC_motor_typedef* _motor);  // Opposite of generateBreak
 void MESCpwm_generateBreakAll();                          // Disables all drives
-
-void MESCpwm_phU_Break(
-    MESC_motor_typedef* _motor);  // Turn all phase U FETs off, Tristate the ouput - For
-                                  // BLDC mode mainly, but also used for measuring
-void MESCpwm_phU_Enable(
-    MESC_motor_typedef* _motor);  // Basically un-break phase U, opposite of above...
-void MESCpwm_phV_Break(MESC_motor_typedef* _motor);
-void MESCpwm_phV_Enable(MESC_motor_typedef* _motor);
-void MESCpwm_phW_Break(MESC_motor_typedef* _motor);
-void MESCpwm_phW_Enable(MESC_motor_typedef* _motor);
 
 #endif /* INC_MESCPWM_H_ */

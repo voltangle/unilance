@@ -47,12 +47,12 @@ pub const BALANCE_CONF: BalanceConfig = BalanceConfig {
         accel_power_threshold: 0.0,
         accel_state_threshold: 0.0,
         braking_state_threshold: 0.0,
-        state_hysteresis: 0
+        state_hysteresis: 0,
     },
     integral_min: 0.0,
     integral_max: 0.0,
     out_min: 0,
-    out_max: 0
+    out_max: 0,
 };
 
 pub struct BspPeripherals<'a> {

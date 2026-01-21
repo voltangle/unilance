@@ -26,7 +26,7 @@
 #define MESChw_setup_H
 
 #include "MESCfoc.h"
-#include "stm32fxxx_hal.h"
+#include "mesc_hal.h"
 
 #define FLASH_STORAGE_PAGE 7
 
@@ -91,7 +91,7 @@ The following function prototypes must be defined in the corresponding:
     MESC_Fxxxx/Core/Src/MESChw_setup.c
 
 in addition to pre-processor defines in the corresponding:
-    MESC_Fxxxx/Core/Inc/stm32fxxx_hal.h
+    MESC_Fxxxx/Core/Inc/mesc_hal.h
 */
 
 /*

@@ -84,7 +84,7 @@
                                         // preferably this one
 
 /////////////////////Prototype stuff that does not really work
-///nicely//////////////////////////////
+/// nicely//////////////////////////////
 
 // #define USE_DEADSHORT //This can be used in place of the phase sensors for startup from
 // running. #define DEADSHORT_CURRENT 30.0f	//When recovering from tracking phase

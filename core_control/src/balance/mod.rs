@@ -41,7 +41,7 @@ pub struct BalanceRuntimeConfig {
     /// What is regarded as the "zero" of a setpoint. Usually translated to the
     /// "pedal angle" setting for the user. Radians
     pub setpoint_zero: f32,
-    pub rideassist: RideAssistRuntimeConfig
+    pub rideassist: RideAssistRuntimeConfig,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]

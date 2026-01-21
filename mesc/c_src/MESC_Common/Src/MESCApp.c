@@ -43,7 +43,7 @@
 #include "MESCerror.h"
 #include "MESCfoc.h"
 #include "MESCmotor_state.h"
-#include "stm32fxxx_hal.h"
+#include "mesc_hal.h"
 
 typedef struct {
     uint32_t reverseState;

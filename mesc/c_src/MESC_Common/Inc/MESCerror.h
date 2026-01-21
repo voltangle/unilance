@@ -32,7 +32,7 @@
 
 // Includes
 #include "MESCfoc.h"
-#include "stm32fxxx_hal.h"
+#include "mesc_hal.h"
 
 // Variables
 extern uint32_t MESC_errors;

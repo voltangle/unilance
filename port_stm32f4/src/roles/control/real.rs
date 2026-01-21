@@ -1,8 +1,8 @@
+use crate::bsp;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceState;
 use mesc::MESC_motor_typedef;
 use proto::CoreLink;
-use crate::bsp;
 
 // ACCESS RULES: This struct can ONLY be accessed in an ISR, specifically the
 // ISR that runs balance_loop(). Because of this, I opted to not use a mutex,

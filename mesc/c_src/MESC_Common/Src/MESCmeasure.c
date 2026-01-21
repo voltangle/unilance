@@ -49,18 +49,18 @@ void MESCmeasure_RL(MESC_motor_typedef* _motor) {
             break;
         case MEAS_STATE_INIT:
             _motor->meas.previous_HFI_type = _motor->HFI.Type;
-            uint16_t half_ARR = _motor->mtimer->Instance->ARR / 2;
-            _motor->mtimer->Instance->CCR1 = half_ARR;
-            _motor->mtimer->Instance->CCR2 = half_ARR;
-            _motor->mtimer->Instance->CCR3 = half_ARR;
+            uint16_t half_duty = MESChal_getMaxDuty(_motor);
+            MESChal_phA_setDuty(_motor, half_duty);
+            MESChal_phB_setDuty(_motor, half_duty);
+            MESChal_phC_setDuty(_motor, half_duty);
             _motor->m.R = 0.001f;       // Initialise with a very low value 1mR
             _motor->m.L_D = 0.000001f;  // Initialise with a very low value 1uH
             _motor->m.L_Q = 0.000001f;
             calculateVoltageGain(_motor);  // Set initial gains to enable MESCFOC to run
             calculateGains(_motor);
-            MESCpwm_phU_Enable(_motor);
-            MESCpwm_phV_Enable(_motor);
-            MESCpwm_phW_Enable(_motor);
+            MESChal_phA_enable(_motor);
+            MESChal_phB_enable(_motor);
+            MESChal_phC_enable(_motor);
             _motor->FOC.Idq_req.d = _motor->meas.measure_current;
             _motor->FOC.Idq_req.q = 0.0f;
             _motor->FOC.FOCAngle = 0;
@@ -193,9 +193,9 @@ void MESCmeasure_RL(MESC_motor_typedef* _motor) {
             _motor->meas.count_topq = 0.0f;
             _motor->meas.count_bottomq = 0.0f;
             if (_motor->meas.PWM_cycles > 2) {  // Wait a bit
-                MESCpwm_phU_Enable(_motor);
-                MESCpwm_phV_Enable(_motor);
-                MESCpwm_phW_Enable(_motor);
+                MESChal_phA_enable(_motor);
+                MESChal_phB_enable(_motor);
+                MESChal_phC_enable(_motor);
                 _motor->meas.state = MEAS_STATE_COLLECT_LQ;
                 _motor->meas.PWM_cycles = 0;
             }
@@ -234,9 +234,9 @@ void MESCmeasure_RL(MESC_motor_typedef* _motor) {
                 calculateGains(_motor);
                 _motor->MotorState = MOTOR_STATE_TRACKING;
                 _motor->meas.PWM_cycles = 0;
-                MESCpwm_phU_Enable(_motor);
-                MESCpwm_phV_Enable(_motor);
-                MESCpwm_phW_Enable(_motor);
+                MESChal_phA_enable(_motor);
+                MESChal_phB_enable(_motor);
+                MESChal_phC_enable(_motor);
 
                 _motor->meas.state = MEAS_STATE_IDLE;
             }
@@ -263,9 +263,9 @@ void MESCmeasure_GetkV(MESC_motor_typedef* _motor) {
         _motor->FOC.flux_observed = _motor->m.flux_linkage_min;
         old_HFI_type = _motor->HFI.Type;
         _motor->HFI.Type = HFI_TYPE_NONE;
-        MESCpwm_phU_Enable(_motor);
-        MESCpwm_phV_Enable(_motor);
-        MESCpwm_phW_Enable(_motor);
+        MESChal_phA_enable(_motor);
+        MESChal_phB_enable(_motor);
+        MESChal_phC_enable(_motor);
     }
 
     MESCfluxobs_run(_motor);  // We run the flux observer during this
@@ -336,7 +336,7 @@ float MESCmeasure_DetectHFI(MESC_motor_typedef* _motor) {
         a++;
         _motor->HFI.Type = HFI_TYPE_D;
         dinductance = dinductance + _motor->FOC.didq.d;
-        HAL_Delay(0);
+        MESChal_delayMs(0);
         // input_vars.input_options = 0b
     }
     dinductance = dinductance / 1000.0f;
@@ -349,7 +349,7 @@ float MESCmeasure_DetectHFI(MESC_motor_typedef* _motor) {
         a++;
         _motor->HFI.Type = HFI_TYPE_D;
         qinductance = qinductance + _motor->FOC.didq.d;
-        HAL_Delay(0);
+        MESChal_delayMs(0);
         // input_vars.input_options = 0b
     }
     qinductance = qinductance / 1000.0f;  // Note that this is not yet an inductance, but
@@ -378,9 +378,9 @@ void MESCmeasure_GetDeadtime(MESC_motor_typedef* _motor) {
     }
 
     if (use_phase == 0) {
-        _motor->mtimer->Instance->CCR1 = test_on_time;
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = 0;
+        MESChal_phA_setDuty(_motor, test_on_time);
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, 0);
         if (_motor->Conv.Iu < 1.0f) {
             test_on_time = test_on_time + 1;
         }
@@ -391,9 +391,9 @@ void MESCmeasure_GetDeadtime(MESC_motor_typedef* _motor) {
         test_on_time_acc[0] = test_on_time_acc[0] + test_on_time;
     }
     if (use_phase == 1) {
-        _motor->mtimer->Instance->CCR1 = 0;
-        _motor->mtimer->Instance->CCR2 = test_on_time;
-        _motor->mtimer->Instance->CCR3 = 0;
+        MESChal_phA_setDuty(_motor, 0);
+        MESChal_phB_setDuty(_motor, test_on_time);
+        MESChal_phC_setDuty(_motor, 0);
         if (_motor->Conv.Iv < 1.0f) {
             test_on_time = test_on_time + 1;
         }
@@ -404,9 +404,9 @@ void MESCmeasure_GetDeadtime(MESC_motor_typedef* _motor) {
         test_on_time_acc[1] = test_on_time_acc[1] + test_on_time;
     }
     if (use_phase == 2) {
-        _motor->mtimer->Instance->CCR1 = 0;
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = test_on_time;
+        MESChal_phA_setDuty(_motor, 0);
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, test_on_time);
         if (_motor->Conv.Iw < 1.0f) {
             test_on_time = test_on_time + 1;
         }
@@ -541,9 +541,9 @@ void MESCmeasure_GetHallTable(MESC_motor_typedef* _motor) {
         _motor->MotorState = MOTOR_STATE_TRACKING;
         _motor->FOC.Idq_req.d = 0;
         _motor->FOC.Idq_req.q = 0;
-        MESCpwm_phU_Enable(_motor);
-        MESCpwm_phV_Enable(_motor);
-        MESCpwm_phW_Enable(_motor);
+        MESChal_phA_enable(_motor);
+        MESChal_phB_enable(_motor);
+        MESChal_phC_enable(_motor);
     }
 }
 
@@ -551,48 +551,49 @@ static volatile int dp_periods = 6;
 void MESCmeasure_DoublePulseTest(MESC_motor_typedef* _motor) {
     static int dp_counter;
     if (dp_counter == 0) {  // Let bootstrap charge
-        __HAL_TIM_DISABLE_IT(_motor->mtimer,
-                             TIM_IT_UPDATE);  // DISABLE INTERRUPT, DANGEROUS
-        MESCpwm_phU_Enable(_motor);
-        MESCpwm_phV_Enable(_motor);
-        MESCpwm_phW_Enable(_motor);
-        _motor->mtimer->Instance->CCR1 = 0;
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = 0;
+        MESChal_disableIRQ(_motor);
+        MESChal_phA_enable(_motor);
+        MESChal_phB_enable(_motor);
+        MESChal_phC_enable(_motor);
+        MESChal_phA_setDuty(_motor, 0);
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, 0);
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter++;
     } else if (dp_counter <= (dp_periods - 3)) {  // W State ON
-        _motor->mtimer->Instance->CCR1 = 0;
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = _motor->mtimer->Instance->ARR;
-        MESCpwm_phU_Break(_motor);
-        MESCpwm_phV_Enable(_motor);
-        MESCpwm_phW_Enable(_motor);
+        MESChal_phA_setDuty(_motor, 0);
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, MESChal_getMaxDuty(_motor));
+        MESChal_phA_break(_motor);
+        MESChal_phB_enable(_motor);
+        MESChal_phC_enable(_motor);
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter++;
     } else if (dp_counter == (dp_periods - 2)) {  // Freewheel
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = 0;
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, 0);
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter++;
     } else if (dp_counter == (dp_periods - 1)) {  // W short second pulse
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = 200;
+        MESChal_phB_setDuty(_motor, 0);
+        // FIXME: Could MAYBE cause a bug where 200 means different duty percentages
+        // depending on how the timer is configured
+        MESChal_phC_setDuty(_motor, 200);
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter++;
     } else if (dp_counter == dp_periods) {  // Freewheel a bit to see the current
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = 0;
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, 0);
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter++;
     } else {  // Turn all off
-        _motor->mtimer->Instance->CCR1 = 0;
-        _motor->mtimer->Instance->CCR2 = 0;
-        _motor->mtimer->Instance->CCR3 = 0;
+        MESChal_phA_setDuty(_motor, 0);
+        MESChal_phB_setDuty(_motor, 0);
+        MESChal_phC_setDuty(_motor, 0);
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter = 0;
         MESCpwm_generateBreak(_motor);
-        __HAL_TIM_ENABLE_IT(_motor->mtimer, TIM_IT_UPDATE);  /// RE-ENABLE INTERRUPT
+        MESChal_enableIRQ(_motor);
         _motor->MotorState = MOTOR_STATE_TRACKING;
     }
 }
