@@ -8,27 +8,23 @@ tasks:
       - find mesc/c_src/MESC_Common/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
       - find mesc/c_src/hardware_conf/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
 
-  build_stm32f4_begode_etmax:
+  build_begode_etmax:
     desc: "(STM32F405RG) Begode ET Max"
     cmds:
       # Yes, this is not ideal in terms of not being automatic. But consider this, the
       # build script in the mesc crate becomes much more compact and simple :)
-      - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo build -p port_stm32f4
+      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo build -p port_stm32
         --no-default-features --features board_begode_etmax
         --target thumbv7em-none-eabi {{.CLI_ARGS}}
-  fix_stm32f4_begode_etmax:
-    desc: "cargo fix for the stm32f4_begode_etmax target"
+  fix_stm32_begode_etmax:
+    desc: "cargo fix for the begode_etmax target"
     cmds:
-      # Yes, this is not ideal in terms of not being automatic. But consider this, the
-      # build script in the mesc crate becomes much more compact and simple :)
-      - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo fix -p port_stm32f4
+      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo fix -p port_stm32
         --no-default-features --features board_begode_etmax
         --target thumbv7em-none-eabi {{.CLI_ARGS}}
-  expand_stm32f4_begode_etmax:
-    desc: "cargo expand for the stm32f4_begode_etmax target"
+  expand_stm32_begode_etmax:
+    desc: "cargo expand for the begode_etmax target"
     cmds:
-      # Yes, this is not ideal in terms of not being automatic. But consider this, the
-      # build script in the mesc crate becomes much more compact and simple :)
-      - TARGET_PORT=stm32f4 TARGET_NAME=begode_etmax cargo expand -p port_stm32f4
+      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo expand -p port_stm32
         --no-default-features --features board_begode_etmax
         --target thumbv7em-none-eabi {{.CLI_ARGS}}

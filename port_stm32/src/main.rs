@@ -70,6 +70,7 @@ fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
 
 // TODO: Try to figure out how to do the hardware config in Rust instead of a C header
 
+// TODO: This has to be refactored so it uses motor config in BSP
 /// Can only be called ONCE at firmware init
 fn configure_mesc() {
     let mut motor = MESC_motor_typedef::default();

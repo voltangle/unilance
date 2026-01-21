@@ -7,4 +7,4 @@ version = "0.1.0"
 mesc = { path = "../mesc" }
 
 [features]
-stm32f4_begode_etmax = []
+stm32_begode_etmax = []

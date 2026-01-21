@@ -21,12 +21,33 @@ use proc_macros::for_role;
 use static_cell::StaticCell;
 
 /*
- * MESC OWNED PERIPHERALS:
- * - TIM8
- * - PB6, PB7, PB8
- * - ADC1, ADC2, ADC3
- * These are NOT to be interacted with from Embassy, IT WILL ALMOST DEFINITELY RESULT
- * IN THE WHEEL MAKING EXPENSIVE SOUNDS
+ * BSP for the Begode ET Max electric unicycle motherboard.
+ *
+ * MCU: STM32F405RG
+ *
+ * Peripherals used in this BSP:
+ * - TIM8 on PC6,7,8, PA7, PB0,1: motor control
+ * - TIM3 on PA6: Tail light WS281x
+ * - TIM4 on PB9: Active(?) buzzer
+ * - SPI1 on PB3,4,5 + SPI1 SS PA15: MPU6500 IMU
+ * - USART1 on PA9,10: BLE module
+ * - USART3 on PB10,11: BMS
+ * - PB6, PB7, PB8: hall sensors
+ * - PA12: park button
+ * - PB15: power button
+ * - PC4,5: TM1638
+ * - PB12: Headlight
+ * - PB14: poweron
+ * - PC9: left DRL
+ * - PA8: right DRL
+ * - PH0,1: 8 MHz oscillator
+ * 
+ * ADC pins:
+ * - PC0: I_battery
+ * - PC1: T_driver
+ * - PA0: V_battery
+ * - PA4: I_phaseA
+ * - PA5: I_phaseC
  */
 
 // TODO: Figure out how to do "input methods". Some wheels will have controls like Begode,

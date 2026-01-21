@@ -1,6 +1,6 @@
 [package]
 edition = "2024"
-name = "port_stm32f4"
+name = "port_stm32"
 version = "0.1.0"
 license = "MIT OR Apache-2.0"
 publish = false
@@ -12,10 +12,13 @@ proc_macros = { path = "../proc_macros" }
 core_control = { path = "../core_control", optional = true }
 core_supervisor = { path = "../core_supervisor", optional = true }
 
-embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac", "memory-x", "time-driver-tim4", "exti", "chrono"] }
+embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac",
+    "exti", "chrono"] }
+embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread",
+    "executor-interrupt", "defmt"] }
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
-embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
-embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime", "tick-hz-32_768"] }
+embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime",
+    "tick-hz-32_768"] }
 embassy-futures = "0.1.2"
 
 defmt = "1.0.1"
@@ -48,10 +51,10 @@ role_supervisor = ["dep:core_supervisor"]
 board_begode_etmax = [
     "role_supervisor",
     "role_control",
-    "mesc/stm32f4_begode_etmax",
-    "core_control/stm32f4_begode_etmax",
-    "core_supervisor/stm32f4_begode_etmax",
+    "core_control/stm32_begode_etmax",
+    "core_supervisor/stm32_begode_etmax",
     "embassy-stm32/stm32f405rg",
+    "embassy-stm32/time-driver-tim5"
 ]
 
 [build-dependencies]
