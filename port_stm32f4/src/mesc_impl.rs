@@ -6,10 +6,6 @@ use core::{
 };
 use embassy_stm32::Peripherals;
 use embassy_time::Duration;
-use mesc::{
-    HAL_StatusTypeDef, HAL_StatusTypeDef_HAL_ERROR, HAL_StatusTypeDef_HAL_OK,
-    HAL_TIM_StateTypeDef_HAL_TIM_STATE_BUSY, TIM_HandleTypeDef,
-};
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mesc_init_1(motor: &mut MESC_motor_typedef) {

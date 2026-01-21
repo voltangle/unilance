@@ -20,8 +20,6 @@ use embassy_stm32::time::Hertz;
 use embassy_sync::channel::Channel;
 use embassy_time::Timer;
 use mesc::MESC_motor_typedef;
-use mesc::TIM_HandleTypeDef;
-use mesc::TIM_TypeDef;
 use proc_macros::for_role;
 use core::sync::atomic::Ordering;
 
