@@ -61,7 +61,7 @@ configurations of the same port for different target hardware. Each BSP has:
 - [ ] Properly do the ET Max config
 - [ ] Add Slint and a minimal UI
 - [ ] Add support for different displays and input method types
-- [ ] Allow to run core_supervisor in a "simulator", to test UI interactions
+- [ ] Allow to run core-supervisor in a "simulator", to test UI interactions
 - [ ] CPU usage - total percentage and per-task/ISR breakdown
 - [ ] Make MESC NOT use direct register access (or be dependent on hardware at all), and
 make it use functions defined in Rust instead
