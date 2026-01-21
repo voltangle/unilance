@@ -70,8 +70,6 @@ float sqrt1_2 = 0.707107f;
 float sqrt3_on_2 = 0.866025f;
 float two_on_sqrt3 = 1.15470f;
 
-MESC_motor_typedef mtr[NUM_MOTORS];
-
 // Debug
 #define DEMCR_TRCENA 0x01000000
 #define DEMCR (*((volatile uint32_t*)0xE000EDFC))
@@ -293,7 +291,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     while (_motor->MotorState == MOTOR_STATE_INITIALISING) {
         // At this point, the ADCs have started and we want nothing to happen until
         // initialisation complete
-        MESCpwm_generateBreakAll();
+        MESCpwm_generateBreak(_motor);
     }
     calculateGains(_motor);
     calculateVoltageGain(_motor);
@@ -1323,7 +1321,7 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
             //_motor->FOC.HFI_Threshold =
             //((HFI_VOLTAGE*sqrt2*2.0f)*_motor->FOC.pwm_period)/((_motor->m.L_D+_motor->m.L_Q)*0.5f);
             if (HFI_THRESHOLD == 0.0f) {
-                _motor->HFI.toggle_voltage = mtr->Conv.Vbus * 0.05f;
+                _motor->HFI.toggle_voltage = _motor->Conv.Vbus * 0.05f;
                 if (_motor->HFI.toggle_voltage < 1.5f) {
                     _motor->HFI.toggle_voltage = 1.5f;
                 }  // Must be greater than HFI hysteresis

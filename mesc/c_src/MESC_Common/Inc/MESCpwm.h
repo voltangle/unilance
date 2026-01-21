@@ -49,6 +49,5 @@ void MESCpwm_generateBreak(
     MESC_motor_typedef* _motor);  // Software break that does not stop the PWM timer but
                                   // disables the outputs, sum of phA,V,W_Break();
 void MESCpwm_generateEnable(MESC_motor_typedef* _motor);  // Opposite of generateBreak
-void MESCpwm_generateBreakAll();                          // Disables all drives
 
 #endif /* INC_MESCPWM_H_ */

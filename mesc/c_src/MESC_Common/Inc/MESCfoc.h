@@ -776,8 +776,6 @@ typedef struct {
     bool conf_is_valid;
 } MESC_motor_typedef;
 
-extern MESC_motor_typedef mtr[NUM_MOTORS];
-
 enum MESCADC {
     ADCIU,
     ADCIV,

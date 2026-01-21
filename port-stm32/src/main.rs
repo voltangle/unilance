@@ -76,5 +76,5 @@ fn configure_mesc() {
     let mut motor = MESC_motor_typedef::default();
     motor.id = 0;
 
-    mesc::set_motor(motor);
+    // mesc::set_motor(motor);
 }

@@ -36,6 +36,8 @@ pub fn balance_loop() {
     // TODO: MESC doesn't expose this, make it work later
     // mesc::houseKeeping(mesc::get_motor());
 
-    let motor = mesc::get_motor();
-    motor.FOC.Idq_req.q = balance_state().iterate(core_control::imu::IMUData::default());
+    // FIXME: replace get_motor()
+
+    // let motor = mesc::get_motor();
+    // motor.FOC.Idq_req.q = balance_state().iterate(core_control::imu::IMUData::default());
 }

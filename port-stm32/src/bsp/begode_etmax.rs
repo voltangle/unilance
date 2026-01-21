@@ -168,7 +168,8 @@ impl PlatformConfig for Config {
 #[interrupt]
 fn TIM8_UP_TIM13() {
     unsafe {
-        MESC_PWM_IRQ_handler(mesc::get_motor());
+        // FIXME: replace get_motor()
+        // MESC_PWM_IRQ_handler(mesc::get_motor());
         // Clear update flag
         MESC_MOTOR_TIM.sr().modify(|w| w.set_uif(false));
     }
@@ -185,7 +186,8 @@ fn TIM3() {
 #[interrupt]
 fn ADC() {
     unsafe {
-        MESC_ADC_IRQ_handler(mesc::get_motor());
+        // FIXME: replace get_motor()
+        // MESC_ADC_IRQ_handler(mesc::get_motor());
         // FIXME: ADC flags are NOT BEING RESET, IT WILL NOT FIRE AGAIN
     }
 }

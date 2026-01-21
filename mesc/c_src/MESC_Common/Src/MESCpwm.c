@@ -326,14 +326,3 @@ void MESCpwm_generateEnable(MESC_motor_typedef* _motor) {
     MESChal_phC_enable(_motor);
 }
 
-void MESCpwm_generateBreakAll() {
-#ifdef INV_ENABLE_M1
-    INV_ENABLE_M1->BSRR = INV_ENABLE_M1_IO << 16U;  // Write the inverter enable pin low
-#endif
-#ifdef INV_ENABLE_M2
-    INV_ENABLE_M2->BSRR = INV_ENABLE_M2_IO << 16U;  // Write the inverter enable pin low
-#endif
-    for (int i = 0; i < NUM_MOTORS; i++) {
-        MESCpwm_generateBreak(&mtr[i]);
-    }
-}
