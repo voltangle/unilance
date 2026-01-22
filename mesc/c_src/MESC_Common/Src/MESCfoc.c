@@ -706,16 +706,6 @@ void fastLoop(MESC_motor_typedef* _motor) {
     _motor->FOC.cycles_fastloop = CPU_CYCLES - cycles;
 }
 
-// The hyperloop runs at PWM timer bottom, when the PWM is in V7 (all high)
-// In this loop, we write the values of the PWM to be updated at the next update
-// event (timer top) This is where we want to inject signals for measurement so
-// that the next signal level takes affect right after the ADC reading In normal
-// run mode, we want to increment the angle and write the next PWM values
-
-void hyperLoop(MESC_motor_typedef* _motor) {
-    // Empty now, merged into fastloop with new dual interrupt routine
-}
-
 #define MAX_ERROR_COUNT 1
 
 void VICheck(

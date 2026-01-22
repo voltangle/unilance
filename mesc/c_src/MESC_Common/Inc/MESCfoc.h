@@ -811,7 +811,6 @@ void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor);
 // stacked in a single interrupt occurring once per period
 // but HFI will be lost
 void fastLoop(MESC_motor_typedef* _motor);
-void hyperLoop(MESC_motor_typedef* _motor);
 void VICheck(MESC_motor_typedef* _motor);
 void ADCConversion(MESC_motor_typedef* _motor);  // Roll this into the V_I_Check? less
                                                  // branching, can probably reduce no.ops
