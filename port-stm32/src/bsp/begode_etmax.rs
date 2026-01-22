@@ -3,10 +3,20 @@ use crate::roles;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceConfig;
 use core_control::balance::RideAssistConfig;
+use embassy_stm32::adc;
+use embassy_stm32::adc::Adc;
+use embassy_stm32::adc::AdcChannel;
+use embassy_stm32::adc::AnyAdcChannel;
+use embassy_stm32::adc::RegularConversionMode;
+use embassy_stm32::adc::RingBufferedAdc;
+use embassy_stm32::adc::SampleTime;
 use embassy_stm32::gpio;
 use embassy_stm32::interrupt;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
+use embassy_stm32::peripherals::ADC1;
+use embassy_stm32::peripherals::ADC2;
+use embassy_stm32::peripherals::ADC3;
 use embassy_stm32::rcc::{Hse, HseMode};
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
@@ -76,20 +86,91 @@ pub const BALANCE_CONF: BalanceConfig = BalanceConfig {
     out_max: 0,
 };
 
+static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
+static mut ADC2_DMA_BUF: [u16; 6] = [0; 6];
+static mut ADC3_DMA_BUF: [u16; 6] = [0; 6];
+
 pub struct BspPeripherals<'a> {
     poweron: gpio::Output<'a>,
     power_button: gpio::Input<'a>,
     park_button: gpio::Input<'a>,
+    adc1: RingBufferedAdc<'a, ADC1>,
+    adc2: RingBufferedAdc<'a, ADC2>,
+    adc3: RingBufferedAdc<'a, ADC3>,
+}
+
+static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
+
+#[allow(static_mut_refs)]
+fn bsp_periph() -> &'static mut BspPeripherals<'static> {
+    unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
 // Gather all peripherals required for opereration and initialize anything that
 // needs to be initialized at this point. This function has to be called ONCE on boot.
 #[allow(static_mut_refs)]
-pub fn init<'a>(p: Peripherals) -> BspPeripherals<'a> {
-    BspPeripherals {
-        poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
-        power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
-        park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
+pub fn init<'a>(p: Peripherals) {
+    let mut i_battery = p.PC0.degrade_adc();
+    let mut t_driver = p.PC1.degrade_adc();
+    let mut v_battery = p.PA0.degrade_adc();
+    let mut i_phase_a = p.PA4.degrade_adc();
+    let mut i_phase_c = p.PA5.degrade_adc();
+
+    let mut adc1 = Adc::new(p.ADC1);
+    let mut adc2 = Adc::new(p.ADC2);
+    let mut adc3 = Adc::new(p.ADC3);
+
+    let vrefint = adc2.enable_vrefint();
+    let core_temp = adc3.enable_temperature();
+
+    // TODO: Revisit the cycles part, maybe make it work better
+    let mut adc1_rb = unsafe {
+        adc1.into_ring_buffered(
+            p.DMA2_CH0,
+            &mut ADC1_DMA_BUF,
+            [
+                (i_phase_a, SampleTime::CYCLES112),
+                (vrefint.degrade_adc(), SampleTime::CYCLES112),
+                (core_temp.degrade_adc(), SampleTime::CYCLES112),
+            ]
+            .into_iter(),
+            RegularConversionMode::Continuous,
+        )
+    };
+    let mut adc2_rb = unsafe {
+        adc2.into_ring_buffered(
+            p.DMA2_CH2,
+            &mut ADC2_DMA_BUF,
+            [
+                (i_phase_c, SampleTime::CYCLES112),
+                (t_driver, SampleTime::CYCLES112),
+            ]
+            .into_iter(),
+            RegularConversionMode::Continuous,
+        )
+    };
+    let mut adc3_rb = unsafe {
+        adc3.into_ring_buffered(
+            p.DMA2_CH1,
+            &mut ADC3_DMA_BUF,
+            [
+                (i_battery, SampleTime::CYCLES112),
+                (v_battery, SampleTime::CYCLES112),
+            ]
+            .into_iter(),
+            RegularConversionMode::Continuous,
+        )
+    };
+
+    unsafe {
+        BSP_PERIPH.write(BspPeripherals {
+            poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
+            power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
+            park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
+            adc1: adc1_rb,
+            adc2: adc2_rb,
+            adc3: adc3_rb,
+        });
     }
 }
 
@@ -196,8 +277,8 @@ fn ADC() {
  * Platform functions
  */
 
-pub fn startup_successful(periph: &mut BspPeripherals) {
-    periph.poweron.set_high();
+pub fn startup_successful() {
+    bsp_periph().poweron.set_high();
 }
 
 #[allow(static_mut_refs)]
@@ -211,3 +292,5 @@ pub fn refresh_adc() {
 pub fn refresh_adc_for_vphase() {
     unimplemented!()
 }
+
+pub async fn adc_read() {}

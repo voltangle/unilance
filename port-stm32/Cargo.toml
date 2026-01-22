@@ -42,7 +42,7 @@ chrono = { version = "^0.4", default-features = false}
 # These only exist here for LSP ease-of-use. When building, ALWAYS use
 # --no-default-features, and ideally, just use pre-configured build commands in the
 # Taskfile.
-default = ["role_control", "role_supervisor", "embassy-stm32/stm32f405rg"]
+default = ["board_begode_etmax"]
 # Roles
 role_control = ["dep:core-control"]
 role_supervisor = ["dep:core-supervisor"]

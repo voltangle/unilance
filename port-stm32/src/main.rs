@@ -5,7 +5,6 @@ mod bsp;
 mod mesc_impl;
 mod reg_flags;
 mod roles;
-mod sthal;
 
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
@@ -50,7 +49,7 @@ async fn main(_spawner: Spawner) -> ! {
     // the timer starts "counting" right after it was created (it just saves a timestamp of
     // when it's supposed to elapse), so .await will "let go" exactly after STARTUP_DELAY_MS
     startup_timer.await;
-    bsp::startup_successful(&mut bsp_periph);
+    bsp::startup_successful();
 
     // Park indefinitely, so all other tasks can just, uhh, run
     core::future::pending::<()>().await;
