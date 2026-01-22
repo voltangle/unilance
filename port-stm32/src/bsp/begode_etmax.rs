@@ -38,7 +38,7 @@ use static_cell::StaticCell;
  * Peripherals used in this BSP:
  * - TIM8 on PC6,7,8, PA7, PB0,1: motor control
  * - TIM3 on PA6: Tail light WS281x
- * - TIM4 on PB9: Active(?) buzzer
+ * - TIM4 on PB9: Passive buzzer
  * - SPI1 on PB3,4,5 + SPI1 SS PA15: MPU6500 IMU
  * - USART1 on PA9,10: BLE module
  * - USART3 on PB10,11: BMS
