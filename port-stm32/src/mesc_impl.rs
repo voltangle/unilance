@@ -1,4 +1,3 @@
-use mesc::MESC_motor_typedef;
 use crate::bsp;
 use core::{
     ptr,
@@ -6,6 +5,7 @@ use core::{
 };
 use embassy_stm32::Peripherals;
 use embassy_time::Duration;
+use mesc::MESC_motor_typedef;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn mesc_init_1(motor: &mut MESC_motor_typedef) {
@@ -65,46 +65,60 @@ pub extern "C" fn MESChal_getTimerHz() -> u32 {
 // TODO: Implement all these with functions from the BSP
 
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_setDeadtimeNs(motor: &mut MESC_motor_typedef, ns: u32) { }
+extern "C" fn MESChal_setDeadtimeNs(motor: &mut MESC_motor_typedef, ns: u32) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phA_break(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_phA_break(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phB_break(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_phB_break(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phC_break(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_phC_break(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phA_enable(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_phA_enable(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phB_enable(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_phB_enable(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phC_enable(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_phC_enable(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_enableOutput(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_enableOutput(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phA_setDuty(motor: &mut MESC_motor_typedef, duty: u16) { }
+extern "C" fn MESChal_phA_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phB_setDuty(motor: &mut MESC_motor_typedef, duty: u16) { }
+extern "C" fn MESChal_phB_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phC_setDuty(motor: &mut MESC_motor_typedef, duty: u16) { }
+extern "C" fn MESChal_phC_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phD_setDuty(motor: &mut MESC_motor_typedef, duty: u16) { }
+extern "C" fn MESChal_phD_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phA_getDuty(motor: &mut MESC_motor_typedef) -> u16 { 0 }
+extern "C" fn MESChal_phA_getDuty(motor: &mut MESC_motor_typedef) -> u16 {
+    0
+}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phB_getDuty(motor: &mut MESC_motor_typedef) -> u16 { 0 }
+extern "C" fn MESChal_phB_getDuty(motor: &mut MESC_motor_typedef) -> u16 {
+    0
+}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_phC_getDuty(motor: &mut MESC_motor_typedef) -> u16 { 0 }
+extern "C" fn MESChal_phC_getDuty(motor: &mut MESC_motor_typedef) -> u16 {
+    0
+}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_getMaxDuty(motor: &mut MESC_motor_typedef) -> u16 { 0 }
+extern "C" fn MESChal_getMaxDuty(motor: &mut MESC_motor_typedef) -> u16 {
+    0
+}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_setMaxDuty(motor: &mut MESC_motor_typedef, duty: u16) { }
+extern "C" fn MESChal_setMaxDuty(motor: &mut MESC_motor_typedef, duty: u16) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_disableIRQ(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_disableIRQ(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_enableIRQ(motor: &mut MESC_motor_typedef) { }
+extern "C" fn MESChal_enableIRQ(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_getTimerPrescaler(motor: &mut MESC_motor_typedef) -> u16 { 0 }
+extern "C" fn MESChal_getTimerPrescaler(motor: &mut MESC_motor_typedef) -> u16 {
+    0
+}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_getCPUCycles() -> u32 { 0 }
+extern "C" fn MESChal_getCPUCycles() -> u32 {
+    0
+}
 #[unsafe(no_mangle)]
-extern "C" fn MESChal_isTimerCountingDown(motor: &mut MESC_motor_typedef) -> bool { false }
+extern "C" fn MESChal_isTimerCountingDown(motor: &mut MESC_motor_typedef) -> bool {
+    false
+}

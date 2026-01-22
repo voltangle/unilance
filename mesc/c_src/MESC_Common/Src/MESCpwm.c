@@ -325,4 +325,3 @@ void MESCpwm_generateEnable(MESC_motor_typedef* _motor) {
     MESChal_phB_enable(_motor);
     MESChal_phC_enable(_motor);
 }
-

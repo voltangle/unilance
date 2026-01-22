@@ -2,14 +2,16 @@
 #![no_main]
 
 mod bsp;
+mod mesc_impl;
 mod reg_flags;
 mod roles;
 mod sthal;
-mod mesc_impl;
 
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
+use core::mem::MaybeUninit;
+use core::sync::atomic::Ordering;
 use core_control::balance::BalanceState;
 use embassy_executor::Spawner;
 use embassy_stm32::Config;
@@ -21,9 +23,10 @@ use embassy_sync::channel::Channel;
 use embassy_time::Timer;
 use mesc::MESC_motor_typedef;
 use proc_macros::for_role;
-use core::sync::atomic::Ordering;
 
 use {defmt_rtt as _, panic_probe as _};
+
+static mut MESC_MOTOR: MaybeUninit<MESC_motor_typedef> = MaybeUninit::uninit();
 
 static CTRL_TO_SUPV_CHANNEL: CoreChannel = Channel::new();
 static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
@@ -68,13 +71,14 @@ fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
     unimplemented!()
 }
 
-// TODO: Try to figure out how to do the hardware config in Rust instead of a C header
+#[allow(static_mut_refs)]
+pub fn get_motor() -> &'static mut MESC_motor_typedef {
+    unsafe { &mut (*MESC_MOTOR.as_mut_ptr()) }
+}
 
-// TODO: This has to be refactored so it uses motor config in BSP
-/// Can only be called ONCE at firmware init
-fn configure_mesc() {
-    let mut motor = MESC_motor_typedef::default();
-    motor.id = 0;
-
-    // mesc::set_motor(motor);
+#[allow(static_mut_refs)]
+pub fn set_motor(motor: MESC_motor_typedef) {
+    unsafe {
+        MESC_MOTOR.write(motor);
+    }
 }

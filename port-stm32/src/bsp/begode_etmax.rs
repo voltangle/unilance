@@ -41,7 +41,7 @@ use static_cell::StaticCell;
  * - PC9: left DRL
  * - PA8: right DRL
  * - PH0,1: 8 MHz oscillator
- * 
+ *
  * ADC pins:
  * - PC0: I_battery
  * - PC1: T_driver

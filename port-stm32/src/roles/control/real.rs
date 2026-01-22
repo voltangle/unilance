@@ -1,4 +1,4 @@
-use crate::bsp;
+use crate::{bsp, get_motor};
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceState;
 use mesc::MESC_motor_typedef;
@@ -11,7 +11,7 @@ use proto::CoreLink;
 // EXPONENTIALLY.
 static mut BALANCE_STATE: MaybeUninit<BalanceState> = MaybeUninit::uninit();
 
-#[allow(static_mut_refs)]
+#[allow(static_mut_refs, unused)]
 fn balance_state() -> &'static mut BalanceState {
     unsafe { (&mut *BALANCE_STATE.as_mut_ptr()) }
 }
@@ -24,6 +24,13 @@ pub fn init() {
     unsafe {
         BALANCE_STATE.write(balance_state);
     }
+    // TODO: Try to figure out how to do the hardware config in Rust instead of a C header
+
+    // TODO: This has to be refactored so it uses motor config in BSP
+    let mut motor = MESC_motor_typedef::default();
+    motor.id = 0;
+
+    crate::set_motor(motor);
 }
 
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
@@ -32,12 +39,13 @@ pub fn init() {
 pub fn start<T: CoreLink>(_link: &T) {}
 
 /// BALANCE_STATE MUST be initialized when this function runs.
+#[allow(unused)]
 pub fn balance_loop() {
     // TODO: MESC doesn't expose this, make it work later
     // mesc::houseKeeping(mesc::get_motor());
 
     // FIXME: replace get_motor()
 
-    // let motor = mesc::get_motor();
-    // motor.FOC.Idq_req.q = balance_state().iterate(core_control::imu::IMUData::default());
+    let motor = crate::get_motor();
+    motor.FOC.Idq_req.q = balance_state().iterate(core_control::imu::IMUData::default());
 }

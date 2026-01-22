@@ -268,7 +268,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
 #ifdef USE_INIT_DELAY
     MESChal_delayMs(1000);  // Give the everything else time to start up (e.g. throttle,
-                          // controller, PWM source...)
+                            // controller, PWM source...)
 #endif
 
     mesc_init_2(_motor);

@@ -885,7 +885,7 @@ void MESC_IC_IRQ_Handler(MESC_motor_typedef* _motor, uint32_t SR, uint32_t CCR1,
 // DEMCR |= DEMCR_TRCENA;
 // DWT_CTRL |= CYCCNTENA;
 void MESChal_delayMs(uint32_t ms);
-void MESChal_setDeadtimeNs(MESC_motor_typedef *motor, uint32_t ns);
+void MESChal_setDeadtimeNs(MESC_motor_typedef* motor, uint32_t ns);
 
 void MESChal_phA_break(MESC_motor_typedef* motor);
 void MESChal_phB_break(MESC_motor_typedef* motor);
