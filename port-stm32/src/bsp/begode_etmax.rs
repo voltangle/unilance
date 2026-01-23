@@ -129,7 +129,7 @@ pub struct BspPeripherals<'a> {
     adc3: RingBufferedAdc<'a, ADC3>,
     balance_loop_tim: timer::low_level::Timer<'a, TIM2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
-    ws281x_tim: SimplePwm<'a, TIM3>
+    ws281x_tim: SimplePwm<'a, TIM3>,
 }
 
 static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();

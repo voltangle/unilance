@@ -22,14 +22,12 @@ fn main() {
             .expect("failed to run bash command");
 
         if !output.status.success() {
-            panic!("Command failed");
+            panic!("arm-none-eabi-gcc failed");
         }
 
-        // Convert stdout to String
         let stdout = String::from_utf8(output.stdout)
-            .expect("Command output was not valid UTF-8");
+            .expect("arm-none-eabi-gcc output was not valid UTF-8");
 
-        // Split by newline, trim, drop empty lines
         stdout
             .lines()
             .map(str::trim)
@@ -45,7 +43,10 @@ fn main() {
     build
         .include("c_src/")
         .include("c_src/hardware_conf")
-        .include(format!("c_src/hardware_conf/{}_{}", target_port, target_name))
+        .include(format!(
+            "c_src/hardware_conf/{}_{}",
+            target_port, target_name
+        ))
         .define("LOGLENGTH", Some("10"))
         // MESC sources
         .include("c_src/MESC_Common/Inc")
@@ -65,8 +66,7 @@ fn main() {
         .compile("MESC");
 
     // Bindings to MESC
-    let mut bindgen = bindgen::Builder::default()
-        .clang_arg("-I./c_src");
+    let mut bindgen = bindgen::Builder::default().clang_arg("-I./c_src");
 
     for include in &arm_gcc_toolchain_includes {
         bindgen = bindgen.clang_arg(format!("-I{}", include));
@@ -74,7 +74,10 @@ fn main() {
     let bindings = bindgen
         .clang_arg("-I./c_src/")
         .clang_arg("-I./c_src/MESC_Common/Inc")
-        .clang_arg(format!("-I./c_src/hardware_conf/{}_{}", target_port, target_name))
+        .clang_arg(format!(
+            "-I./c_src/hardware_conf/{}_{}",
+            target_port, target_name
+        ))
         .clang_arg("-I./c_src/hardware_conf")
         .header("c_src/mesc_wrap.h")
         .use_core()
