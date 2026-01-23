@@ -9,3 +9,10 @@ incremental = false
 codegen-units = 1
 # note: debug = true is okay - debuginfo isn't flashed to the device!
 debug = true
+
+[patch.crates-io]
+embassy-stm32 = { git = "https://github.com/embassy-rs/embassy.git", rev = "1953eb3" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "1953eb3" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "1953eb3" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "1953eb3" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "1953eb3" }
