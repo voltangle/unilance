@@ -1,5 +1,6 @@
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 
 // TODO: Add some feature flags for USE_* defines in the hardware config and use that
 
@@ -11,13 +12,37 @@ fn main() {
     let target_name = std::env::var("TARGET_NAME")
         .expect("TARGET_NAME is not defined. Are you using task build-<target-name>?");
 
-    // FIXME: all these fixed paths to arm-none-eabi are stupid
-    // I will need to use this command:
-    // arm-none-eabi-gcc -Wp,-v -E - < /dev/null 2>&1 | sed -n 's/^ //p'
-    cc::Build::new()
-        .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include")
-        .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include-fixed")
-        .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/include")
+    let mut build = cc::Build::new();
+
+    let arm_gcc_toolchain_includes: Vec<String> = {
+        let output = Command::new("bash")
+            .arg("-c")
+            .arg("arm-none-eabi-gcc -Wp,-v -E - < /dev/null 2>&1 | sed -n 's/^ //p'")
+            .output()
+            .expect("failed to run bash command");
+
+        if !output.status.success() {
+            panic!("Command failed");
+        }
+
+        // Convert stdout to String
+        let stdout = String::from_utf8(output.stdout)
+            .expect("Command output was not valid UTF-8");
+
+        // Split by newline, trim, drop empty lines
+        stdout
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(|l| l.to_string())
+            .collect()
+    };
+
+    for include in &arm_gcc_toolchain_includes {
+        build.include(include);
+    }
+
+    build
         .include("c_src/")
         .include("c_src/hardware_conf")
         .include(format!("c_src/hardware_conf/{}_{}", target_port, target_name))
@@ -40,11 +65,13 @@ fn main() {
         .compile("MESC");
 
     // Bindings to MESC
-    let bindings = bindgen::Builder::default()
-        .clang_arg("-I./c_src")
-        .clang_arg("-I/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include")
-        .clang_arg("-I/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include-fixed")
-        .clang_arg("-I/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/../../../../arm-none-eabi/include")
+    let mut bindgen = bindgen::Builder::default()
+        .clang_arg("-I./c_src");
+
+    for include in &arm_gcc_toolchain_includes {
+        bindgen = bindgen.clang_arg(format!("-I{}", include));
+    }
+    let bindings = bindgen
         .clang_arg("-I./c_src/")
         .clang_arg("-I./c_src/MESC_Common/Inc")
         .clang_arg(format!("-I./c_src/hardware_conf/{}_{}", target_port, target_name))

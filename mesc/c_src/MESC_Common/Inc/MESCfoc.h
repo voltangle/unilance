@@ -742,8 +742,6 @@ typedef struct {
 ///////////////////////////////////////////////////////////////////////////////////////////
 typedef struct {
     uint8_t id;
-    // TIM_HandleTypeDef* mtimer;    // 3 phase PWM timer
-    // TIM_HandleTypeDef* stimer;    // Timer that services the slowloop
     // FIXME: I'm disabling enctimer altogether, because it's not used for my usecase
     // Instead, I should make it also support the MESChal thing
     //
@@ -913,8 +911,6 @@ void MESChal_setMaxDuty(MESC_motor_typedef* motor, uint16_t duty);
 
 void MESChal_disableIRQ(MESC_motor_typedef* motor);
 void MESChal_enableIRQ(MESC_motor_typedef* motor);
-// NOTE: Both of these are most likely too platform dependent, so I'll have to figure
-// out how to make this part better. But honestly IDGAF if it works it works
 uint32_t MESChal_getTimerHz(MESC_motor_typedef* motor);
 uint32_t MESChal_getCPUCycles();
 bool MESChal_isTimerCountingDown(MESC_motor_typedef* motor);
