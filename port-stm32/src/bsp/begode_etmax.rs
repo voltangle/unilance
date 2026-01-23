@@ -4,6 +4,7 @@ use core::mem::MaybeUninit;
 use core_control::balance::BalanceConfig;
 use core_control::balance::RideAssistConfig;
 use embassy_executor::Metadata;
+use embassy_executor::Spawner;
 use embassy_stm32::adc;
 use embassy_stm32::adc::Adc;
 use embassy_stm32::adc::AdcChannel;
@@ -12,6 +13,7 @@ use embassy_stm32::adc::RegularConversionMode;
 use embassy_stm32::adc::RingBufferedAdc;
 use embassy_stm32::adc::SampleTime;
 use embassy_stm32::gpio;
+use embassy_stm32::gpio::OutputType;
 use embassy_stm32::interrupt;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
@@ -19,13 +21,19 @@ use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
 use embassy_stm32::peripherals::ADC1;
 use embassy_stm32::peripherals::ADC2;
 use embassy_stm32::peripherals::ADC3;
+use embassy_stm32::peripherals::TIM2;
+use embassy_stm32::peripherals::TIM8;
 use embassy_stm32::rcc::{Hse, HseMode};
 use embassy_stm32::time::Hertz;
+use embassy_stm32::timer;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
+use embassy_stm32::timer::complementary_pwm::ComplementaryPwmPin;
+use embassy_stm32::timer::low_level::CountingMode;
+use embassy_stm32::timer::low_level::RoundTo;
+use embassy_stm32::timer::simple_pwm::PwmPin;
 use embassy_stm32::{Config, Peripherals};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
-use embassy_executor::Spawner;
 use embassy_time::Duration;
 use embassy_time::Instant;
 use embassy_time::Timer;
@@ -45,6 +53,7 @@ use static_cell::StaticCell;
  * - TIM8 on PC6,7,8, PA7, PB0,1: motor control
  * - TIM3 on PA6: Tail light WS281x
  * - TIM4 on PB9: Passive buzzer
+ * - TIM5: Embassy time source
  * - SPI1 on PB3,4,5 + SPI1 SS PA15: MPU6500 IMU
  * - USART1 on PA9,10: BLE module
  * - USART3 on PB10,11: BMS
@@ -108,6 +117,8 @@ pub struct BspPeripherals<'a> {
     adc1: RingBufferedAdc<'a, ADC1>,
     adc2: RingBufferedAdc<'a, ADC2>,
     adc3: RingBufferedAdc<'a, ADC3>,
+    balance_loop_tim: timer::low_level::Timer<'a, TIM2>,
+    motor_tim: ComplementaryPwm<'a, TIM8>,
 }
 
 static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
@@ -173,6 +184,24 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         )
     };
 
+    let mut balance_loop_tim = timer::low_level::Timer::new(p.TIM2);
+    balance_loop_tim.set_frequency(Hertz::khz(1), RoundTo::Slower);
+    balance_loop_tim.enable_update_interrupt(true);
+
+    let mut motor_tim = ComplementaryPwm::new(
+        p.TIM8,
+        Some(PwmPin::new(p.PC6, OutputType::PushPull)),
+        Some(ComplementaryPwmPin::new(p.PA7, OutputType::PushPull)),
+        Some(PwmPin::new(p.PC7, OutputType::PushPull)),
+        Some(ComplementaryPwmPin::new(p.PB0, OutputType::PushPull)),
+        Some(PwmPin::new(p.PC8, OutputType::PushPull)),
+        Some(ComplementaryPwmPin::new(p.PB1, OutputType::PushPull)),
+        None,
+        None,
+        Hertz::khz(10),
+        CountingMode::EdgeAlignedDown,
+    );
+
     unsafe {
         BSP_PERIPH.write(BspPeripherals {
             poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
@@ -181,6 +210,8 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
             adc1: adc1_rb,
             adc2: adc2_rb,
             adc3: adc3_rb,
+            balance_loop_tim,
+            motor_tim,
         });
     }
 
@@ -190,9 +221,6 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
 /*
  * MESC configuration
  */
-
-// Peripheral table
-pub const MESC_MOTOR_TIM: TimAdv = embassy_stm32::pac::TIM8;
 
 // NOTE: ideally this default init should be in the mesc crate
 #[unsafe(export_name = "g_hw_setup")]
@@ -258,60 +286,28 @@ impl PlatformConfig for Config {
  * Interrupts
  */
 
-// FIXME: TIM8 is not configured
 #[interrupt]
 fn TIM8_UP_TIM13() {
     unsafe {
-        // FIXME: replace get_motor()
-        // MESC_PWM_IRQ_handler(mesc::get_motor());
+        MESC_PWM_IRQ_handler(crate::get_motor());
         // Clear update flag
-        MESC_MOTOR_TIM.sr().modify(|w| w.set_uif(false));
+        embassy_stm32::pac::TIM8.sr().modify(|w| w.set_uif(false));
     }
 }
 
-// FIXME: TIM3 is not configured
 /// The balance loop interrupt
 #[interrupt]
-fn TIM3() {
+fn TIM2() {
     roles::control::balance_loop();
 }
 
-// FIXME: ADCs are not configured nor used
 #[interrupt]
 fn ADC() {
     unsafe {
-        // FIXME: replace get_motor()
-        // MESC_ADC_IRQ_handler(mesc::get_motor());
-        // FIXME: ADC flags are NOT BEING RESET, IT WILL NOT FIRE AGAIN
+        MESC_ADC_IRQ_handler(crate::get_motor());
     }
 }
 
-// #[interrupt]
-// fn DMA2_STREAM0() {}
-//
-// #[interrupt]
-// fn DMA2_STREAM2() {}
-//
-// #[allow(static_mut_refs)]
-// #[interrupt]
-// fn DMA2_STREAM1() {
-//     // Check which half is read with the NDTR register
-//     let half_transfer = DMA2.isr(0).read().htif(1);
-//     let transfer_complete = DMA2.isr(0).read().tcif(1);
-//     let data: &[u16] = unsafe {
-//         if half_transfer {
-//             &ADC3_DMA_BUF[..(ADC3_DMA_BUF.len() / 2)]
-//         } else if transfer_complete {
-//             &ADC3_DMA_BUF[(ADC3_DMA_BUF.len() / 2) - 1..]
-//         } else {
-//             defmt::warn!(
-//                 "DMA2_Stream1: Somehow both HT and TC are reset. How did we get here?"
-//             );
-//             return;
-//         }
-//     };
-// }
-//
 /*
  * Platform functions
  */
@@ -347,8 +343,10 @@ pub async fn adc_dma_update() {
                 let core_temp = measurements[2];
 
                 motor.Raw.Iu = i_phase_a;
-            },
-            Err(_) => defmt::warn!("adc_dma_update: not reading DMA for ADC1 fast enough"),
+            }
+            Err(_) => {
+                defmt::warn!("adc_dma_update: not reading DMA for ADC1 fast enough")
+            }
         }
         match bsp_periph().adc2.read(&mut measurements).await {
             Ok(_) => {
@@ -356,8 +354,10 @@ pub async fn adc_dma_update() {
                 let t_driver = measurements[1];
 
                 motor.Raw.Iw = i_phase_c;
-            },
-            Err(_) => defmt::warn!("adc_dma_update: not reading DMA for ADC2 fast enough"),
+            }
+            Err(_) => {
+                defmt::warn!("adc_dma_update: not reading DMA for ADC2 fast enough")
+            }
         }
         match bsp_periph().adc3.read(&mut measurements).await {
             Ok(_) => {
@@ -365,8 +365,10 @@ pub async fn adc_dma_update() {
                 let v_battery = measurements[1];
 
                 motor.Raw.Vbus = v_battery;
-            },
-            Err(_) => defmt::warn!("adc_dma_update: not reading DMA for ADC3 fast enough"),
+            }
+            Err(_) => {
+                defmt::warn!("adc_dma_update: not reading DMA for ADC3 fast enough")
+            }
         }
 
         next += period;

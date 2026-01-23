@@ -1226,9 +1226,8 @@ void calculateFlux(MESC_motor_typedef* _motor) {
 
 void calculateGains(MESC_motor_typedef* _motor) {
     _motor->FOC.pwm_period = 1.0f / _motor->FOC.pwm_frequency;
-    MESChal_setMaxDuty(_motor, MESChal_getTimerHz(_motor) /
-                                   (((float)MESChal_getTimerPrescaler(_motor) + 1.0f) *
-                                    2 * _motor->FOC.pwm_frequency));
+    MESChal_setMaxDuty(_motor,
+                       MESChal_getTimerHz(_motor) * 2 * _motor->FOC.pwm_frequency);
     // Just short of dead center (dead center will
     // not actually trigger the conversion)
     MESChal_phD_setDuty(_motor, MESChal_getMaxDuty(_motor) - 5);
