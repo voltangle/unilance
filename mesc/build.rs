@@ -12,6 +12,8 @@ fn main() {
         .expect("TARGET_NAME is not defined. Are you using task build-<target-name>?");
 
     // FIXME: all these fixed paths to arm-none-eabi are stupid
+    // I will need to use this command:
+    // arm-none-eabi-gcc -Wp,-v -E - < /dev/null 2>&1 | sed -n 's/^ //p'
     cc::Build::new()
         .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include")
         .include("/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/14.2.1/include-fixed")

@@ -45,6 +45,31 @@ configurations of the same port for different target hardware. Each BSP has:
 - Its own module in `src/bsp` of its port, named `<bsp_name>.rs` if a single file or just
 `<bsp_name>` if it's a folder.
 
+## System architecture
+
+The project is split into two main role - the control role and supervisor role.
+Control is responsible for all mission-critical tasks, like motor control, balancing,
+power alarms, etc etc, while supervisor, uhh, "supervises" and orchestrates the rest of
+the system.
+
+### Responsibilites of the control role
+- Motor control
+- Balancing
+- Power alarms
+- Calculation and processing of the torque map
+- Communication with the supervisor via CAN (or in-memory channels, if both roles are combined)
+
+### Responsibilities of the supervisor role
+- Startup and shutdown
+- If roles are split, handling power delivery to the control MCU
+- Communication with control
+- External buttons
+- Displays
+- BMS communications
+- Relaying BMS system limits to control
+- BLE/Wi-Fi
+- USB PD
+
 ## Tasks
 
 - [x] Figure out ports for different MCUs and boards
@@ -55,7 +80,7 @@ configurations of the same port for different target hardware. Each BSP has:
     - [x] PI2D (Progressive + Integral + Double (sided) Derivative)
     - [ ] PI2D endstops
     - [ ] Tiltback algorithm
-    - [ ] Angle cut out
+    - [ ] Angle cut out (both on pitch and roll axis)
     - [ ] Ride Assist
 - [ ] Implement some kind of bootloader with embassy_boot
 - [ ] Properly do the ET Max config
@@ -63,6 +88,7 @@ configurations of the same port for different target hardware. Each BSP has:
 - [ ] Add support for different displays and input method types
 - [ ] Allow to run core-supervisor in a "simulator", to test UI interactions
 - [ ] CPU usage - total percentage and per-task/ISR breakdown
-- [ ] Make MESC NOT use direct register access (or be dependent on hardware at all), and
+- [x] Make MESC NOT use direct register access (or be dependent on hardware at all), and
 make it use functions defined in Rust instead
+- [ ] Add current limiting via Ibus to MESC
 - [ ] Testing

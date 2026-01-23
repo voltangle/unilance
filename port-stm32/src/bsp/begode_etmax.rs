@@ -3,6 +3,7 @@ use crate::roles;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceConfig;
 use core_control::balance::RideAssistConfig;
+use embassy_executor::Metadata;
 use embassy_stm32::adc;
 use embassy_stm32::adc::Adc;
 use embassy_stm32::adc::AdcChannel;
@@ -12,6 +13,7 @@ use embassy_stm32::adc::RingBufferedAdc;
 use embassy_stm32::adc::SampleTime;
 use embassy_stm32::gpio;
 use embassy_stm32::interrupt;
+use embassy_stm32::pac::DMA2;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
 use embassy_stm32::peripherals::ADC1;
@@ -23,6 +25,10 @@ use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
 use embassy_stm32::{Config, Peripherals};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
+use embassy_executor::Spawner;
+use embassy_time::Duration;
+use embassy_time::Instant;
+use embassy_time::Timer;
 use mesc::MESC_ADC_IRQ_handler;
 use mesc::MESC_PWM_IRQ_handler;
 use mesc::MESC_motor_typedef;
@@ -58,6 +64,11 @@ use static_cell::StaticCell;
  * - PA0: V_battery
  * - PA4: I_phaseA
  * - PA5: I_phaseC
+ *
+ * DMA setup:
+ * - DMA2 Channel 0 on ADC1: I_phaseA, Vrefint, core temp
+ * - DMA2 Channel 2 on ADC2: I_phaceC, T_driver
+ * - DMA2 Channel 1 on ADC3: I_battery, V_battery
  */
 
 // TODO: Figure out how to do "input methods". Some wheels will have controls like Begode,
@@ -87,8 +98,8 @@ pub const BALANCE_CONF: BalanceConfig = BalanceConfig {
 };
 
 static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
-static mut ADC2_DMA_BUF: [u16; 6] = [0; 6];
-static mut ADC3_DMA_BUF: [u16; 6] = [0; 6];
+static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
+static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
 
 pub struct BspPeripherals<'a> {
     poweron: gpio::Output<'a>,
@@ -109,19 +120,19 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 // Gather all peripherals required for opereration and initialize anything that
 // needs to be initialized at this point. This function has to be called ONCE on boot.
 #[allow(static_mut_refs)]
-pub fn init<'a>(p: Peripherals) {
-    let mut i_battery = p.PC0.degrade_adc();
-    let mut t_driver = p.PC1.degrade_adc();
-    let mut v_battery = p.PA0.degrade_adc();
-    let mut i_phase_a = p.PA4.degrade_adc();
-    let mut i_phase_c = p.PA5.degrade_adc();
+pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
+    let i_battery = p.PC0.degrade_adc();
+    let t_driver = p.PC1.degrade_adc();
+    let v_battery = p.PA0.degrade_adc();
+    let i_phase_a = p.PA4.degrade_adc();
+    let i_phase_c = p.PA5.degrade_adc();
 
     let mut adc1 = Adc::new(p.ADC1);
     let mut adc2 = Adc::new(p.ADC2);
     let mut adc3 = Adc::new(p.ADC3);
 
-    let vrefint = adc2.enable_vrefint();
-    let core_temp = adc3.enable_temperature();
+    let vrefint = adc1.enable_vrefint().degrade_adc();
+    let core_temp = adc1.enable_temperature().degrade_adc();
 
     // TODO: Revisit the cycles part, maybe make it work better
     let mut adc1_rb = unsafe {
@@ -130,8 +141,8 @@ pub fn init<'a>(p: Peripherals) {
             &mut ADC1_DMA_BUF,
             [
                 (i_phase_a, SampleTime::CYCLES112),
-                (vrefint.degrade_adc(), SampleTime::CYCLES112),
-                (core_temp.degrade_adc(), SampleTime::CYCLES112),
+                (vrefint, SampleTime::CYCLES112),
+                (core_temp, SampleTime::CYCLES112),
             ]
             .into_iter(),
             RegularConversionMode::Continuous,
@@ -172,6 +183,8 @@ pub fn init<'a>(p: Peripherals) {
             adc3: adc3_rb,
         });
     }
+
+    spawner.spawn(adc_dma_update().expect("Failed to spawn ADC DMA update task"));
 }
 
 /*
@@ -273,6 +286,32 @@ fn ADC() {
     }
 }
 
+// #[interrupt]
+// fn DMA2_STREAM0() {}
+//
+// #[interrupt]
+// fn DMA2_STREAM2() {}
+//
+// #[allow(static_mut_refs)]
+// #[interrupt]
+// fn DMA2_STREAM1() {
+//     // Check which half is read with the NDTR register
+//     let half_transfer = DMA2.isr(0).read().htif(1);
+//     let transfer_complete = DMA2.isr(0).read().tcif(1);
+//     let data: &[u16] = unsafe {
+//         if half_transfer {
+//             &ADC3_DMA_BUF[..(ADC3_DMA_BUF.len() / 2)]
+//         } else if transfer_complete {
+//             &ADC3_DMA_BUF[(ADC3_DMA_BUF.len() / 2) - 1..]
+//         } else {
+//             defmt::warn!(
+//                 "DMA2_Stream1: Somehow both HT and TC are reset. How did we get here?"
+//             );
+//             return;
+//         }
+//     };
+// }
+//
 /*
  * Platform functions
  */
@@ -281,16 +320,57 @@ pub fn startup_successful() {
     bsp_periph().poweron.set_high();
 }
 
-#[allow(static_mut_refs)]
 pub fn refresh_adc() {
-    // unsafe {
-    //     (&mut *MOTOR_TIM_DRIVER.as_mut_ptr()).set_high();
-    // }
-    unimplemented!()
+    // Empty, as ADC read is implemented through DMA
 }
 
 pub fn refresh_adc_for_vphase() {
-    unimplemented!()
+    // Empty, there are no phase voltage sensors on this board
 }
 
-pub async fn adc_read() {}
+#[embassy_executor::task]
+pub async fn adc_dma_update() {
+    let mut measurements: [u16; 3] = [0; 3];
+    let meta = Metadata::for_current_task().await;
+    let period = Duration::from_millis(1); // 1 kHz
+    let mut next = Instant::now();
+    let mut motor = crate::get_motor();
+
+    meta.set_deadline(next.as_ticks());
+
+    loop {
+        motor.Raw.Iv = 2048; // No phase sense on phase B
+        match bsp_periph().adc1.read(&mut measurements).await {
+            Ok(_) => {
+                let i_phase_a = measurements[0];
+                let vrefint = measurements[1];
+                let core_temp = measurements[2];
+
+                motor.Raw.Iu = i_phase_a;
+            },
+            Err(_) => defmt::warn!("adc_dma_update: not reading DMA for ADC1 fast enough"),
+        }
+        match bsp_periph().adc2.read(&mut measurements).await {
+            Ok(_) => {
+                let i_phase_c = measurements[0];
+                let t_driver = measurements[1];
+
+                motor.Raw.Iw = i_phase_c;
+            },
+            Err(_) => defmt::warn!("adc_dma_update: not reading DMA for ADC2 fast enough"),
+        }
+        match bsp_periph().adc3.read(&mut measurements).await {
+            Ok(_) => {
+                let i_battery = measurements[0];
+                let v_battery = measurements[1];
+
+                motor.Raw.Vbus = v_battery;
+            },
+            Err(_) => defmt::warn!("adc_dma_update: not reading DMA for ADC3 fast enough"),
+        }
+
+        next += period;
+        meta.set_deadline(next.as_ticks());
+        Timer::at(next).await;
+    }
+}

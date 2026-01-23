@@ -223,15 +223,15 @@
                                 : value))
 
 typedef struct {
-    int Iu;
-    int Iv;
-    int Iw;
+    uint16_t Iu;
+    uint16_t Iv;
+    uint16_t Iw;
 
-    int Vbus;
+    uint16_t Vbus;
 
-    int Vu;
-    int Vv;
-    int Vw;
+    uint16_t Vu;
+    uint16_t Vv;
+    uint16_t Vw;
 
     int MOSu_T;
     int MOSv_T;
@@ -916,7 +916,6 @@ void MESChal_enableIRQ(MESC_motor_typedef* motor);
 // NOTE: Both of these are most likely too platform dependent, so I'll have to figure
 // out how to make this part better. But honestly IDGAF if it works it works
 uint32_t MESChal_getTimerHz(MESC_motor_typedef* motor);
-uint16_t MESChal_getTimerPrescaler(MESC_motor_typedef* motor);
 uint32_t MESChal_getCPUCycles();
 bool MESChal_isTimerCountingDown(MESC_motor_typedef* motor);
 

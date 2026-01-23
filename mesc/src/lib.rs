@@ -21,3 +21,17 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 // pub fn get_motor() -> &'static mut MESC_motor_typedef {
 //     unsafe { &mut mtr[0] }
 // }
+
+
+/// A safe abstraction over C bindings to MESC.
+pub struct Motor {
+    /// It is only done as a mutable reference so that it can be easily constructed
+    /// in MESChal functions.
+    instance: &mut MESC_motor_typedef,
+}
+
+impl Motor {
+    pub fn foc_init(&mut self) {
+        unsafe { MESCfoc_Init(self.instance) };
+    }
+}

@@ -31,7 +31,7 @@ static CTRL_TO_SUPV_CHANNEL: CoreChannel = Channel::new();
 static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) -> ! {
+async fn main(spawner: Spawner) -> ! {
     let p = embassy_stm32::init(Config::for_platform());
     let clocks = embassy_stm32::rcc::clocks(&p.RCC);
     mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
@@ -39,7 +39,7 @@ async fn main(_spawner: Spawner) -> ! {
     roles::supervisor::init();
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
 
-    let mut bsp_periph = bsp::init(p);
+    let mut bsp_periph = bsp::init(p, &spawner);
 
     let supervisor_core_link = make_core_link(true);
     let control_core_link = make_core_link(false);

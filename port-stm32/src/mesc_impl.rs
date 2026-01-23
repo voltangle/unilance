@@ -59,6 +59,7 @@ pub extern "C" fn MESChal_delayMs(ms: u32) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn MESChal_getTimerHz() -> u32 {
+    // FIXME: Doesn't take into account the timer prescaler
     HCLK_HZ.load(Ordering::Relaxed)
 }
 
@@ -110,10 +111,6 @@ extern "C" fn MESChal_setMaxDuty(motor: &mut MESC_motor_typedef, duty: u16) {}
 extern "C" fn MESChal_disableIRQ(motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_enableIRQ(motor: &mut MESC_motor_typedef) {}
-#[unsafe(no_mangle)]
-extern "C" fn MESChal_getTimerPrescaler(motor: &mut MESC_motor_typedef) -> u16 {
-    0
-}
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_getCPUCycles() -> u32 {
     0

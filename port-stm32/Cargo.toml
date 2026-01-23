@@ -12,13 +12,25 @@ proc-macros = { path = "../proc-macros" }
 core-control = { path = "../core-control", optional = true }
 core-supervisor = { path = "../core-supervisor", optional = true }
 
-embassy-stm32 = { version = "0.5.0", features = ["defmt", "unstable-pac",
-    "exti", "chrono"] }
-embassy-executor = { version = "0.9.1", features = ["arch-cortex-m", "executor-thread",
-    "executor-interrupt", "defmt"] }
-embassy-sync = { version = "0.7.2", features = ["defmt"] }
-embassy-time = { version = "0.5.0", features = ["defmt", "defmt-timestamp-uptime",
-    "tick-hz-32_768"] }
+# NOTE: Done temporarily while Embassy releases their scheduler-deadline feature for
+# embassy-executor. When released, remove vendor and replace with normal version
+embassy-stm32 = { path = "../vendor/embassy/embassy-stm32", features = [
+    "defmt",
+    "unstable-pac",
+    "exti",
+    "chrono"
+]}
+embassy-executor = { path = "../vendor/embassy/embassy-executor", features = [
+    "arch-cortex-m",
+    "executor-thread",
+    "defmt"
+]}
+embassy-sync = { path = "../vendor/embassy/embassy-sync", features = ["defmt"] }
+embassy-time = { path = "../vendor/embassy/embassy-time", features = [
+    "defmt",
+    "defmt-timestamp-uptime",
+    "tick-hz-32_768"
+]}
 embassy-futures = "0.1.2"
 
 defmt = "1.0.1"
@@ -54,7 +66,8 @@ board_begode_etmax = [
     "core-control/stm32_begode_etmax",
     "core-supervisor/stm32_begode_etmax",
     "embassy-stm32/stm32f405rg",
-    "embassy-stm32/time-driver-tim5"
+    "embassy-stm32/time-driver-tim5",
+    "embassy-executor/scheduler-deadline"
 ]
 
 [build-dependencies]
