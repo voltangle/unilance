@@ -6,11 +6,10 @@ and motor control stuff. All credit for that goes to the creator, David Molony.
 ## Building
 
 To check out all available targets, run `task all_targets`. To build for a target, run
-`task build_<target-name>`, for example `task build_stm32_begode_etmax`.
+`task build_<target-name>`, for example `task build_begode_etmax`.
 
-The naming convention for target names is `<mcu>_<manufacturer>_<model>`. If there is no
-name for a manufacturer, just skip it. Naming inside a port binary doesn't need the MCU
-section.
+The naming convention for target names is `<manufacturer>_<model>`. If there is no
+name for a manufacturer, just skip it.
 
 ## Resource sharing between the Rust and C sections
 
@@ -29,7 +28,7 @@ by Rust consumer code.
 ## Ports and boards
 
 Each port is a separate binary in the root Cargo workspace, all named port_<mcu>. <mcu>
-could be either a family of chips (stm32f4), or a specific one (stm32f405), depending
+could be either a family of chips (stm32), or a specific one (stm32f405), depending
 on the port itself. Each port has:
 
 - Its own bin crate
@@ -74,7 +73,7 @@ the system.
 
 - [x] Figure out ports for different MCUs and boards
 - [x] Implement support for both single and dual MCU boards
-- [ ] Make MESC work (no linker errors, all functions (at least theoretically) properly start)
+- [x] Make MESC work (no linker errors, all functions (at least theoretically) properly start)
     - [ ] Refactor the configuration system
 - [ ] Balance algorithm (at least preliminary)
     - [x] PI2D (Progressive + Integral + Double (sided) Derivative)
