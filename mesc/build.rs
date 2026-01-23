@@ -21,6 +21,7 @@ fn main() {
         .include("c_src/")
         .include("c_src/hardware_conf")
         .include(format!("c_src/hardware_conf/{}_{}", target_port, target_name))
+        .define("LOGLENGTH", Some("10"))
         // MESC sources
         .include("c_src/MESC_Common/Inc")
         .file("c_src/MESC_Common/Src/MESCerror.c")
