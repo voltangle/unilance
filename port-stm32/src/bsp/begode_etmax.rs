@@ -22,6 +22,7 @@ use embassy_stm32::peripherals::ADC1;
 use embassy_stm32::peripherals::ADC2;
 use embassy_stm32::peripherals::ADC3;
 use embassy_stm32::peripherals::TIM2;
+use embassy_stm32::peripherals::TIM3;
 use embassy_stm32::peripherals::TIM8;
 use embassy_stm32::rcc::{Hse, HseMode};
 use embassy_stm32::time::Hertz;
@@ -31,6 +32,7 @@ use embassy_stm32::timer::complementary_pwm::ComplementaryPwmPin;
 use embassy_stm32::timer::low_level::CountingMode;
 use embassy_stm32::timer::low_level::RoundTo;
 use embassy_stm32::timer::simple_pwm::PwmPin;
+use embassy_stm32::timer::simple_pwm::SimplePwm;
 use embassy_stm32::{Config, Peripherals};
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::mutex::Mutex;
@@ -75,9 +77,15 @@ use static_cell::StaticCell;
  * - PA5: I_phaseC
  *
  * DMA setup:
- * - DMA2 Channel 0 on ADC1: I_phaseA, Vrefint, core temp
- * - DMA2 Channel 2 on ADC2: I_phaceC, T_driver
- * - DMA2 Channel 1 on ADC3: I_battery, V_battery
+ * - DMA1 Stream 2 on TIM3: WS281x
+ * - DMA2 Stream 0 on ADC1: I_phaseA, Vrefint, core temp
+ * - DMA2 Stream 2 on ADC2: I_phaceC, T_driver
+ * - DMA2 Stream 1 on ADC3: I_battery, V_battery
+ *
+ * Custom IRQs:
+ * - TIM2: balance loop
+ * - ADC: MESC ADC handler
+ * - TIM8_UP_TIM13: MESC PWM handler
  */
 
 // TODO: Figure out how to do "input methods". Some wheels will have controls like Begode,
@@ -109,6 +117,8 @@ pub const BALANCE_CONF: BalanceConfig = BalanceConfig {
 static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
 static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
+// just enough space for smooth operation
+static mut WS281X_BUF: [u16; 500] = [0; 500];
 
 pub struct BspPeripherals<'a> {
     poweron: gpio::Output<'a>,
@@ -119,6 +129,7 @@ pub struct BspPeripherals<'a> {
     adc3: RingBufferedAdc<'a, ADC3>,
     balance_loop_tim: timer::low_level::Timer<'a, TIM2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
+    ws281x_tim: SimplePwm<'a, TIM3>
 }
 
 static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
@@ -130,6 +141,8 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 
 // Gather all peripherals required for opereration and initialize anything that
 // needs to be initialized at this point. This function has to be called ONCE on boot.
+// Peripherals initialized here have to be ONLY initialized. They have to be either off
+// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
 pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
     let i_battery = p.PC0.degrade_adc();
@@ -201,6 +214,17 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         Hertz::khz(10),
         CountingMode::EdgeAlignedDown,
     );
+    motor_tim.set_master_output_enable(false);
+
+    let mut ws281x_tim = SimplePwm::new(
+        p.TIM3,
+        Some(PwmPin::new(p.PA6, OutputType::PushPull)),
+        None,
+        None,
+        None,
+        Hertz::khz(800),
+        CountingMode::EdgeAlignedUp,
+    );
 
     unsafe {
         BSP_PERIPH.write(BspPeripherals {
@@ -212,6 +236,7 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
             adc3: adc3_rb,
             balance_loop_tim,
             motor_tim,
+            ws281x_tim,
         });
     }
 
@@ -245,12 +270,7 @@ pub fn init_1(_motor: &mut MESC_motor_typedef) {}
 pub fn init_2(_motor: &mut MESC_motor_typedef) {}
 
 pub fn init_3(_motor: &mut MESC_motor_typedef) {
-    unsafe {
-        let _p = Peripherals::steal();
-        // let mut tim = ComplementaryPwm::new(p.TIM8);
-
-        // TODO: Implement
-    }
+    unimplemented!()
 }
 
 pub fn hw_init(_motor: &mut MESC_motor_typedef) {
@@ -314,6 +334,7 @@ fn ADC() {
 
 pub fn startup_successful() {
     bsp_periph().poweron.set_high();
+    bsp_periph().motor_tim.set_master_output_enable(true);
 }
 
 pub fn refresh_adc() {
@@ -342,7 +363,9 @@ pub async fn adc_dma_update() {
                 let vrefint = measurements[1];
                 let core_temp = measurements[2];
 
-                motor.Raw.Iu = i_phase_a;
+                critical_section::with(|_| {
+                    motor.Raw.Iu = i_phase_a;
+                });
             }
             Err(_) => {
                 defmt::warn!("adc_dma_update: not reading DMA for ADC1 fast enough")
@@ -353,7 +376,9 @@ pub async fn adc_dma_update() {
                 let i_phase_c = measurements[0];
                 let t_driver = measurements[1];
 
-                motor.Raw.Iw = i_phase_c;
+                critical_section::with(|_| {
+                    motor.Raw.Iw = i_phase_c;
+                });
             }
             Err(_) => {
                 defmt::warn!("adc_dma_update: not reading DMA for ADC2 fast enough")
@@ -364,7 +389,9 @@ pub async fn adc_dma_update() {
                 let i_battery = measurements[0];
                 let v_battery = measurements[1];
 
-                motor.Raw.Vbus = v_battery;
+                critical_section::with(|_| {
+                    motor.Raw.Vbus = v_battery;
+                });
             }
             Err(_) => {
                 defmt::warn!("adc_dma_update: not reading DMA for ADC3 fast enough")

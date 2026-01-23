@@ -2,6 +2,7 @@
 #![no_main]
 
 mod bsp;
+mod driver;
 mod mesc_impl;
 mod reg_flags;
 mod roles;
