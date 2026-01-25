@@ -9,12 +9,16 @@ use embassy_stm32::adc;
 use embassy_stm32::adc::Adc;
 use embassy_stm32::adc::AdcChannel;
 use embassy_stm32::adc::AnyAdcChannel;
+use embassy_stm32::adc::ConversionTrigger;
+use embassy_stm32::adc::Exten;
 use embassy_stm32::adc::RegularConversionMode;
 use embassy_stm32::adc::RingBufferedAdc;
 use embassy_stm32::adc::SampleTime;
 use embassy_stm32::gpio;
 use embassy_stm32::gpio::OutputType;
 use embassy_stm32::interrupt;
+use embassy_stm32::pac;
+use embassy_stm32::pac::timer::regs::SrAdv;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
@@ -146,7 +150,7 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 // Peripherals initialized here have to be ONLY initialized. They have to be either off
 // or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
-pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
+pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let i_battery = p.PC0.degrade_adc();
     let t_driver = p.PC1.degrade_adc();
     let v_battery = p.PA0.degrade_adc();
@@ -171,7 +175,13 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
                 (core_temp, SampleTime::CYCLES112),
             ]
             .into_iter(),
-            RegularConversionMode::Continuous,
+            RegularConversionMode::Triggered(ConversionTrigger {
+                // TIM8_TRGO, aka ADC conversions are driven by the motor control timer.
+                // Refer to RM0090 Rev 21 (F405 reference manual) table 69 (nice) in
+                // section 13.6 for details.
+                channel: 0b1110,
+                edge: Exten::RISING_EDGE,
+            }),
         )
     };
     let mut adc2_rb = unsafe {
@@ -183,7 +193,10 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
                 (t_driver, SampleTime::CYCLES112),
             ]
             .into_iter(),
-            RegularConversionMode::Continuous,
+            RegularConversionMode::Triggered(ConversionTrigger {
+                channel: 0b1110,
+                edge: Exten::RISING_EDGE,
+            }),
         )
     };
     let mut adc3_rb = unsafe {
@@ -195,7 +208,10 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
                 (v_battery, SampleTime::CYCLES112),
             ]
             .into_iter(),
-            RegularConversionMode::Continuous,
+            RegularConversionMode::Triggered(ConversionTrigger {
+                channel: 0b1110,
+                edge: Exten::RISING_EDGE,
+            }),
         )
     };
 
@@ -214,7 +230,7 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         None,
         None,
         Hertz::khz(10),
-        CountingMode::EdgeAlignedDown,
+        CountingMode::EdgeAlignedDown, // TODO: I will need to check what's up with this
     );
     motor_tim.set_master_output_enable(false);
 
@@ -255,8 +271,6 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
             ws281x_tim,
         });
     }
-
-    spawner.spawn(adc_dma_update().expect("Failed to spawn ADC DMA update task"));
 }
 
 /*
@@ -325,11 +339,17 @@ impl PlatformConfig for Config {
 #[interrupt]
 fn TIM8_UP_TIM13() {
     rtos_trace::trace::isr_enter();
+
+    let motor = crate::get_motor();
+    adc_dma_read();
     unsafe {
-        MESC_PWM_IRQ_handler(crate::get_motor());
-        // Clear update flag
-        embassy_stm32::pac::TIM8.sr().modify(|w| w.set_uif(false));
+        mesc::fastLoop(motor);
+        MESC_PWM_IRQ_handler(motor);
     }
+
+    // Clear update flag
+    pac::TIM8.sr().modify(|w| w.set_uif(false));
+
     rtos_trace::trace::isr_exit();
 }
 
@@ -339,15 +359,6 @@ fn TIM2() {
     rtos_trace::trace::isr_enter();
     roles::control::balance_loop();
     rtos_trace::trace::isr_exit();
-}
-
-// FIXME: ADC interrupts are not reliable, as it's going in DMA. Use some other timing
-// source
-#[interrupt]
-fn ADC() {
-    unsafe {
-        MESC_ADC_IRQ_handler(crate::get_motor());
-    }
 }
 
 /*
@@ -367,61 +378,31 @@ pub fn refresh_adc_for_vphase() {
     // Empty, there are no phase voltage sensors on this board
 }
 
-#[embassy_executor::task]
-pub async fn adc_dma_update() {
-    let mut measurements: [u16; 3] = [0; 3];
-    let meta = Metadata::for_current_task().await;
-    let period = Duration::from_millis(1); // 1 kHz
-    let mut next = Instant::now();
-    let mut motor = crate::get_motor();
+fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
+    let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
 
-    meta.set_deadline(next.as_ticks());
+    // if the amount of data to write is smaller than half the buffer, then DMA is
+    // writing to the second half of the buffer
+    if ndtr < (buf.len() - 1) / 2 {
+        &buf[..buf.len() / 2]
+    } else {
+        &buf[(buf.len() / 2) - 1..]
+    }
+}
 
-    loop {
-        motor.Raw.Iv = 2048; // No phase sense on phase B
-        match bsp_periph().adc1.read(&mut measurements).await {
-            Ok(_) => {
-                let i_phase_a = measurements[0];
-                let vrefint = measurements[1];
-                let core_temp = measurements[2];
+#[allow(static_mut_refs)]
+fn adc_dma_read() {
+    unsafe {
+        let mut motor = crate::get_motor();
+        motor.Raw.Iv = 2048;
 
-                critical_section::with(|_| {
-                    motor.Raw.Iu = i_phase_a;
-                });
-            }
-            Err(_) => {
-                defmt::warn!("adc_dma_update: not reading DMA for ADC1 fast enough")
-            }
-        }
-        match bsp_periph().adc2.read(&mut measurements).await {
-            Ok(_) => {
-                let i_phase_c = measurements[0];
-                let t_driver = measurements[1];
+        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
+        motor.Raw.Iu = adc1_buf[0]; // I_phaseA
 
-                critical_section::with(|_| {
-                    motor.Raw.Iw = i_phase_c;
-                });
-            }
-            Err(_) => {
-                defmt::warn!("adc_dma_update: not reading DMA for ADC2 fast enough")
-            }
-        }
-        match bsp_periph().adc3.read(&mut measurements).await {
-            Ok(_) => {
-                let i_battery = measurements[0];
-                let v_battery = measurements[1];
+        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
+        motor.Raw.Vbus = adc2_buf[1]; // V_battery
 
-                critical_section::with(|_| {
-                    motor.Raw.Vbus = v_battery;
-                });
-            }
-            Err(_) => {
-                defmt::warn!("adc_dma_update: not reading DMA for ADC3 fast enough")
-            }
-        }
-
-        next += period;
-        meta.set_deadline(next.as_ticks());
-        Timer::at(next).await;
+        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
+        motor.Raw.Iw = adc3_buf[0];
     }
 }

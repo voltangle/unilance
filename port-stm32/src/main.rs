@@ -2,11 +2,11 @@
 #![no_main]
 
 mod bsp;
+mod cpu_usage;
 mod driver;
 mod mesc_impl;
 mod regs;
 mod roles;
-mod cpu_usage;
 
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]

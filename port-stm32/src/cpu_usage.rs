@@ -1,7 +1,7 @@
-use core::sync::atomic::{AtomicU32, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 
 use cortex_m::peripheral::DWT;
-use rtos_trace::{global_trace, RtosTrace};
+use rtos_trace::{RtosTrace, global_trace};
 
 // ===== Timestamp source =====
 // Prefer DWT CYCCNT when available; otherwise use a free-running hardware timer.
@@ -9,13 +9,13 @@ use rtos_trace::{global_trace, RtosTrace};
 #[inline(always)]
 fn now_cycles() -> u32 {
     // DWT CYCCNT example (Cortex-M3/M4/M7). Ensure you've enabled it at boot.
-    unsafe { (*DWT::ptr()).cyccnt.read() }
+    unsafe { (*DWT::PTR).cyccnt.read() }
 }
 
 // Modes
 const MODE_IDLE: u8 = 0;
 const MODE_BUSY: u8 = 1;
-const MODE_ISR:  u8 = 2;
+const MODE_ISR: u8 = 2;
 
 // State
 static MODE: AtomicU8 = AtomicU8::new(MODE_BUSY);
