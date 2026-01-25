@@ -1,15 +1,11 @@
 use super::PlatformConfig;
 use crate::roles;
-use core::mem;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceConfig;
 use core_control::balance::RideAssistConfig;
-use embassy_executor::Metadata;
 use embassy_executor::Spawner;
-use embassy_stm32::adc;
 use embassy_stm32::adc::Adc;
 use embassy_stm32::adc::AdcChannel;
-use embassy_stm32::adc::AnyAdcChannel;
 use embassy_stm32::adc::ConversionTrigger;
 use embassy_stm32::adc::Exten;
 use embassy_stm32::adc::RegularConversionMode;
@@ -20,10 +16,6 @@ use embassy_stm32::gpio::OutputType;
 use embassy_stm32::interrupt;
 use embassy_stm32::pac;
 use embassy_stm32::pac::DMA2;
-use embassy_stm32::pac::TIM8;
-use embassy_stm32::pac::timer::regs::SrAdv;
-use embassy_stm32::pac::timer::{TimAdv, TimGp16};
-use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
 use embassy_stm32::peripherals::ADC1;
 use embassy_stm32::peripherals::ADC2;
 use embassy_stm32::peripherals::ADC3;
@@ -42,14 +34,7 @@ use embassy_stm32::timer::low_level::RoundTo;
 use embassy_stm32::timer::simple_pwm::PwmPin;
 use embassy_stm32::timer::simple_pwm::SimplePwm;
 use embassy_stm32::{Config, Peripherals};
-use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
-use embassy_sync::mutex::Mutex;
-use embassy_time::Duration;
-use embassy_time::Instant;
-use embassy_time::Timer;
 use mesc::MESC_PWM_IRQ_handler;
-use proc_macros::for_role;
-use static_cell::StaticCell;
 
 /*
  * BSP for the Begode ET Max electric unicycle motherboard.
@@ -247,7 +232,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     imu_spi_conf.mode = spi::MODE_0;
     imu_spi_conf.frequency = Hertz::mhz(1);
 
-    let imu_spi = Spi::new(
+    let _imu_spi = Spi::new(
         p.SPI1,
         p.PB3,
         p.PB5,

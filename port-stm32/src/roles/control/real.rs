@@ -1,4 +1,4 @@
-use crate::{bsp, get_motor};
+use crate::bsp;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceState;
 use mesc::MESC_motor_typedef;

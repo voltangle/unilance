@@ -1,9 +1,5 @@
 use crate::{bsp, cpu_usage};
-use core::{
-    ptr,
-    sync::atomic::{AtomicU32, Ordering},
-};
-use embassy_stm32::Peripherals;
+use core::sync::atomic::{AtomicU32, Ordering};
 use embassy_time::Duration;
 use mesc::MESC_motor_typedef;
 

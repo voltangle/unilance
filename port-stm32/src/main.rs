@@ -13,12 +13,8 @@ use crate::bsp::PlatformConfig;
 use crate::roles::{CoreChannel, MemChannelCoreLink};
 use core::mem::MaybeUninit;
 use core::sync::atomic::Ordering;
-use core_control::balance::BalanceState;
 use embassy_executor::Spawner;
 use embassy_stm32::Config;
-use embassy_stm32::rcc::Hse;
-use embassy_stm32::rcc::HseMode;
-use embassy_stm32::time::Hertz;
 #[for_role("combined")]
 use embassy_sync::channel::Channel;
 use embassy_time::Timer;
