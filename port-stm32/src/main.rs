@@ -41,7 +41,7 @@ async fn main(spawner: Spawner) -> ! {
     roles::supervisor::init();
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
 
-    let mut bsp_periph = bsp::init(p, &spawner);
+    bsp::init(p, &spawner);
 
     let supervisor_core_link = make_core_link(true);
     let control_core_link = make_core_link(false);

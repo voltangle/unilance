@@ -551,7 +551,7 @@ static volatile int dp_periods = 6;
 void MESCmeasure_DoublePulseTest(MESC_motor_typedef* _motor) {
     static int dp_counter;
     if (dp_counter == 0) {  // Let bootstrap charge
-        MESChal_disableIRQ(_motor);
+        MESChal_setIRQ(_motor, false);
         MESChal_phA_enable(_motor);
         MESChal_phB_enable(_motor);
         MESChal_phC_enable(_motor);
@@ -593,7 +593,7 @@ void MESCmeasure_DoublePulseTest(MESC_motor_typedef* _motor) {
         _motor->test_vals.dp_current_final[dp_counter] = _motor->Conv.Iv;
         dp_counter = 0;
         MESCpwm_generateBreak(_motor);
-        MESChal_enableIRQ(_motor);
+        MESChal_setIRQ(_motor, true);
         _motor->MotorState = MOTOR_STATE_TRACKING;
     }
 }

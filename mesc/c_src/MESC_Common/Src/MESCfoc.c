@@ -278,7 +278,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 // Reconfigure dead times
 // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
 #ifdef CUSTOM_DEADTIME
-    MESChal_setDeadtime(_motor, CUSTOM_DEADTIME);
+    MESChal_setDeadtimeNs(_motor, CUSTOM_DEADTIME);
 #endif
 
     // Start the PWM channels, reset the counter to zero each time to avoid
@@ -1226,8 +1226,7 @@ void calculateFlux(MESC_motor_typedef* _motor) {
 
 void calculateGains(MESC_motor_typedef* _motor) {
     _motor->FOC.pwm_period = 1.0f / _motor->FOC.pwm_frequency;
-    MESChal_setMaxDuty(_motor,
-                       MESChal_getTimerHz(_motor) * 2 * _motor->FOC.pwm_frequency);
+    MESChal_setPWMFrequency(_motor, _motor->FOC.pwm_frequency);
     // Just short of dead center (dead center will
     // not actually trigger the conversion)
     MESChal_phD_setDuty(_motor, MESChal_getMaxDuty(_motor) - 5);

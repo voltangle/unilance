@@ -3,12 +3,8 @@ use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
 use cortex_m::peripheral::DWT;
 use rtos_trace::{RtosTrace, global_trace};
 
-// ===== Timestamp source =====
-// Prefer DWT CYCCNT when available; otherwise use a free-running hardware timer.
-// This function must be very fast and callable in ISR context.
 #[inline(always)]
-fn now_cycles() -> u32 {
-    // DWT CYCCNT example (Cortex-M3/M4/M7). Ensure you've enabled it at boot.
+pub fn now_cycles() -> u32 {
     unsafe { (*DWT::PTR).cyccnt.read() }
 }
 

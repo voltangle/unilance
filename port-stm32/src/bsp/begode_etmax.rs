@@ -1,5 +1,6 @@
 use super::PlatformConfig;
 use crate::roles;
+use core::mem;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceConfig;
 use core_control::balance::RideAssistConfig;
@@ -18,8 +19,9 @@ use embassy_stm32::gpio;
 use embassy_stm32::gpio::OutputType;
 use embassy_stm32::interrupt;
 use embassy_stm32::pac;
-use embassy_stm32::pac::timer::regs::SrAdv;
 use embassy_stm32::pac::DMA2;
+use embassy_stm32::pac::TIM8;
+use embassy_stm32::pac::timer::regs::SrAdv;
 use embassy_stm32::pac::timer::{TimAdv, TimGp16};
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB};
 use embassy_stm32::peripherals::ADC1;
@@ -45,10 +47,7 @@ use embassy_sync::mutex::Mutex;
 use embassy_time::Duration;
 use embassy_time::Instant;
 use embassy_time::Timer;
-use mesc::MESC_ADC_IRQ_handler;
 use mesc::MESC_PWM_IRQ_handler;
-use mesc::MESC_motor_typedef;
-use mesc::hw_setup_s;
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -157,15 +156,15 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let i_phase_a = p.PA4.degrade_adc();
     let i_phase_c = p.PA5.degrade_adc();
 
-    let mut adc1 = Adc::new(p.ADC1);
-    let mut adc2 = Adc::new(p.ADC2);
-    let mut adc3 = Adc::new(p.ADC3);
+    let adc1 = Adc::new(p.ADC1);
+    let adc2 = Adc::new(p.ADC2);
+    let adc3 = Adc::new(p.ADC3);
 
     let vrefint = adc1.enable_vrefint().degrade_adc();
     let core_temp = adc1.enable_temperature().degrade_adc();
 
     // TODO: Revisit the cycles part, maybe make it work better
-    let mut adc1_rb = unsafe {
+    let adc1_rb = unsafe {
         adc1.into_ring_buffered(
             p.DMA2_CH0,
             &mut ADC1_DMA_BUF,
@@ -184,7 +183,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
-    let mut adc2_rb = unsafe {
+    let adc2_rb = unsafe {
         adc2.into_ring_buffered(
             p.DMA2_CH3,
             &mut ADC2_DMA_BUF,
@@ -199,7 +198,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
-    let mut adc3_rb = unsafe {
+    let adc3_rb = unsafe {
         adc3.into_ring_buffered(
             p.DMA2_CH1,
             &mut ADC3_DMA_BUF,
@@ -215,7 +214,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         )
     };
 
-    let mut balance_loop_tim = timer::low_level::Timer::new(p.TIM2);
+    let balance_loop_tim = timer::low_level::Timer::new(p.TIM2);
     balance_loop_tim.set_frequency(Hertz::khz(1), RoundTo::Slower);
     balance_loop_tim.enable_update_interrupt(true);
 
@@ -234,7 +233,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     );
     motor_tim.set_master_output_enable(false);
 
-    let mut ws281x_tim = SimplePwm::new(
+    let ws281x_tim = SimplePwm::new(
         p.TIM3,
         Some(PwmPin::new(p.PA6, OutputType::PushPull)),
         None,
@@ -248,7 +247,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     imu_spi_conf.mode = spi::MODE_0;
     imu_spi_conf.frequency = Hertz::mhz(1);
 
-    let mut imu_spi = Spi::new(
+    let imu_spi = Spi::new(
         p.SPI1,
         p.PB3,
         p.PB5,
@@ -277,39 +276,158 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
  * MESC configuration
  */
 
-// NOTE: ideally this default init should be in the mesc crate
-#[unsafe(export_name = "g_hw_setup")]
-pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
-    Imax: 0.0,
-    Vmax: 0.0,
-    Vmin: 0.0,
-    Rshunt: 0.0,
-    RVBT: 0.0,
-    RVBB: 0.0,
-    VBGain: 0.0,
-    RIphPU: 0.0,
-    RIphSR: 0.0,
-    OpGain: 0.0,
-    Igain: 0.0,
-    RawCurrLim: 0,
-    RawVoltLim: 0,
-};
+pub mod foc {
+    use crate::{bsp::begode_etmax::bsp_periph, mesc_impl::HCLK_HZ};
+    use core::{mem, sync::atomic::Ordering};
+    use cortex_m::prelude::_embedded_hal_Pwm;
+    use embassy_stm32::{
+        pac::{GPIOB, TIM8},
+        time::Hertz,
+        timer::Channel,
+    };
+    use mesc::{MESC_motor_typedef, hw_setup_s};
 
-pub fn init_1(_motor: &mut MESC_motor_typedef) {}
+    // NOTE: ideally this default init should be in the mesc crate
+    #[unsafe(export_name = "g_hw_setup")]
+    pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
+        Imax: 0.0,
+        Vmax: 0.0,
+        Vmin: 0.0,
+        Rshunt: 0.0,
+        RVBT: 0.0,
+        RVBB: 0.0,
+        VBGain: 0.0,
+        RIphPU: 0.0,
+        RIphSR: 0.0,
+        OpGain: 0.0,
+        Igain: 0.0,
+        RawCurrLim: 0,
+        RawVoltLim: 0,
+    };
 
-pub fn init_2(_motor: &mut MESC_motor_typedef) {}
+    pub fn init_1(_motor: &mut MESC_motor_typedef) {}
 
-pub fn init_3(_motor: &mut MESC_motor_typedef) {
-    unimplemented!()
-}
+    pub fn init_2(_motor: &mut MESC_motor_typedef) {}
 
-pub fn hw_init(_motor: &mut MESC_motor_typedef) {
-    unimplemented!()
-}
+    pub fn init_3(_motor: &mut MESC_motor_typedef) {
+        unimplemented!()
+    }
 
-// PB6, 7, 8
-pub fn get_hall_state() -> u8 {
-    ((GPIOB.idr().read().0 >> 6) & 0b111) as u8
+    pub fn hw_init(_motor: &mut MESC_motor_typedef) {
+        unimplemented!()
+    }
+
+    // PB6, 7, 8
+    pub fn get_hall_state() -> u8 {
+        ((GPIOB.idr().read().0 >> 6) & 0b111) as u8
+    }
+
+    #[inline(always)]
+    pub fn refresh_adc() {
+        // Empty, as ADC read is implemented through DMA
+    }
+
+    #[inline(always)]
+    pub fn refresh_adc_for_vphase() {
+        // Empty, there are no phase voltage sensors on this board
+    }
+
+    #[inline(always)]
+    pub fn set_irq(_motor: &mut MESC_motor_typedef, state: bool) {
+        TIM8.dier().read().set_uie(state);
+    }
+
+    #[inline(always)]
+    pub fn is_tim_counting_down(_motor: &mut MESC_motor_typedef) -> bool {
+        // The Dir enum is always going to be just two values, 0 and 1. It is guaranteed
+        // that it not cause any UB.
+        unsafe { mem::transmute(TIM8.cr1().read().dir()) }
+    }
+
+    #[inline(always)]
+    pub fn set_pwm_frequency(_motor: &mut MESC_motor_typedef, freq: u32) {
+        bsp_periph().motor_tim.set_frequency(Hertz::hz(freq));
+    }
+
+    #[inline(always)]
+    pub fn get_max_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+        bsp_periph().motor_tim.get_max_duty() as u16
+    }
+
+    #[inline(always)]
+    pub fn phase_a_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+        bsp_periph().motor_tim.get_duty(Channel::Ch1)
+    }
+
+    #[inline(always)]
+    pub fn phase_b_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+        bsp_periph().motor_tim.get_duty(Channel::Ch2)
+    }
+
+    #[inline(always)]
+    pub fn phase_c_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+        bsp_periph().motor_tim.get_duty(Channel::Ch3)
+    }
+
+    #[inline(always)]
+    pub fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        bsp_periph().motor_tim.set_duty(Channel::Ch1, duty.into());
+    }
+
+    #[inline(always)]
+    pub fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        bsp_periph().motor_tim.set_duty(Channel::Ch2, duty.into());
+    }
+
+    #[inline(always)]
+    pub fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        bsp_periph().motor_tim.set_duty(Channel::Ch3, duty.into());
+    }
+
+    #[inline(always)]
+    pub fn phase_d_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        bsp_periph().motor_tim.set_duty(Channel::Ch4, duty.into());
+    }
+
+    #[inline(always)]
+    pub fn enable_output(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.set_master_output_enable(true);
+    }
+
+    pub fn phase_a_enable(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.enable(Channel::Ch1);
+    }
+
+    pub fn phase_b_enable(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.enable(Channel::Ch2);
+    }
+
+    pub fn phase_c_enable(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.enable(Channel::Ch3);
+    }
+
+    pub fn phase_a_break(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.disable(Channel::Ch1);
+    }
+
+    pub fn phase_b_break(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.disable(Channel::Ch2);
+    }
+
+    pub fn phase_c_break(_motor: &mut MESC_motor_typedef) {
+        bsp_periph().motor_tim.disable(Channel::Ch3);
+    }
+
+    pub fn set_deadtime(_motor: &mut MESC_motor_typedef, ns: u16) {
+        // FIXME: doesn't take into account the timer prescaler
+        let tim_clk = HCLK_HZ.load(Ordering::Relaxed) as f32;
+        // how many nanoseconds there are in a second
+        let ns_in_sec = 1000000000.0;
+        // how many nanoseconds equal to one timer counter tick
+        let tick_ns = ns_in_sec / tim_clk;
+
+        bsp_periph().motor_tim.set_dead_time(ns / tick_ns as u16);
+    }
 }
 
 /*
@@ -370,13 +488,9 @@ pub fn startup_successful() {
     bsp_periph().motor_tim.set_master_output_enable(true);
 }
 
-pub fn refresh_adc() {
-    // Empty, as ADC read is implemented through DMA
-}
-
-pub fn refresh_adc_for_vphase() {
-    // Empty, there are no phase voltage sensors on this board
-}
+/*
+ * BSP-specific functions
+ */
 
 fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
     let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
@@ -393,7 +507,7 @@ fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
 #[allow(static_mut_refs)]
 fn adc_dma_read() {
     unsafe {
-        let mut motor = crate::get_motor();
+        let motor = crate::get_motor();
         motor.Raw.Iv = 2048;
 
         let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
