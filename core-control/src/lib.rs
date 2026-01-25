@@ -1,7 +1,7 @@
 #![no_std]
 
 pub mod balance;
-pub mod imu;
+pub mod ahrs;
 
 // TODO: start filling something in here
 
@@ -10,7 +10,11 @@ pub enum State {
     Booting,
     Disarmed,
     Armed,
-    Running,
-    CriticalFault,
     ShuttingDown,
+}
+
+pub enum FaultType {
+    OverleanPitch,
+    OverleanRoll,
+    FreespinOnStartup
 }

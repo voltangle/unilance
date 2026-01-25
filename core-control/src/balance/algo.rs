@@ -1,6 +1,6 @@
 use crate::{
     balance::{BalanceState, RideAssistCoreState},
-    imu::IMUData,
+    ahrs::IMUData,
 };
 use micromath::F32Ext;
 

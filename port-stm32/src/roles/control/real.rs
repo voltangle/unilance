@@ -45,5 +45,5 @@ pub fn balance_loop() {
     // mesc::houseKeeping(mesc::get_motor());
 
     let motor = crate::get_motor();
-    motor.FOC.Idq_req.q = balance_state().iterate(core_control::imu::IMUData::default());
+    motor.FOC.Idq_req.q = balance_state().iterate(core_control::ahrs::IMUData::default());
 }
