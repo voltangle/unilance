@@ -23,8 +23,10 @@ embassy-stm32 = { version = "0.5.0", features = [
 embassy-executor = { version = "0.9.1", features = [
     "arch-cortex-m",
     "executor-thread",
+    "rtos-trace",
     "defmt"
 ]}
+rtos-trace = "0.2"
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
 embassy-time = { version = "0.5.0", features = [
     "defmt",

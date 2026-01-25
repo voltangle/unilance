@@ -8,29 +8,34 @@ tasks:
       - find mesc/c_src/MESC_Common/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
       - find mesc/c_src/hardware_conf/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
 
-  build_begode_etmax:
-    desc: "(STM32F405RG) Begode ET Max"
+  begode_etmax:
+    internal: true
+    vars:
+      CARGO_METHOD: '{{.CARGO_METHOD}}'
     cmds:
-      # Yes, this is not ideal in terms of not being automatic. But consider this, the
-      # build script in the mesc crate becomes much more compact and simple :)
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo build -p port-stm32
-        --no-default-features --features board_begode_etmax
-        --target thumbv7em-none-eabihf {{.CLI_ARGS}}
-  fix_stm32_begode_etmax:
-    desc: "cargo fix for the begode_etmax target"
+      - |
+        TARGET_PORT=stm32 TARGET_NAME=begode_etmax \
+        cargo {{.CARGO_METHOD}} -p port-stm32 \
+          --no-default-features --features board_begode_etmax \
+          --target thumbv7em-none-eabihf {{.CLI_ARGS}}
+
+  begode_etmax:build:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo fix -p port-stm32
-        --no-default-features --features board_begode_etmax
-        --target thumbv7em-none-eabihf {{.CLI_ARGS}}
-  expand_stm32_begode_etmax:
-    desc: "cargo expand for the begode_etmax target"
+      - task: begode_etmax
+        vars:
+          CARGO_METHOD: build
+  begode_etmax:fix:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo expand -p port-stm32
-        --no-default-features --features board_begode_etmax
-        --target thumbv7em-none-eabihf {{.CLI_ARGS}}
-  bloat_stm32_begode_etmax:
-    desc: "cargo bloat for the begode_etmax target"
+      - task: begode_etmax
+        vars:
+          CARGO_METHOD: fix
+  begode_etmax:expand:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo bloat -p port-stm32
-        --no-default-features --features board_begode_etmax
-        --target thumbv7em-none-eabihf {{.CLI_ARGS}}
+      - task: begode_etmax
+        vars:
+          CARGO_METHOD: expand
+  begode_etmax:bloat:
+    cmds:
+      - task: begode_etmax
+        vars:
+          CARGO_METHOD: bloat

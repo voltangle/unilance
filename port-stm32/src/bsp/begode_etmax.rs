@@ -25,6 +25,8 @@ use embassy_stm32::peripherals::TIM2;
 use embassy_stm32::peripherals::TIM3;
 use embassy_stm32::peripherals::TIM8;
 use embassy_stm32::rcc::{Hse, HseMode};
+use embassy_stm32::spi;
+use embassy_stm32::spi::Spi;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer;
 use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
@@ -79,8 +81,8 @@ use static_cell::StaticCell;
  * DMA setup:
  * - DMA1 Stream 2 on TIM3: WS281x
  * - DMA2 Stream 0 on ADC1: I_phaseA, Vrefint, core temp
- * - DMA2 Stream 2 on ADC2: I_phaceC, T_driver
  * - DMA2 Stream 1 on ADC3: I_battery, V_battery
+ * - DMA2 Stream 3 on ADC2: I_phaceC, T_driver
  *
  * Custom IRQs:
  * - TIM2: balance loop
@@ -174,7 +176,7 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
     };
     let mut adc2_rb = unsafe {
         adc2.into_ring_buffered(
-            p.DMA2_CH2,
+            p.DMA2_CH3,
             &mut ADC2_DMA_BUF,
             [
                 (i_phase_c, SampleTime::CYCLES112),
@@ -224,6 +226,20 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         None,
         Hertz::khz(800),
         CountingMode::EdgeAlignedUp,
+    );
+
+    let mut imu_spi_conf = spi::Config::default();
+    imu_spi_conf.mode = spi::MODE_0;
+    imu_spi_conf.frequency = Hertz::mhz(1);
+
+    let mut imu_spi = Spi::new(
+        p.SPI1,
+        p.PB3,
+        p.PB5,
+        p.PB4,
+        p.DMA2_CH5,
+        p.DMA2_CH2,
+        imu_spi_conf,
     );
 
     unsafe {
@@ -308,19 +324,25 @@ impl PlatformConfig for Config {
 
 #[interrupt]
 fn TIM8_UP_TIM13() {
+    rtos_trace::trace::isr_enter();
     unsafe {
         MESC_PWM_IRQ_handler(crate::get_motor());
         // Clear update flag
         embassy_stm32::pac::TIM8.sr().modify(|w| w.set_uif(false));
     }
+    rtos_trace::trace::isr_exit();
 }
 
 /// The balance loop interrupt
 #[interrupt]
 fn TIM2() {
+    rtos_trace::trace::isr_enter();
     roles::control::balance_loop();
+    rtos_trace::trace::isr_exit();
 }
 
+// FIXME: ADC interrupts are not reliable, as it's going in DMA. Use some other timing
+// source
 #[interrupt]
 fn ADC() {
     unsafe {

@@ -87,6 +87,7 @@ the system.
 - [ ] Add support for different displays and input method types
 - [ ] Allow to run core-supervisor in a "simulator", to test UI interactions
 - [ ] CPU usage - total percentage and per-task/ISR breakdown
+- [ ] Buzzer support; adjust tone and volume, make the patterns platform independent
 - [x] Make MESC NOT use direct register access (or be dependent on hardware at all), and
 make it use functions defined in Rust instead
 - [ ] Add current limiting via Ibus to MESC

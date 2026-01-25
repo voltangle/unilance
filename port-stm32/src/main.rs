@@ -4,8 +4,9 @@
 mod bsp;
 mod driver;
 mod mesc_impl;
-mod reg_flags;
+mod regs;
 mod roles;
+mod cpu_usage;
 
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
