@@ -1,11 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{
-    Error, Item, LitStr, Result, Token,
-    parse::{Parse, ParseStream},
-    parse_macro_input,
-    punctuated::Punctuated,
-};
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::{Error, Item, LitStr, Result, Token, parse_macro_input};
 
 struct Args {
     roles: Vec<LitStr>,

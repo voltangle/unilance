@@ -1,7 +1,7 @@
 #![no_std]
 
-pub mod balance;
 pub mod ahrs;
+pub mod balance;
 
 // TODO: start filling something in here
 
@@ -16,5 +16,5 @@ pub enum State {
 pub enum FaultType {
     OverleanPitch,
     OverleanRoll,
-    FreespinOnStartup
+    FreespinOnStartup,
 }

@@ -79,3 +79,12 @@ pub fn set_motor(motor: MESC_motor_typedef) {
         MESC_MOTOR.write(motor);
     }
 }
+
+#[cfg(miri)]
+#[unsafe(no_mangle)]
+fn miri_start(argc: isize, argv: *const *const u8) -> isize {
+    unsafe {
+        __cortex_m_rt_main();
+    }
+    0
+}

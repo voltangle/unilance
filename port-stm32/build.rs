@@ -1,4 +1,5 @@
-use std::{env, fs, path::PathBuf};
+use std::path::PathBuf;
+use std::{env, fs};
 
 fn main() {
     println!("cargo:rustc-link-arg-bins=--nmagic");

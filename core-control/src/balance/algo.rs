@@ -1,7 +1,5 @@
-use crate::{
-    balance::{BalanceState, RideAssistCoreState},
-    ahrs::IMUData,
-};
+use crate::ahrs::IMUData;
+use crate::balance::{BalanceState, RideAssistCoreState};
 use micromath::F32Ext;
 
 impl BalanceState {

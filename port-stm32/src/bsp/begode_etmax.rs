@@ -1,39 +1,22 @@
 use super::PlatformConfig;
 use crate::roles;
 use core::mem::MaybeUninit;
-use core_control::balance::BalanceConfig;
-use core_control::balance::RideAssistConfig;
+use core_control::balance::{BalanceConfig, RideAssistConfig};
 use embassy_executor::Spawner;
-use embassy_stm32::adc::Adc;
-use embassy_stm32::adc::AdcChannel;
-use embassy_stm32::adc::ConversionTrigger;
-use embassy_stm32::adc::Exten;
-use embassy_stm32::adc::RegularConversionMode;
-use embassy_stm32::adc::RingBufferedAdc;
-use embassy_stm32::adc::SampleTime;
-use embassy_stm32::gpio;
+use embassy_stm32::adc::{
+    Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
+    SampleTime,
+};
 use embassy_stm32::gpio::OutputType;
-use embassy_stm32::interrupt;
-use embassy_stm32::pac;
 use embassy_stm32::pac::DMA2;
-use embassy_stm32::peripherals::ADC1;
-use embassy_stm32::peripherals::ADC2;
-use embassy_stm32::peripherals::ADC3;
-use embassy_stm32::peripherals::TIM2;
-use embassy_stm32::peripherals::TIM3;
-use embassy_stm32::peripherals::TIM8;
+use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{Hse, HseMode};
-use embassy_stm32::spi;
 use embassy_stm32::spi::Spi;
 use embassy_stm32::time::Hertz;
-use embassy_stm32::timer;
-use embassy_stm32::timer::complementary_pwm::ComplementaryPwm;
-use embassy_stm32::timer::complementary_pwm::ComplementaryPwmPin;
-use embassy_stm32::timer::low_level::CountingMode;
-use embassy_stm32::timer::low_level::RoundTo;
-use embassy_stm32::timer::simple_pwm::PwmPin;
-use embassy_stm32::timer::simple_pwm::SimplePwm;
-use embassy_stm32::{Config, Peripherals};
+use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
+use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
+use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
+use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
 use mesc::MESC_PWM_IRQ_handler;
 
 /*
@@ -262,14 +245,14 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
  */
 
 pub mod foc {
-    use crate::{bsp::begode_etmax::bsp_periph, mesc_impl::HCLK_HZ};
-    use core::{mem, sync::atomic::Ordering};
+    use crate::bsp::begode_etmax::bsp_periph;
+    use crate::mesc_impl::HCLK_HZ;
+    use core::mem;
+    use core::sync::atomic::Ordering;
     use cortex_m::prelude::_embedded_hal_Pwm;
-    use embassy_stm32::{
-        pac::{GPIOB, TIM8},
-        time::Hertz,
-        timer::Channel,
-    };
+    use embassy_stm32::pac::{GPIOB, TIM8};
+    use embassy_stm32::time::Hertz;
+    use embassy_stm32::timer::Channel;
     use mesc::{MESC_motor_typedef, hw_setup_s};
 
     // NOTE: ideally this default init should be in the mesc crate

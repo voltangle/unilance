@@ -9,8 +9,7 @@ pub mod supervisor;
 
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
-use proto::CoreLink;
-use proto::CoreLinkMessage;
+use proto::{CoreLink, CoreLinkMessage};
 
 pub type CoreChannel = Channel<CriticalSectionRawMutex, CoreLinkMessage, 8>;
 

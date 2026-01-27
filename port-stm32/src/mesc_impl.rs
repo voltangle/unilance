@@ -73,7 +73,6 @@ extern "C" fn MESChal_phA_break(motor: &mut MESC_motor_typedef) {
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phB_break(motor: &mut MESC_motor_typedef) {
-    
     bsp::foc::phase_b_break(motor);
 }
 
