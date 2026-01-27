@@ -12,8 +12,6 @@ proc-macros = { path = "../proc-macros" }
 core-control = { path = "../core-control", optional = true }
 core-supervisor = { path = "../core-supervisor", optional = true }
 
-# NOTE: Done temporarily while Embassy releases their scheduler-deadline feature for
-# embassy-executor. When released, remove vendor and replace with normal version
 embassy-stm32 = { version = "0.5.0", features = [
     "defmt",
     "unstable-pac",
@@ -65,8 +63,6 @@ role_supervisor = ["dep:core-supervisor"]
 board_begode_etmax = [
     "role_supervisor",
     "role_control",
-    "core-control/stm32_begode_etmax",
-    "core-supervisor/stm32_begode_etmax",
     "embassy-stm32/stm32f405rg",
     "embassy-stm32/time-driver-tim5",
     "embassy-executor/scheduler-deadline"
