@@ -27,8 +27,7 @@ pub fn init() {
     // TODO: Try to figure out how to do the hardware config in Rust instead of a C header
 
     // TODO: This has to be refactored so it uses motor config in BSP
-    let mut motor = MESC_motor_typedef::default();
-    motor.id = 0;
+    let motor = MESC_motor_typedef { id: 0, ..Default::default() };
 
     crate::set_motor(motor);
 }

@@ -34,6 +34,11 @@ tasks:
       - task: begode_etmax
         vars:
           CARGO_METHOD: expand
+  begode_etmax:clippy:
+    cmds:
+      - task: begode_etmax
+        vars:
+          CARGO_METHOD: clippy
   begode_etmax:bloat:
     cmds:
       - task: begode_etmax

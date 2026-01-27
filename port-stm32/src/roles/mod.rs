@@ -42,8 +42,8 @@ impl CoreLink for CanBusCoreLink {
 impl<'a> MemChannelCoreLink<'a> {
     pub fn new(send: &'a CoreChannel, recv: &'a CoreChannel) -> Self {
         MemChannelCoreLink {
-            send_channel: &send,
-            recv_channel: &recv,
+            send_channel: send,
+            recv_channel: recv,
         }
     }
 }

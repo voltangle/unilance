@@ -166,7 +166,7 @@ pub fn process_input_methods(methods: &mut [InputMethod]) {
                 method.button,
                 ButtonGesture::LongPress {
                     continuing: false,
-                    level: level,
+                    level,
                 },
             );
             method.state = InputMethodState::Idle;
