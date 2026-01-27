@@ -135,7 +135,8 @@ pub fn process_input_methods(methods: &mut [InputMethod]) {
 
                 // because int division always rounds down, it will only increment the level
                 // if it passed the threshold
-                1 + (beyond_long / SUPER_LONG_PRESS_DURATION_MS).min(u16::MAX as u64) as u16
+                1 + (beyond_long / SUPER_LONG_PRESS_DURATION_MS).min(u16::MAX as u64)
+                    as u16
             };
 
             if level != current_level {
