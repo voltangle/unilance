@@ -82,17 +82,20 @@ the system.
     - [ ] Angle cut out (both on pitch and roll axis)
     - [ ] Ride Assist
 - [ ] Implement some kind of bootloader with embassy_boot
-- [ ] Properly do the ET Max config
+- [x] Properly do the ET Max config
 - [ ] Add Slint and a minimal UI
-- [ ] Add support for different displays and input method types
+- [ ] Implement support for different displays
+- [x] Implement input methods
 - [ ] Implement storage with littlefs
     - [ ] Do block device with embedded parity info
     - [ ] Do system config with a postcard type
 - [ ] Implement protocols with postcard
-    - [ ] BLE
-    - [ ] Internal CAN bus
-    - [ ] CHAdeMO
+    - [ ] BLE (postcard)
+    - [ ] Internal CAN bus (postcard)
+    - [ ] CHAdeMO (IEC 62196)
+- [ ] Current sensor sanity checks and identifying if one or more are either damaged or dying
 - [ ] Allow to run core-supervisor in a "simulator", to test UI interactions
+- [ ] Auto shutoff timer on idle
 - [x] CPU usage - total percentage
 - [ ] Buzzer support; adjust tone and volume, make the patterns platform independent
 - [x] Make MESC NOT use direct register access (or be dependent on hardware at all), and
