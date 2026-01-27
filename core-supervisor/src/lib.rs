@@ -1,6 +1,6 @@
 #![no_std]
 
-// TODO: start filling something in here
+pub mod input;
 
 // Random entries just so its filled with something
 pub enum State {

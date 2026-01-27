@@ -97,5 +97,6 @@ the system.
 - [ ] Buzzer support; adjust tone and volume, make the patterns platform independent
 - [x] Make MESC NOT use direct register access (or be dependent on hardware at all), and
 make it use functions defined in Rust instead
+- [ ] Integrate Miri for UB checks
 - [ ] Add current limiting via Ibus to MESC
 - [ ] Testing
