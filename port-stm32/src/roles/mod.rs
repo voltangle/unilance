@@ -1,7 +1,9 @@
 #[cfg(not(any(feature = "role_control", feature = "role_supervisor")))]
 compile_error!("Enable at least one role: role_control or role_supervisor (or both)!");
 
+#[cfg(feature = "role_control")]
 pub mod control;
+#[cfg(feature = "role_supervisor")]
 pub mod supervisor;
 
 // NOTE: Ideally, at least the traits should NOT be part of the port, and be split off,

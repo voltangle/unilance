@@ -35,11 +35,9 @@ pub fn init() {
 
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
-#[allow(unused)]
 pub fn start<T: CoreLink>(_link: &T) {}
 
 /// BALANCE_STATE MUST be initialized when this function runs.
-#[allow(unused)]
 pub fn balance_loop() {
     // TODO: MESC doesn't expose this, make it work later
     // mesc::houseKeeping(mesc::get_motor());
