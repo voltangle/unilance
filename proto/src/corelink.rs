@@ -79,11 +79,8 @@ pub enum Message {
         len: u64,
     },
     FileTransmissionRequestApproved {
+        /// The sequence ID this transfer will use.
         sequence_id: u32,
-        /// It's here so the protocol can be easily portable between different transport
-        /// layers. For example, in-memory channels can just crank this shit up, because
-        /// there is effectively no limit on what can be sent.
-        packet_len: u8,
     },
     FileTransmissionRequestDenied {
         reason: FileTransmissionDeniedReason,
@@ -97,7 +94,6 @@ pub enum Message {
         /// if the receiving party responds with a nack, then the packet is sent again by
         /// the transmitting party.
         packet_num: u32,
-        /// Length of the data buffer has to equal packet_len set in FileTransmissionApproved.
         #[serde(with = "serde_arrays")]
         data: [u8; 50]
     },
