@@ -3,8 +3,13 @@ name = "proto"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+test = true
+bench = false
+
 [dependencies]
 serde = { version = "1.0.*", default-features = false }
-postcard = "1.1.3"
-fixedstr = { version = "0.5.10", features = ["serde", "no-alloc"] }
+postcard = { version = "1.1.3", features = ["experimental-derive", "heapless"]}
 serde_arrays = "0.2.0"
+# Match the version in postcard
+heapless = { version = "0.7.17", features = ["serde"] }

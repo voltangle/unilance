@@ -1,8 +1,11 @@
 //! This file has the entirety of the CORElink protocol used in UniLANCE for communication
 //! between different nodes in the system.
 
-use fixedstr::zstr;
+use heapless::String;
+use postcard::experimental::max_size::MaxSize;
 use serde::{Deserialize, Serialize};
+
+const CANFD_DATA_LEN_MAX: usize = 64;
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone)]
 pub enum Node {
@@ -43,7 +46,7 @@ pub struct CanID {
 /// This enum contains all possible messages in the system.
 /// The #[repr(u16)] is there to know the ID of each message no matter if the enum item
 /// is unit or not. For more details, refer to https://github.com/rust-lang/rfcs/blob/master/text/2363-arbitrary-enum-discriminant.md
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Clone, MaxSize)]
 #[repr(u16)]
 pub enum Message {
     Heartbeat,
@@ -57,8 +60,8 @@ pub enum Message {
     /// components, together with serial numbers.
     Hello {
         /// Firmware in the form of a user-readable version string.
-        firmware_version: zstr<16>,
-        serial_number: zstr<28>,
+        firmware_version: String<16>,
+        serial_number: String<28>,
         /// System time as a UNIX timestamp.
         system_time: u64,
         /// Total mileage that the sender has previously remembered.
@@ -75,7 +78,10 @@ pub enum Message {
     /// Request to transmit a file from one node to another. The other node has to respond
     /// with either FileTransmissionStartApproved or FileTransmissionStartDenied.
     FileTransmissionRequest {
-        filename: zstr<50>,
+        /// This funny ass length was specifically chosen so it fits exactly into the 64 
+        /// byte limit of CAN-FD.
+        filename: String<47>,
+        sequence_id: u32,
         len: u64,
     },
     FileTransmissionRequestApproved {
@@ -94,8 +100,9 @@ pub enum Message {
         /// if the receiving party responds with a nack, then the packet is sent again by
         /// the transmitting party.
         packet_num: u32,
+        /// Sized right up the CAN-FD limit (64 bytes).
         #[serde(with = "serde_arrays")]
-        data: [u8; 50]
+        data: [u8; 53]
     },
     /// The file packet was received successfully, continue on with the transmission
     FileTransmissionAck {
@@ -123,13 +130,13 @@ pub enum Message {
     },
 }
 
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
 pub enum FileTransmissionDeniedReason {
     UnknownFile,
     NotEnoughSpace,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
 pub enum ShutdownReason {
     UserRequest,
     IdleTimeout,
@@ -148,5 +155,10 @@ pub trait CoreLink {
     // FIXME: No result type for return. For now it's like this because I couldn't be
     // bothered to figure it out yet, and for now it's only used for in memory channels,
     // which have only one reason to fail, so a timeout will catch something like this.
-    async fn core_send(&mut self, msg: &Message);
+    async fn core_send(&mut self, msg: Message);
 }
+
+/// Makes sure that the message can and will fit inside a CAN-FD packet.
+const _: () = {
+    assert!(Message::POSTCARD_MAX_SIZE <= CANFD_DATA_LEN_MAX);
+};
