@@ -69,6 +69,14 @@ the system.
 - BLE/Wi-Fi
 - USB PD
 
+## Init process
+
+When the user presses the power button, they effectively enable power to the supervisor node
+in the system. Supervisor executes its own init process, then enables power and sends a 
+hello message to the control node. Control wakes up, asks for a config, does its init 
+process, and either sends a success or an error back to the supervisor. Control never stores
+any settings locally; everything is sent to it by the supervisor node.
+
 ## Tasks
 
 - [x] Figure out ports for different MCUs and boards

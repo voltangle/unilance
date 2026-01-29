@@ -2,7 +2,7 @@ use crate::bsp;
 use core::mem::MaybeUninit;
 use core_control::balance::BalanceState;
 use mesc::MESC_motor_typedef;
-use proto::CoreLink;
+use proto::corelink::CoreLink;
 
 // ACCESS RULES: This struct can ONLY be accessed in an ISR, specifically the
 // ISR that runs balance_loop(). Because of this, I opted to not use a mutex,
@@ -27,14 +27,17 @@ pub fn init() {
     // TODO: Try to figure out how to do the hardware config in Rust instead of a C header
 
     // TODO: This has to be refactored so it uses motor config in BSP
-    let motor = MESC_motor_typedef { id: 0, ..Default::default() };
+    let motor = MESC_motor_typedef {
+        id: 0,
+        ..Default::default()
+    };
 
     crate::set_motor(motor);
 }
 
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
-pub fn start<T: CoreLink>(_link: &T) {}
+pub fn start(_link: &impl CoreLink) {}
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn balance_loop() {

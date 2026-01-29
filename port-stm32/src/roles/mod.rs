@@ -11,9 +11,9 @@ pub mod supervisor;
 
 use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
-use proto::{CoreLink, CoreLinkMessage};
+use proto::corelink::{CoreLink, Message};
 
-pub type CoreChannel = Channel<CriticalSectionRawMutex, CoreLinkMessage, 8>;
+pub type CoreChannel = Channel<CriticalSectionRawMutex, Message, 8>;
 
 pub struct CanBusCoreLink;
 pub struct MemChannelCoreLink<'a> {
@@ -30,11 +30,11 @@ impl CanBusCoreLink {
 }
 
 impl CoreLink for CanBusCoreLink {
-    async fn core_recv(&mut self) -> CoreLinkMessage {
+    async fn core_recv(&mut self) -> Message {
         unimplemented!()
     }
 
-    async fn core_send(&mut self, _msg: &CoreLinkMessage) {
+    async fn core_send(&mut self, _msg: &Message) {
         unimplemented!()
     }
 }
@@ -49,11 +49,11 @@ impl<'a> MemChannelCoreLink<'a> {
 }
 
 impl CoreLink for MemChannelCoreLink<'_> {
-    async fn core_send(&mut self, msg: &CoreLinkMessage) {
+    async fn core_send(&mut self, msg: &Message) {
         self.send_channel.send(*msg).await
     }
 
-    async fn core_recv(&mut self) -> CoreLinkMessage {
+    async fn core_recv(&mut self) -> Message {
         self.recv_channel.receive().await
     }
 }
