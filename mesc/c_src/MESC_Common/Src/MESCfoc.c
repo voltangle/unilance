@@ -1498,7 +1498,10 @@ void slowLoop(MESC_motor_typedef* _motor) {
                     // Remain in tracking
                     break;
                 }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
             } else if (_motor->ControlMode == MOTOR_CONTROL_MODE_POSITION) {
+#pragma GCC diagnostic pop
                 if (_motor->MotorState != MOTOR_STATE_ERROR) {
                     _motor->MotorState = MOTOR_STATE_RUN;
                 }
