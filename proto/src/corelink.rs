@@ -78,7 +78,7 @@ pub enum Message {
     /// Request to transmit a file from one node to another. The other node has to respond
     /// with either FileTransmissionStartApproved or FileTransmissionStartDenied.
     FileTransmissionRequest {
-        /// This funny ass length was specifically chosen so it fits exactly into the 64 
+        /// This funny ass length was specifically chosen so it fits exactly into the 64
         /// byte limit of CAN-FD.
         filename: String<47>,
         sequence_id: u32,
@@ -102,11 +102,11 @@ pub enum Message {
         packet_num: u32,
         /// Sized right up the CAN-FD limit (64 bytes).
         #[serde(with = "serde_arrays")]
-        data: [u8; 53]
+        data: [u8; 53],
     },
     /// The file packet was received successfully, continue on with the transmission
     FileTransmissionAck {
-        sequence_id: u32
+        sequence_id: u32,
     },
     // The file packet was NOT received successfully. The sender has to send that packet
     // again.
@@ -151,11 +151,11 @@ fn get_message_id(message: Message) -> u16 {
 /// Link between two core modules, control and supervisor
 #[allow(async_fn_in_trait)]
 pub trait CoreLink {
-    async fn core_recv(&mut self) -> Message;
+    async fn core_recv(&self) -> Message;
     // FIXME: No result type for return. For now it's like this because I couldn't be
     // bothered to figure it out yet, and for now it's only used for in memory channels,
     // which have only one reason to fail, so a timeout will catch something like this.
-    async fn core_send(&mut self, msg: Message);
+    async fn core_send(&self, msg: Message);
 }
 
 /// Makes sure that the message can and will fit inside a CAN-FD packet.

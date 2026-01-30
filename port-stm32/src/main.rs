@@ -34,17 +34,16 @@ async fn main(spawner: Spawner) -> ! {
     let clocks = embassy_stm32::rcc::clocks(&p.RCC);
     mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
 
+    let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
+
+    bsp::init(p, &spawner);
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::init();
     #[cfg(feature = "role_control")]
     roles::control::init();
 
-    let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
-
-    bsp::init(p, &spawner);
-
     #[cfg(feature = "role_supervisor")]
-    roles::supervisor::start(&make_core_link(true));
+    roles::supervisor::start(&spawner, make_core_link(true));
     #[cfg(feature = "role_control")]
     roles::control::start(&make_core_link(false));
 

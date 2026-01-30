@@ -30,11 +30,11 @@ impl CanBusCoreLink {
 }
 
 impl CoreLink for CanBusCoreLink {
-    async fn core_recv(&mut self) -> Message {
+    async fn core_recv(&self) -> Message {
         unimplemented!()
     }
 
-    async fn core_send(&mut self, _msg: Message) {
+    async fn core_send(&self, _msg: Message) {
         unimplemented!()
     }
 }
@@ -49,11 +49,11 @@ impl<'a> MemChannelCoreLink<'a> {
 }
 
 impl CoreLink for MemChannelCoreLink<'_> {
-    async fn core_send(&mut self, msg: Message) {
+    async fn core_send(&self, msg: Message) {
         self.send_channel.send(msg).await
     }
 
-    async fn core_recv(&mut self) -> Message {
+    async fn core_recv(&self) -> Message {
         self.recv_channel.receive().await
     }
 }
