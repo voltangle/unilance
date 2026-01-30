@@ -1,14 +1,14 @@
 use std::io;
 
 use ratatui::{
+    DefaultTerminal,
     buffer::Buffer,
     crossterm::event::{self, Event, KeyCode, KeyEventKind},
     layout::{Constraint, Layout, Rect},
-    style::{palette::tailwind, Color, Stylize},
+    style::{Color, Stylize, palette::tailwind},
     symbols,
     text::Line,
     widgets::{Block, Padding, Paragraph, Tabs, Widget},
-    DefaultTerminal,
 };
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
@@ -171,9 +171,11 @@ impl SelectedTab {
     }
 
     fn render_tab3(self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new("I know, these are some basic changes. But I think you got the main idea.")
-            .block(self.block())
-            .render(area, buf);
+        Paragraph::new(
+            "I know, these are some basic changes. But I think you got the main idea.",
+        )
+        .block(self.block())
+        .render(area, buf);
     }
 
     /// A block surrounding the tab's content
