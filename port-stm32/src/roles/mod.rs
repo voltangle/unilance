@@ -15,7 +15,6 @@ use proto::corelink::{CoreLink, Message};
 
 pub type CoreChannel = Channel<CriticalSectionRawMutex, Message, 8>;
 
-pub struct CanBusCoreLink;
 pub struct MemChannelCoreLink<'a> {
     send_channel: &'a CoreChannel,
     recv_channel: &'a CoreChannel,
@@ -23,21 +22,23 @@ pub struct MemChannelCoreLink<'a> {
 
 // TODO: Make CAN bus impl work
 
-impl CanBusCoreLink {
-    pub fn new() -> Self {
-        CanBusCoreLink {}
-    }
-}
-
-impl CoreLink for CanBusCoreLink {
-    async fn core_recv(&self) -> Message {
-        unimplemented!()
-    }
-
-    async fn core_send(&self, _msg: Message) {
-        unimplemented!()
-    }
-}
+// pub struct CanBusCoreLink;
+//
+// impl CanBusCoreLink {
+//     pub fn new() -> Self {
+//         CanBusCoreLink {}
+//     }
+// }
+//
+// impl CoreLink for CanBusCoreLink {
+//     async fn core_recv(&self) -> Message {
+//         unimplemented!()
+//     }
+//
+//     async fn core_send(&self, _msg: Message) {
+//         unimplemented!()
+//     }
+// }
 
 impl<'a> MemChannelCoreLink<'a> {
     pub fn new(send: &'a CoreChannel, recv: &'a CoreChannel) -> Self {

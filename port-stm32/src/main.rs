@@ -45,7 +45,7 @@ async fn main(spawner: Spawner) -> ! {
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::start(&spawner, make_core_link(true));
     #[cfg(feature = "role_control")]
-    roles::control::start(&make_core_link(false));
+    roles::control::start(&spawner, make_core_link(false));
 
     // the timer starts "counting" right after it was created (it just saves a timestamp of
     // when it's supposed to elapse), so .await will "let go" exactly after STARTUP_DELAY_MS

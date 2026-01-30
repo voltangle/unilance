@@ -1,8 +1,10 @@
-use crate::bsp;
+use crate::{bsp, roles::MemChannelCoreLink};
 use core::mem::MaybeUninit;
-use core_control::balance::BalanceState;
+use core_control::{State, balance::BalanceState};
+use embassy_executor::Spawner;
 use mesc::MESC_motor_typedef;
-use proto::corelink::CoreLink;
+use proc_macros::for_role;
+use static_cell::StaticCell;
 
 // ACCESS RULES: This struct can ONLY be accessed in an ISR, specifically the
 // ISR that runs balance_loop(). Because of this, I opted to not use a mutex,
@@ -10,6 +12,11 @@ use proto::corelink::CoreLink;
 // RESPECT THESE RULES, OR THE CHANCE OF THE WHEEL MAKING EXPENSIVE SOUNDS RISES
 // EXPONENTIALLY.
 static mut BALANCE_STATE: MaybeUninit<BalanceState> = MaybeUninit::uninit();
+
+static CONTROL_STATE: StaticCell<State> = StaticCell::new();
+#[for_role("combined")]
+type PlatformCoreLink<'a> = MemChannelCoreLink<'a>;
+static CONTROL_CORELINK: StaticCell<PlatformCoreLink> = StaticCell::new();
 
 #[allow(static_mut_refs, unused)]
 fn balance_state() -> &'static mut BalanceState {
@@ -37,7 +44,11 @@ pub fn init() {
 
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
-pub fn start(_link: &impl CoreLink) {}
+pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
+    let state = CONTROL_STATE.init(State::default());
+    let corelink = CONTROL_CORELINK.init(link);
+    spawner.spawn(main_task(state, corelink).expect("failed to start control main task"));
+}
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn balance_loop() {
@@ -46,4 +57,12 @@ pub fn balance_loop() {
 
     let motor = crate::get_motor();
     motor.FOC.Idq_req.q = balance_state().iterate(core_control::ahrs::IMUData::default());
+}
+
+#[embassy_executor::task]
+async fn main_task(
+    state: &'static mut State,
+    link: &'static mut MemChannelCoreLink<'static>,
+) {
+    core_control::main_task(state, link).await;
 }

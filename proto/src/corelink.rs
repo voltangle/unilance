@@ -107,10 +107,18 @@ pub enum Message {
     /// The file packet was received successfully, continue on with the transmission
     FileTransmissionAck {
         sequence_id: u32,
+        packet_num: u32,
     },
-    // The file packet was NOT received successfully. The sender has to send that packet
-    // again.
+    /// The file packet was NOT received successfully. The sender has to send that packet
+    /// again.
     FileTransmissionNack {
+        sequence_id: u32,
+        packet_num: u32,
+    },
+    /// Marks the file transmission as "finished" at packet_num. This message should be
+    /// sent by the transmitting party, which should be then followed by FileTransmissionAck
+    /// from the receiving party with packet_num set to packet_num in this message.
+    FileTransmissionEnd {
         sequence_id: u32,
         packet_num: u32,
     },
@@ -142,10 +150,12 @@ pub enum ShutdownReason {
     IdleTimeout,
 }
 
-// TODO: Test it it actually works
-fn get_message_id(message: Message) -> u16 {
-    let ptr_to_message = (&message as *const Message) as *const u16;
-    unsafe { *ptr_to_message }
+impl Message {
+    // TODO: Test it it actually works
+    pub fn message_id(&self) -> u16 {
+        let ptr_to_message = (self as *const Self) as *const u16;
+        unsafe { *ptr_to_message }
+    }
 }
 
 /// Link between two core modules, control and supervisor

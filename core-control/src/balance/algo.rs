@@ -48,7 +48,7 @@ impl BalanceState {
     }
 
     /// Doesn't output anything, because its output is actually the internal setpoint.
-    fn iterate_ride_assist(&mut self, pos_state: &IMUData, current_out: f32) {
+    fn iterate_ride_assist(&mut self, pos_state: &IMUData, _current_out: f32) {
         // Check for current state and if any changes are in order
         match self.rideassist.state {
             RideAssistCoreState::Acceleration => {

@@ -5,6 +5,11 @@ version = "0.1.0"
 
 [dependencies]
 mesc = { path = "../mesc" }
+proto = { path = "../proto" }
 micromath = "2.1.0"
+embassy-time = { version = "0.5.0", features = ["defmt"]}
+embassy-futures = "0.1.2"
+embassy-sync = { version = "0.7.2", features = ["defmt"] }
+heapless = "0.9.2"
 
 [features]

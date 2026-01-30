@@ -12,7 +12,9 @@ use static_cell::StaticCell;
 use crate::roles::MemChannelCoreLink;
 
 static SUPERVISOR_STATE: StaticCell<Mutex<NoopRawMutex, State>> = StaticCell::new();
-static SUPERVISOR_CORELINK: StaticCell<MemChannelCoreLink<'static>> = StaticCell::new();
+#[for_role("combined")]
+type PlatformCoreLink<'a> = MemChannelCoreLink<'a>;
+static SUPERVISOR_CORELINK: StaticCell<PlatformCoreLink> = StaticCell::new();
 static LITTLEFS_STORAGE: StaticCell<RamStorage> = StaticCell::new();
 static LITTLEFS_ALLOC: StaticCell<Allocation<RamStorage>> = StaticCell::new();
 static LITTLEFS: StaticCell<Mutex<NoopRawMutex, Filesystem<'static, RamStorage>>> =
@@ -35,8 +37,7 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     // must allocate state statically before use
     let alloc = LITTLEFS_ALLOC.init(Filesystem::allocate());
     let fs = Filesystem::mount(alloc, storage).unwrap();
-    let fs_mutex: Mutex<NoopRawMutex, _> = Mutex::new(fs);
-    let fs_ref = LITTLEFS.init(fs_mutex);
+    let fs_ref = LITTLEFS.init(Mutex::new(fs));
 
     spawner.spawn(
         corelink_heartbeat(state, corelink).expect("Unable to start CORElink heartbeat"),

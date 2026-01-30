@@ -33,13 +33,13 @@ pub struct State {
 }
 
 pub async fn corelink_heartbeat<T: RawMutex>(
-    state: &'static Mutex<T, State>,
+    _state: &'static Mutex<T, State>,
     link: &'static impl CoreLink,
 ) {
     let mut ticker = Ticker::every(Duration::from_hz(10));
 
     loop {
-        link.core_send(Message::Heartbeat);
+        link.core_send(Message::Heartbeat).await;
         ticker.next().await;
     }
 }
@@ -76,12 +76,10 @@ pub async fn main_task(
                             state.lock().await.control_running = true;
                         }
                         Message::ConfigRequest => {
-                            // FIXME: For this to work, I have to implement the file storage
-                            // facilities for this shi, which means - littlefs. Christ on a stick.
                             let conf_len =
                                 match fs.lock().await.metadata(path!("/conf/control.pc"))
                                 {
-                                    Ok(len) => len,
+                                    Ok(meta) => meta.len(),
                                     Err(code) => panic!(
                                         "control node config failed with code {:?}",
                                         code
@@ -93,7 +91,7 @@ pub async fn main_task(
                                     .lock()
                                     .await
                                     .file_transmission_next_sequence_id,
-                                len: 0,
+                                len: conf_len as u64,
                             })
                             .await;
                             state.lock().await.file_transmission_next_sequence_id += 1;
