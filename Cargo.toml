@@ -1,17 +1,20 @@
 [workspace]
 resolver = "3"
-members = ["mesc", "core-control", "core-supervisor", "port-stm32", "proto", "proc-macros"]
+members = ["mesc", "core-control", "core-supervisor", "port-stm32", "proto", "proc-macros", "lancemate"]
 
 [profile.release]
 lto = true
-opt-level = "s"
+# Optimize mainly for speed, but if the binary becomes way too big to fit in a bootloader
+# partition, switch to "s" or "z"
+opt-level = 3
 incremental = false
 codegen-units = 1
 # NOTE: debug = true is okay - debuginfo isn't flashed to the device!
 debug = true
 
 # NOTE: Done temporarily while Embassy releases their scheduler-deadline feature for
-# embassy-executor. When released, remove vendor and replace with normal version
+# embassy-executor and my triggered ADC DMA conversion change in embassy-stm32. When
+# released, remove vendor and replace with normal version
 [patch.crates-io]
 embassy-stm32 = { git = "https://github.com/embassy-rs/embassy.git", rev = "d41b6b0" }
 embassy-executor = { git = "https://github.com/embassy-rs/embassy.git", rev = "d41b6b0" }
