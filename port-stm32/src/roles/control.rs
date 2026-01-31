@@ -1,6 +1,8 @@
-use crate::{bsp, roles::MemChannelCoreLink};
+use crate::bsp;
+use crate::roles::MemChannelCoreLink;
 use core::mem::MaybeUninit;
-use core_control::{State, balance::BalanceState};
+use core_control::State;
+use core_control::balance::BalanceState;
 use embassy_executor::Spawner;
 use mesc::MESC_motor_typedef;
 use proc_macros::for_role;

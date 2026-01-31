@@ -114,6 +114,7 @@ pub enum Message {
     FileTransmissionNack {
         sequence_id: u32,
         packet_num: u32,
+        reason: FileTransmissionNackReason,
     },
     /// Marks the file transmission as "finished" at packet_num. This message should be
     /// sent by the transmitting party, which should be then followed by FileTransmissionAck
@@ -121,6 +122,10 @@ pub enum Message {
     FileTransmissionEnd {
         sequence_id: u32,
         packet_num: u32,
+    },
+    /// Acknowledges that the file transmission has ended.
+    FileTransmissionEndAck {
+        sequence_id: u32,
     },
     /// Telemetry from the control node, that is sent with a frequency of 100 Hz.
     ///
@@ -142,12 +147,20 @@ pub enum Message {
 pub enum FileTransmissionDeniedReason {
     UnknownFile,
     NotEnoughSpace,
+    SequenceAlreadyExists,
+    TooManyTransfers,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
 pub enum ShutdownReason {
     UserRequest,
     IdleTimeout,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
+pub enum FileTransmissionNackReason {
+    UnknownSequence,
+    LostPacket,
 }
 
 impl Message {

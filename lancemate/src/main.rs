@@ -1,15 +1,13 @@
 use std::io;
 
-use ratatui::{
-    DefaultTerminal,
-    buffer::Buffer,
-    crossterm::event::{self, Event, KeyCode, KeyEventKind},
-    layout::{Constraint, Layout, Rect},
-    style::{Color, Stylize, palette::tailwind},
-    symbols,
-    text::Line,
-    widgets::{Block, Padding, Paragraph, Tabs, Widget},
-};
+use ratatui::buffer::Buffer;
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::palette::tailwind;
+use ratatui::style::{Color, Stylize};
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Padding, Paragraph, Tabs, Widget};
+use ratatui::{DefaultTerminal, symbols};
 use strum::{Display, EnumIter, FromRepr, IntoEnumIterator};
 
 fn main() -> io::Result<()> {

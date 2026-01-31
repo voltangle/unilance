@@ -96,6 +96,7 @@ pub async fn main_task(
                             .await;
                             state.lock().await.file_transmission_next_sequence_id += 1;
                         }
+                        // TODO: Do a file transfer implementation here
                         _ => {}
                     },
                 }
