@@ -97,7 +97,7 @@ any settings locally; everything is sent to it by the supervisor node.
 - [x] PI2D (Progressive + Integral + Double (sided) Derivative) part of the balance algo
 - [ ] Implement simple FLASH storage littlefs driver + littlefs orchestration
 - [ ] Implement basic CORElink communication
-    - [ ] Initial hello exchange
+    - [x] Initial hello exchange
     - [ ] Config transmission
     - [ ] (maybe) error reporting
 - [x] CPU usage - total percentage
