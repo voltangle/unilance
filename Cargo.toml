@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["mesc", "core-control", "core-supervisor", "port-stm32", "proto", "proc-macros", "lancemate"]
+members = ["mesc", "core-control", "core-supervisor", "port-stm32", "proto", "proc-macros", "lancemate/src-tauri"]
 
 [profile.release]
 lto = true

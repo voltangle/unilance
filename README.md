@@ -75,13 +75,15 @@ the system.
 - BLE/Wi-Fi
 - USB PD
 
-## Init process
+## Communication between nodes
 
-When the user presses the power button, they effectively enable power to the supervisor node
-in the system. Supervisor executes its own init process, then enables power and sends a 
-hello message to the control node. Control wakes up, asks for a config, does its init 
-process, and either sends a success or an error back to the supervisor. Control never stores
-any settings locally; everything is sent to it by the supervisor node.
+The system is designed around the fact that the supervisor is the "master" uC, while every
+other component in the system only work as "slaves". By "slaves" I mean the fact that they
+don't do anything unless instructed to (with exceptions).
+
+When the user presses the power button, the first uC to start up is always the supervisor,
+and then all other chips are initialized, like control and BMS. The BMS uC is not usually
+completely off tho, most of the time it's just in a power saving state.
 
 ## Tasks
 
