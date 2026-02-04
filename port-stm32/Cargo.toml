@@ -50,6 +50,7 @@ nb = "1.1.0"
 static_cell = "2"
 chrono = { version = "^0.4", default-features = false}
 littlefs2 = { version = "0.6.1", features = ["c-stubs"] }
+atomic_enum = "0.3.0"
 
 [features]
 # These only exist here for LSP ease-of-use. When building, ALWAYS use

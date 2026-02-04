@@ -1,5 +1,5 @@
-use core::sync::atomic::{AtomicU8, AtomicU32, Ordering};
-
+use atomic_enum::atomic_enum;
+use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::peripheral::DWT;
 use rtos_trace::{RtosTrace, global_trace};
 
@@ -8,22 +8,23 @@ pub fn now_cycles() -> u32 {
     unsafe { (*DWT::PTR).cyccnt.read() }
 }
 
-// Modes
-const MODE_IDLE: u8 = 0;
-const MODE_BUSY: u8 = 1;
-const MODE_ISR: u8 = 2;
+#[atomic_enum]
+#[derive(PartialEq)]
+enum ExecMode {
+    Idle,
+    Busy,
+    ISR,
+}
 
-// State
-static MODE: AtomicU8 = AtomicU8::new(MODE_BUSY);
+static MODE: AtomicExecMode = AtomicExecMode::new(ExecMode::Idle);
 static LAST_TS: AtomicU32 = AtomicU32::new(0);
 static ISR_NEST: AtomicU32 = AtomicU32::new(0);
 
-// Accumulators (32-bit only)
 static ACC_IDLE: AtomicU32 = AtomicU32::new(0);
 static ACC_BUSY: AtomicU32 = AtomicU32::new(0);
 
 #[inline(always)]
-fn transition_to(new_mode: u8) {
+fn transition_to(new_mode: ExecMode) {
     let t = now_cycles();
     let last = LAST_TS.swap(t, Ordering::Relaxed);
 
@@ -31,10 +32,9 @@ fn transition_to(new_mode: u8) {
     let dt = t.wrapping_sub(last);
 
     let prev = MODE.swap(new_mode, Ordering::Relaxed);
-    if prev == MODE_IDLE {
+    if prev == ExecMode::Idle {
         ACC_IDLE.fetch_add(dt, Ordering::Relaxed);
     } else {
-        // BUSY and ISR both count as busy
         ACC_BUSY.fetch_add(dt, Ordering::Relaxed);
     }
 }
@@ -58,15 +58,15 @@ impl RtosTrace for CpuUsageTracer {
 
     // Embassy tells us it is going idle.
     fn system_idle() {
-        transition_to(MODE_IDLE);
+        transition_to(ExecMode::Idle);
     }
 
     // Task starts executing in thread-mode.
     fn task_exec_begin(_id: u32) {
         // If we were idle, this will close the idle interval.
         // If we were ISR, we stay ISR until isr_exit.
-        if MODE.load(Ordering::Relaxed) != MODE_ISR {
-            transition_to(MODE_BUSY);
+        if MODE.load(Ordering::Relaxed) != ExecMode::ISR {
+            transition_to(ExecMode::Busy);
         }
     }
 
@@ -78,7 +78,7 @@ impl RtosTrace for CpuUsageTracer {
     fn isr_enter() {
         // Handle nesting: only transition on first entry.
         if ISR_NEST.fetch_add(1, Ordering::Relaxed) == 0 {
-            transition_to(MODE_ISR);
+            transition_to(ExecMode::ISR);
         }
     }
 
@@ -86,16 +86,16 @@ impl RtosTrace for CpuUsageTracer {
         // Only transition back when exiting the outermost ISR.
         if ISR_NEST.fetch_sub(1, Ordering::Relaxed) == 1 {
             // After ISR, we assume we're busy until the executor declares idle again.
-            transition_to(MODE_BUSY);
+            transition_to(ExecMode::Busy);
         }
     }
 
     fn isr_exit_to_scheduler() {
-        // Conservative: treat as busy.
+        // SAFETY: treat as busy.
         // (Some systems use this when an ISR wakes the scheduler.)
         // Using BUSY is fine; system_idle() will later switch to IDLE.
         // If nesting bookkeeping is correct, this is rarely needed.
-        transition_to(MODE_BUSY);
+        transition_to(ExecMode::Busy);
     }
 }
 
