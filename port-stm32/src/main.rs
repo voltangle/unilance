@@ -2,10 +2,10 @@
 #![no_main]
 
 mod bsp;
+mod constants;
 mod cpu_usage;
 mod driver;
 mod mesc_impl;
-mod regs;
 mod roles;
 
 use crate::bsp::PlatformConfig;

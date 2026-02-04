@@ -1,4 +1,5 @@
 use super::PlatformConfig;
+use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::roles;
 use core::mem::MaybeUninit;
 use core_control::balance::{BalanceConfig, RideAssistConfig};
@@ -10,7 +11,11 @@ use embassy_stm32::adc::{
 use embassy_stm32::gpio::OutputType;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
-use embassy_stm32::rcc::{Hse, HseMode};
+use embassy_stm32::rcc::mux::{Clk48sel, ClockMux};
+use embassy_stm32::rcc::{
+    self, AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv,
+    PllSource, RtcClockSource, Sysclk,
+};
 use embassy_stm32::spi::Spi;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
@@ -40,7 +45,11 @@ use mesc::MESC_PWM_IRQ_handler;
  * - PB14: poweron
  * - PC9: left DRL
  * - PA8: right DRL
- * - PH0,1: 8 MHz oscillator
+ *
+ * Clock sources:
+ * - HSI: unused
+ * - HSE: 8 MHz bypass
+ * - LSI: unused
  *
  * ADC pins:
  * - PC0: I_battery
@@ -112,10 +121,10 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
     unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
-// Gather all peripherals required for opereration and initialize anything that
-// needs to be initialized at this point. This function has to be called ONCE on boot.
-// Peripherals initialized here have to be ONLY initialized. They have to be either off
-// or doing something "invisible", like DMA ADC.
+/// Gather all peripherals required for opereration and initialize anything that
+/// needs to be initialized at this point. This function has to be called ONCE on boot.
+/// Peripherals initialized here have to be ONLY initialized. They have to be either off
+/// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
 pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let i_battery = p.PC0.degrade_adc();
@@ -131,22 +140,22 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let vrefint = adc1.enable_vrefint().degrade_adc();
     let core_temp = adc1.enable_temperature().degrade_adc();
 
-    // TODO: Revisit the cycles part, maybe make it work better
+    // NOTE: time to convert 3 channels is 17,5 microseconds, which is plenty, considering
+    // that the motor timer update interrupt runs every 100 microseconds. Technically,
+    // I can just get rid of the third ADC and sample input voltage/current with the
+    // first two ADCs, but no harm in using all three.
     let adc1_rb = unsafe {
         adc1.into_ring_buffered(
             p.DMA2_CH0,
             &mut ADC1_DMA_BUF,
             [
-                (i_phase_a, SampleTime::CYCLES112),
-                (vrefint, SampleTime::CYCLES112),
-                (core_temp, SampleTime::CYCLES112),
+                (i_phase_a, SampleTime::CYCLES480),
+                (vrefint, SampleTime::CYCLES480),
+                (core_temp, SampleTime::CYCLES480),
             ]
             .into_iter(),
             RegularConversionMode::Triggered(ConversionTrigger {
-                // TIM8_TRGO, aka ADC conversions are driven by the motor control timer.
-                // Refer to RM0090 Rev 21 (F405 reference manual) table 69 (nice) in
-                // section 13.6 for details.
-                channel: 0b1110,
+                channel: ADC_CONV_TRIG_TIM8_TRGO,
                 edge: Exten::RISING_EDGE,
             }),
         )
@@ -156,12 +165,12 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             p.DMA2_CH3,
             &mut ADC2_DMA_BUF,
             [
-                (i_phase_c, SampleTime::CYCLES112),
-                (t_driver, SampleTime::CYCLES112),
+                (i_phase_c, SampleTime::CYCLES480),
+                (t_driver, SampleTime::CYCLES480),
             ]
             .into_iter(),
             RegularConversionMode::Triggered(ConversionTrigger {
-                channel: 0b1110,
+                channel: ADC_CONV_TRIG_TIM8_TRGO,
                 edge: Exten::RISING_EDGE,
             }),
         )
@@ -171,12 +180,12 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             p.DMA2_CH1,
             &mut ADC3_DMA_BUF,
             [
-                (i_battery, SampleTime::CYCLES112),
-                (v_battery, SampleTime::CYCLES112),
+                (i_battery, SampleTime::CYCLES480),
+                (v_battery, SampleTime::CYCLES480),
             ]
             .into_iter(),
             RegularConversionMode::Triggered(ConversionTrigger {
-                channel: 0b1110,
+                channel: ADC_CONV_TRIG_TIM8_TRGO,
                 edge: Exten::RISING_EDGE,
             }),
         )
@@ -402,19 +411,43 @@ pub mod foc {
  * Clock configurations
  */
 
-// NOTE: No idea if it actually makes sense to do an extension trait, but shit, it looks
-// nice when used
-
 impl PlatformConfig for Config {
+    /// Clock configurations here result in the following frequencies:
+    ///
+    /// - FCLK Cortex: 168 MHz
+    /// - Cortex System timer: 168 MHz
+    /// - Ethernet PTP: 168 MHz
+    /// - HCLK: 168 MHz
+    /// - APB1 peripherals: 42 MHz
+    /// - APB1 timers: 84 MHz
+    /// - APB2 peripherals: 84 MHz
+    /// - APB2 timers: 168 MHz
     fn for_platform() -> Self {
-        let mut config = Config::default();
+        let mut conf = Config::default();
 
-        config.rcc.hsi = false;
-        config.rcc.hse = Some(Hse {
+        conf.rcc.hsi = false;
+
+        conf.rcc.hse = Some(Hse {
             freq: Hertz::mhz(8),
             mode: HseMode::Bypass,
         });
-        config
+
+        conf.rcc.sys = Sysclk::PLL1_P;
+        conf.rcc.pll_src = PllSource::HSE;
+        conf.rcc.pll = Some(Pll {
+            prediv: PllPreDiv::DIV4,
+            mul: PllMul::MUL168,
+            divp: Some(PllPDiv::DIV2),
+            divq: None,
+            divr: None,
+        });
+
+        conf.rcc.ahb_pre = AHBPrescaler::DIV1;
+        conf.rcc.apb1_pre = APBPrescaler::DIV4;
+        conf.rcc.apb2_pre = APBPrescaler::DIV2;
+        conf.rcc.mux.rtcsel = RtcClockSource::HSE;
+
+        conf
     }
 }
 

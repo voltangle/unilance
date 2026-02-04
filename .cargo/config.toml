@@ -1,8 +1,8 @@
 # NOTE: This file is only here so that my LSP works properly. To actually build the firmware,
 # use for example `task build-bg-etmax`. For all supported targets, do `task --list-all`.
-#
-# [build]
-# target = "thumbv7em-none-eabi"
-#
-# [env]
-# DEFMT_LOG = "trace"
+
+[build]
+target = "thumbv7em-none-eabi"
+
+[env]
+DEFMT_LOG = "trace"
