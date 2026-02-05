@@ -1,0 +1,5 @@
+package com.arvenora.lancemate
+
+import androidx.compose.ui.window.ComposeUIViewController
+
+fun MainViewController() = ComposeUIViewController { App() }
