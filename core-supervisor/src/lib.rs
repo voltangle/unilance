@@ -75,27 +75,6 @@ pub async fn main_task(
                         Message::BootSuccessful => {
                             state.lock().await.control_running = true;
                         }
-                        Message::ConfigRequest => {
-                            let conf_len =
-                                match fs.lock().await.metadata(path!("/conf/control.pc"))
-                                {
-                                    Ok(meta) => meta.len(),
-                                    Err(code) => panic!(
-                                        "control node config failed with code {:?}",
-                                        code
-                                    ),
-                                };
-                            link.core_send(Message::FileTransmissionRequest {
-                                filename: "conf.pc".into(),
-                                sequence_id: state
-                                    .lock()
-                                    .await
-                                    .file_transmission_next_sequence_id,
-                                len: conf_len as u64,
-                            })
-                            .await;
-                            state.lock().await.file_transmission_next_sequence_id += 1;
-                        }
                         // TODO: Do a file transfer implementation here
                         _ => {}
                     },

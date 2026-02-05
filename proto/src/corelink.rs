@@ -38,8 +38,8 @@ pub struct CanID {
     source: Node,
     /// 5 bits
     dest: Node,
-    /// 16 bits, not as an enum as you're supposed to set it to the value of the associated
-    /// const in the message struct itself
+    /// 16 bits, not as an enum as you're supposed to set it to the value of the message
+    /// itself, as its set as #[repr(u16)]
     message_id: u16,
 }
 
@@ -72,9 +72,11 @@ pub enum Message {
     BootFailure,
     /// Boot was successful (duh). Can be sent by any system node.
     BootSuccessful,
-    /// Request current configuration for itself. The following message should be a
-    /// FileTransmissionStartRequest, with the filename set as "conf.pc"
-    ConfigRequest,
+    WriteValue {
+        key: String<20>,
+        #[serde(with = "serde_arrays")]
+        value: [u8; 42],
+    },
     /// Request to transmit a file from one node to another. The other node has to respond
     /// with either FileTransmissionStartApproved or FileTransmissionStartDenied.
     FileTransmissionRequest {

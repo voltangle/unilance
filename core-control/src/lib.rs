@@ -77,7 +77,6 @@ pub async fn main_task(state: &mut State, link: &mut impl CoreLink) {
                     stored_total_mileage: 0.0,
                 })
                 .await;
-                link.core_send(Message::ConfigRequest).await;
             }
             // FIXME: This file transfer implementation is retarded. Check if it even works
             // and redo it in a more reliable way
@@ -149,7 +148,7 @@ pub async fn main_task(state: &mut State, link: &mut impl CoreLink) {
                         link.core_send(Message::FileTransmissionAck {
                             sequence_id,
                             packet_num,
-                        });
+                        }).await;
                     }
                     None => {
                         link.core_send(Message::FileTransmissionNack {

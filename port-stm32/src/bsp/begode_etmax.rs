@@ -11,9 +11,8 @@ use embassy_stm32::adc::{
 use embassy_stm32::gpio::OutputType;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
-use embassy_stm32::rcc::mux::{Clk48sel, ClockMux};
 use embassy_stm32::rcc::{
-    self, AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv,
+    AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv,
     PllSource, RtcClockSource, Sysclk,
 };
 use embassy_stm32::spi::Spi;
