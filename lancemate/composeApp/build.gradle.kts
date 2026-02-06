@@ -42,7 +42,9 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation("dev.bluefalcon:blue-falcon:2.5.0")
+            implementation(libs.blue.falcon)
+            implementation(libs.navigation3.ui)
+            implementation(libs.compose.material3.adaptive)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
