@@ -19,7 +19,6 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 @Preview
 fun App() {
-
     var selectedItem by remember { mutableIntStateOf(0) }
     val items = listOf("Home", "Search", "Settings")
     val selectedIcons = listOf(Res.drawable.home_24px, Res.drawable.favorite_24px, Res.drawable.star_24px)
@@ -35,11 +34,8 @@ fun App() {
 
     MaterialTheme {
         Row(Modifier.fillMaxWidth()) {
-            ModalWideNavigationRail(
+            WideNavigationRail(
                 state = state,
-                // Note: the value of expandedHeaderTopPadding depends on the layout of your screen in
-                // order to achieve the best alignment.
-                // expandedHeaderTopPadding = 64.dp,
                 header = {
                     // Header icon button should have a tooltip.
                     TooltipBox(
