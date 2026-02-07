@@ -51,7 +51,7 @@ fun App() {
     var showConnectionSheet by remember { mutableStateOf(false) }
 
     MaterialTheme(colorScheme = colors) {
-        if (sizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) || !sizeClass.isHeightAtLeastBreakpoint(
+        if (sizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) && sizeClass.isHeightAtLeastBreakpoint(
                 WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND
             )
         ) {
@@ -137,9 +137,7 @@ fun App() {
                         }
                     }
                     AppContent(selectedItem)
-                    AnimatedVisibility(visible = showConnectionSheet,
-                        enter = fadeIn(), exit = fadeOut()
-                    ) {
+                    if (showConnectionSheet) {
                         Dialog(onDismissRequest = { showConnectionSheet = false}) {
                             Card(
                                 modifier = Modifier
@@ -174,8 +172,25 @@ fun App() {
                         )
                     }
                 }
-            }) { contentPadding ->
-                AppContent(selectedItem)
+            },
+                floatingActionButton = {
+                    TooltipBox(
+                        positionProvider =
+                            TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                        tooltip = { PlainTooltip { Text("Manage current connection") } },
+                        state = rememberTooltipState(),
+                    ) {
+                        FloatingActionButton(
+                            modifier = Modifier.padding(start = 20.dp),
+                            onClick = { showConnectionSheet = true },
+                        ) {
+                            Icon(painterResource(Res.drawable.link_2), "Manage current connection")
+                        }
+                    }
+                }) { contentPadding ->
+                Box(modifier = Modifier.padding(contentPadding)) {
+                    AppContent(selectedItem)
+                }
                 if (showConnectionSheet) {
                     ModalBottomSheet(
                         onDismissRequest = { showConnectionSheet = false },
