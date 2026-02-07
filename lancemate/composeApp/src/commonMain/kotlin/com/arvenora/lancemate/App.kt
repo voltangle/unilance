@@ -146,7 +146,9 @@ fun App() {
                                     .padding(16.dp),
                                 shape = RoundedCornerShape(16.dp),
                             ) {
-                                ConnectionSheet()
+                                Box(modifier = Modifier.padding(8.dp)) {
+                                    ConnectionSheet()
+                                }
                             }
                         }
                     }
