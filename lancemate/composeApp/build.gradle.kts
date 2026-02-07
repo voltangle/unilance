@@ -45,6 +45,7 @@ kotlin {
             implementation(libs.blue.falcon)
             implementation(libs.navigation3.ui)
             implementation(libs.compose.material3.adaptive)
+            implementation(libs.kotlinx.serialization.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
