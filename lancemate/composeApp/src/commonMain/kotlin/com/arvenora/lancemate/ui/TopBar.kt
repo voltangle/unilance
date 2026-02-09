@@ -1,10 +1,13 @@
 package com.arvenora.lancemate.ui
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import lancemate.composeapp.generated.resources.Res
 import lancemate.composeapp.generated.resources.arrow_back
 import lancemate.composeapp.generated.resources.menu
@@ -19,6 +22,7 @@ fun TopBar(
 ) {
     if (isExpanded) {
         TopAppBar(
+            modifier = Modifier.height(54.dp),
             colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
             title = {
                 Text(

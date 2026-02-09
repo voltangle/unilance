@@ -1,12 +1,12 @@
 package com.arvenora.lancemate.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
@@ -34,7 +34,7 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 fun ConfigTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
     val strategy = rememberListDetailSceneStrategy<Any>()
-
+    val overscrollEffect = rememberOverscrollEffect()
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
@@ -48,12 +48,30 @@ fun ConfigTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
                             verticalArrangement = Arrangement.Center,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            Text("Choose a item from the list screen")
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.background,
+                                ),
+                                modifier = Modifier.fillMaxSize()
+                                    .padding(end = 20.dp, bottom = 20.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(8.dp).fillMaxSize(),
+                                    verticalArrangement = Arrangement.Center,
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text("Choose a config group")
+                                }
+                            }
                         }
                     })
             ) {
-                LazyColumn {
-                    items((0..4).count()) { v ->
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    overscrollEffect = overscrollEffect,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items((0..10).count()) { v ->
                         ListItem(
                             modifier = Modifier.clickable {
                                 if (backStack.size > 1) {

@@ -12,10 +12,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.window.core.layout.WindowSizeClass
 import com.arvenora.lancemate.nav.Root
 import com.arvenora.lancemate.platform.platformSystemColorScheme
 import com.arvenora.lancemate.ui.*
+import com.arvenora.lancemate.viewmodel.ConnectionManagerViewModel
+import com.arvenora.lancemate.viewmodel.ConnectionMethod
+import com.arvenora.lancemate.viewmodel.ConnectionState
 import kotlinx.coroutines.launch
 import lancemate.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
@@ -41,7 +45,6 @@ fun App() {
     val scope = rememberCoroutineScope()
     val sizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val connectionSheetState = rememberModalBottomSheetState()
-    var showConnectionSheet by remember { mutableStateOf(false) }
 
     val backStacks = listOf(
         Pair(RootNavTarget.LiveData, remember { mutableStateListOf<Any>(Root) }),
@@ -62,6 +65,8 @@ fun App() {
         sizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND) && sizeClass.isHeightAtLeastBreakpoint(
             WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND
         )
+
+    val connectionManagerVM = viewModel { ConnectionManagerViewModel() }
 
     MaterialExpressiveTheme(colorScheme = platformSystemColorScheme()) {
         Scaffold(containerColor = MaterialTheme.colorScheme.surfaceContainer) { contentPadding ->
@@ -119,24 +124,14 @@ fun App() {
                                     tooltip = { PlainTooltip { Text("Manage current connection") } },
                                     state = rememberTooltipState(),
                                 ) {
-                                    ExtendedFloatingActionButton(
+                                    FAB(
                                         modifier = Modifier.padding(
                                             start = 20.dp, end = 20.dp
                                         ),
-                                        elevation = FloatingActionButtonDefaults.elevation(
-                                            0.dp, 0.dp, 0.dp, 0.dp
-                                        ),
-                                        expanded = navigationRailState.targetValue == WideNavigationRailValue.Expanded,
-                                        onClick = { showConnectionSheet = true },
-                                        icon = {
-                                            Icon(
-                                                painterResource(Res.drawable.link_2),
-                                                "Manage current connection"
-                                            )
-                                        },
-                                        text = {
-                                            Text("Connection")
-                                        })
+                                        navigationRailState.targetValue == WideNavigationRailValue.Expanded,
+                                        true,
+                                        connectionManagerVM,
+                                    )
                                 }
                             }
                         },
@@ -199,15 +194,11 @@ fun App() {
                                 tooltip = { PlainTooltip { Text("Manage current connection") } },
                                 state = rememberTooltipState(),
                             ) {
-                                FloatingActionButton(
-                                    modifier = Modifier.padding(start = 20.dp),
-                                    onClick = { showConnectionSheet = true },
-                                ) {
-                                    Icon(
-                                        painterResource(Res.drawable.link_2),
-                                        "Manage current connection"
-                                    )
-                                }
+                                FAB(
+                                    expanded = connectionManagerVM.connectionState.value != ConnectionState.Connected,
+                                    inNavRail = false,
+                                    connectionManagerVM = connectionManagerVM,
+                                )
                             }
                         }
                     }, topBar = {
@@ -218,31 +209,31 @@ fun App() {
                         )
                     }) { contentPadding ->
                     Box(modifier = Modifier.padding(contentPadding)) {
-                        AppContent(isExpandedSize,selectedItem, backStacks)
+                        AppContent(isExpandedSize, selectedItem, backStacks)
                     }
                     if (isExpandedSize) {
-                        if (showConnectionSheet) {
-                            Dialog(onDismissRequest = {
-                                showConnectionSheet = false
-                            }) {
+                        if (connectionManagerVM.showConnectionSheet.value) {
+                            Dialog(onDismissRequest = { connectionManagerVM.hideSheet() }) {
                                 Card(
-                                    modifier = Modifier.fillMaxWidth().height(200.dp)
+                                    modifier = Modifier.fillMaxWidth()
                                         .padding(16.dp),
                                     shape = RoundedCornerShape(16.dp),
                                 ) {
-                                    Box(modifier = Modifier.padding(8.dp)) {
-                                        ConnectionSheet()
+                                    Box(modifier = Modifier.padding(16.dp)) {
+                                        ConnectionManager(connectionManagerVM, scope)
                                     }
                                 }
                             }
                         }
                     } else {
-                        if (showConnectionSheet) {
+                        if (connectionManagerVM.showConnectionSheet.value) {
                             ModalBottomSheet(
-                                onDismissRequest = { showConnectionSheet = false },
+                                onDismissRequest = { connectionManagerVM.hideSheet() },
                                 sheetState = connectionSheetState
                             ) {
-                                ConnectionSheet()
+                                Box(modifier = Modifier.padding(8.dp)) {
+                                    ConnectionManager(connectionManagerVM, scope)
+                                }
                             }
                         }
                     }
@@ -258,11 +249,11 @@ fun AppContent(
     selectedItem: RootNavTarget,
     backStacks: List<Pair<RootNavTarget, SnapshotStateList<Any>>>
 ) {
-    var currentBackStack =
+    val currentBackStack =
         backStacks.first { value -> value.first == selectedItem }.second
     when (selectedItem) {
         RootNavTarget.LiveData -> {
-            LiveDataTab(currentBackStack)
+            LiveDataTab(isExpanded, currentBackStack)
         }
 
         RootNavTarget.Config -> {
@@ -278,7 +269,60 @@ fun AppContent(
         }
 
         RootNavTarget.Firmware -> {
-            FirmwareTab(currentBackStack)
+            FirmwareTab(isExpanded, currentBackStack)
         }
     }
+}
+
+
+@Composable
+fun FAB(
+    modifier: Modifier = Modifier,
+    expanded: Boolean,
+    inNavRail: Boolean,
+    connectionManagerVM: ConnectionManagerViewModel
+) {
+    ExtendedFloatingActionButton(
+        modifier = modifier,
+        elevation = if (inNavRail) FloatingActionButtonDefaults.elevation(
+            0.dp, 0.dp, 0.dp, 0.dp
+        ) else FloatingActionButtonDefaults.elevation(),
+        expanded = expanded,
+        onClick = { connectionManagerVM.showConnectionSheet.value = true },
+        icon = {
+            when (connectionManagerVM.method.value) {
+                ConnectionMethod.Bluetooth -> {
+                    if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
+                        Icon(
+                            painterResource(Res.drawable.bluetooth_connected),
+                            "Connected via BLE"
+                        )
+                    } else {
+                        Icon(
+                            painterResource(Res.drawable.bluetooth),
+                            "Not connected via BLE"
+                        )
+                    }
+                }
+
+                ConnectionMethod.USB -> {
+                    if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
+                        Icon(
+                            painterResource(Res.drawable.usb), "Connected via USB"
+                        )
+                    } else {
+                        Icon(
+                            painterResource(Res.drawable.usb_off), "Unconnected via USB"
+                        )
+                    }
+                }
+            }
+        },
+        text = {
+            if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
+                Text("Connected")
+            } else {
+                Text("Connect")
+            }
+        })
 }
