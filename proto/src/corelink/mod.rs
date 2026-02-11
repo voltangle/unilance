@@ -1,5 +1,8 @@
-//! This file has the entirety of the CORElink protocol used in UniLANCE for communication
+//! This mod has the entirety of the CORElink protocol used in UniLANCE for communication
 //! between different nodes in the system.
+
+pub mod control;
+pub mod supervisor;
 
 use heapless::String;
 use postcard::experimental::max_size::MaxSize;
@@ -72,10 +75,31 @@ pub enum Message {
     BootFailure,
     /// Boot was successful (duh). Can be sent by any system node.
     BootSuccessful,
-    WriteValue {
-        key: String<20>,
+    /// Similar to a BLE "notification". The data in it depends on the sender; it can
+    /// always be parsed by a corresponding enum.
+    Notify {
         #[serde(with = "serde_arrays")]
-        value: [u8; 42],
+        data: [u8; 63]
+    },
+    /// Akin to a "write register". The key is a value from an enum belonging to the node
+    /// that this message is sent to, for example, ControlValueKey.
+    WriteValue {
+        key: u32,
+        #[serde(with = "serde_arrays")]
+        value: [u8; 58],
+    },
+    /// Akin to a "read register". The key is a value from an enum belonging to the node
+    /// that this message is sent to, for example, ControlValueKey.
+    ReadValue {
+        key: u32,
+    },
+    WriteValueNack {
+        key: u32,
+        reason: ValueNackReason
+    },
+    ReadValueNack {
+        key: u32,
+        reason: ValueNackReason
     },
     /// Request to transmit a file from one node to another. The other node has to respond
     /// with either FileTransmissionStartApproved or FileTransmissionStartDenied.
@@ -129,24 +153,11 @@ pub enum Message {
     FileTransmissionEndAck {
         sequence_id: u32,
     },
-    /// Telemetry from the control node, that is sent with a frequency of 100 Hz.
-    ///
-    /// Has all data that has to be synced between control and supervisor.
-    ControlTelemetry {
-        /// Current speed in cm/s.
-        ///
-        /// The reason it's using this UoM is because I want to use SI units as much as
-        /// possible, and then convert them to whatever they have to be for the end usecase. In
-        /// this case, it was also supposed to be m/s, but instead of using a float to represent
-        /// decimals I would just put cm/s and then divide by 100 to get m/s.
-        speed_cmps: u16,
-        /// Input current in deciamps.
-        i_input_da: i16,
-    },
 }
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
 pub enum FileTransmissionDeniedReason {
+    Unspecified,
     UnknownFile,
     NotEnoughSpace,
     SequenceAlreadyExists,
@@ -155,14 +166,23 @@ pub enum FileTransmissionDeniedReason {
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
 pub enum ShutdownReason {
+    Unspecified,
     UserRequest,
     IdleTimeout,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
 pub enum FileTransmissionNackReason {
+    Unspecified,
     UnknownSequence,
     LostPacket,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
+pub enum ValueNackReason {
+    Unspecified,
+    NotAllowed,
+    NoSuchKey
 }
 
 impl Message {
