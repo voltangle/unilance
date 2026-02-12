@@ -4,15 +4,19 @@ use micromath::F32Ext;
 
 impl BalanceState {
     /// Call this right after setting up the config.
-    pub fn init(&mut self) {
-        self.setpoint = self.run_config.setpoint_zero;
-        self.dt_sec = self.config.dt as f32 / 1000000.0;
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_dt(&mut self, dt: u16) {
+        self.config.dt = dt;
+        self.dt_sec = dt as f32 / 1000000.0;
     }
 
     /// Main balance loop function. Has to be called in ISR, for real time guarantees.
     pub fn iterate(&mut self, imu_state: IMUData) -> f32 {
         let pid_out = self.iterate_pid(&imu_state);
-        if self.run_config.rideassist.enable {
+        if self.config.rideassist.enable {
             self.iterate_ride_assist(&imu_state, pid_out);
         }
         return pid_out;
@@ -30,9 +34,9 @@ impl BalanceState {
             .clamp(self.config.integral_min, self.config.integral_max);
 
         let d_term = if pos_state.pitch_rate.is_sign_positive() {
-            self.config.kd_forward as f32 * pos_state.pitch_rate
+            self.config.kd_fore as f32 * pos_state.pitch_rate
         } else {
-            self.config.kd_backward as f32 * pos_state.pitch_rate
+            self.config.kd_aft as f32 * pos_state.pitch_rate
         };
 
         let temp_out = p_term + self.pid_integral_accum + d_term;

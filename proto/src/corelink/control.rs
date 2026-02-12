@@ -1,3 +1,4 @@
+use int_enum::IntEnum;
 use postcard::experimental::max_size::MaxSize;
 use serde::{Deserialize, Serialize};
 
@@ -22,13 +23,28 @@ pub enum ControlNotification {
     },
 }
 
-// TODO: add keys
-#[derive(Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, MaxSize)]
+/// For all type definitions and documentation, please refer to the [BalanceConfig]
+/// struct (and all related) in core-control.
+#[allow(non_camel_case_types)]
+#[derive(
+    Serialize, Deserialize, PartialEq, PartialOrd, Debug, Copy, Clone, IntEnum, MaxSize,
+)]
+#[repr(u32)]
 pub enum ControlValueKey {
-    PI2DkP,
-    PI2DkI,
-    PI2DkDf,
-    PI2DkDa,
+    PI2D_kP,
+    PI2D_kPExpo,
+    PI2D_kI,
+    PI2D_kDFore,
+    PI2D_kDAft,
+    /// Refer to [BalanceConfig::setpoint_zero]
+    SetpointZero,
+    PI2DIntegralMax,
+    PI2DIntegralMin,
+    MaxPhaseCurrent,
+    /// Referring to regenerative braking current
+    MinPhaseCurrent,
+    /// Refer to [RideAssistConfig::enable]
+    RideAssistEnabled,
 }
 
 const _: () = {

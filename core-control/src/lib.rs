@@ -1,23 +1,28 @@
 #![no_std]
 
+use mesc::MESC_motor_typedef;
 use embassy_time::{Duration, Ticker};
 use heapless::{Vec, VecView};
+use proto::corelink::control::ControlValueKey;
 use proto::corelink::{
     CoreLink, FileTransmissionDeniedReason, FileTransmissionNackReason, Message,
+    ValueNackReason,
 };
 
+use crate::balance::{BalanceConfig, BalanceState};
+use crate::corelink::handle_corelink;
 use crate::info::FW_VERSION;
 
 pub mod ahrs;
 pub mod balance;
+mod corelink;
 mod info;
 
 // TODO: start filling something in here
 
 // Random entries just so its filled with something
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
 pub enum SystemState {
-    #[default]
     Booting,
     Disarmed,
     Armed,
@@ -31,171 +36,29 @@ pub enum FaultType {
     FreespinOnStartup,
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]
+#[derive(Clone, Copy)]
 pub struct State {
     state: SystemState,
+    motor: MESC_motor_typedef,
+    pub balance: BalanceState,
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-enum FileTransferState {
-    WaitingForFirstPacket,
-    Requested,
-    Transferring,
-    Ended,
-}
-
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
-struct FileTransfer {
-    sequence_id: u32,
-    packet_num: u32,
-    state: FileTransferState,
+impl State {
+    pub fn new() -> Self {
+        Self {
+            state: SystemState::Booting,
+            balance: BalanceState::new(),
+            motor: MESC_motor_typedef::default(),
+        }
+    }
 }
 
 // TODO: If more tasks will need state, redo it as a ref to a mutex
 pub async fn main_task(state: &mut State, link: &mut impl CoreLink) {
     let mut ticker = Ticker::every(Duration::from_hz(100));
 
-    let mut file_transfers: Vec<FileTransfer, 5> = Vec::new();
-
     loop {
-        match link.core_recv().await {
-            Message::Hello {
-                firmware_version,
-                serial_number,
-                system_time,
-                stored_total_mileage,
-            } => {
-                if firmware_version != info::FW_VERSION {
-                    // TODO: Make it do an error response or something
-                    panic!("Firmware version differ, unable to proceed");
-                }
-
-                link.core_send(Message::Hello {
-                    firmware_version: FW_VERSION.into(),
-                    serial_number: "".into(),
-                    system_time: 0,
-                    stored_total_mileage: 0.0,
-                })
-                .await;
-            }
-            // FIXME: This file transfer implementation is retarded. Check if it even works
-            // and redo it in a more reliable way
-            Message::FileTransmissionRequest {
-                filename,
-                sequence_id,
-                len,
-            } => {
-                for (i, transfer) in file_transfers.clone().iter().enumerate() {
-                    // Check if there is already any transfer with that sequence
-                    if transfer.sequence_id == sequence_id
-                        && transfer.state != FileTransferState::Ended
-                    {
-                        link.core_send(Message::FileTransmissionRequestDenied {
-                            reason: FileTransmissionDeniedReason::SequenceAlreadyExists,
-                        })
-                        .await;
-                        continue;
-                    }
-
-                    if transfer.sequence_id == sequence_id
-                        && transfer.state == FileTransferState::Ended
-                    {
-                        file_transfers.remove(i);
-                    }
-                }
-
-                if file_transfers.is_full() {
-                    link.core_send(Message::FileTransmissionRequestDenied {
-                        reason: FileTransmissionDeniedReason::TooManyTransfers,
-                    })
-                    .await;
-                    continue;
-                }
-
-                let transfer = FileTransfer {
-                    sequence_id,
-                    packet_num: todo!(),
-                    state: FileTransferState::WaitingForFirstPacket,
-                };
-                file_transfers.push(transfer);
-                link.core_send(Message::FileTransmissionRequestApproved { sequence_id })
-                    .await;
-            }
-            Message::FileTransmissionPacket {
-                sequence_id,
-                packet_num,
-                data,
-            } => {
-                match file_transfers
-                    .iter_mut()
-                    .filter(|ft| ft.sequence_id == sequence_id)
-                    .next()
-                {
-                    Some(ft) => {
-                        ft.state = FileTransferState::Transferring;
-                        // if packet received has a number larger than stored at least by 2
-                        if packet_num - 1 > ft.packet_num {
-                            link.core_send(Message::FileTransmissionNack {
-                                sequence_id,
-                                packet_num: ft.packet_num + 1,
-                                reason: FileTransmissionNackReason::LostPacket,
-                            })
-                            .await;
-                            continue;
-                        }
-                        // TODO: handle saving packet data somewhere
-                        ft.packet_num += 1;
-                        link.core_send(Message::FileTransmissionAck {
-                            sequence_id,
-                            packet_num,
-                        }).await;
-                    }
-                    None => {
-                        link.core_send(Message::FileTransmissionNack {
-                            sequence_id,
-                            packet_num,
-                            reason: FileTransmissionNackReason::UnknownSequence,
-                        })
-                        .await;
-                        continue;
-                    }
-                }
-            }
-            Message::FileTransmissionEnd {
-                sequence_id,
-                packet_num,
-            } => {
-                match file_transfers
-                    .iter_mut()
-                    .filter(|ft| ft.sequence_id == sequence_id)
-                    .next()
-                {
-                    Some(ft) => {
-                        if ft.packet_num != packet_num {
-                            link.core_send(Message::FileTransmissionNack {
-                                sequence_id,
-                                packet_num,
-                                reason: FileTransmissionNackReason::LostPacket,
-                            })
-                            .await;
-                            continue;
-                        }
-                    }
-                    None => {
-                        link.core_send(Message::FileTransmissionNack {
-                            sequence_id,
-                            packet_num,
-                            reason: FileTransmissionNackReason::UnknownSequence,
-                        })
-                        .await;
-                        continue;
-                    }
-                }
-                // TODO: handle saving data
-                file_transfers.retain(|ft| ft.sequence_id != sequence_id);
-            }
-            _ => {}
-        }
+        handle_corelink(state, link).await;
         ticker.next().await;
     }
 }

@@ -8,30 +8,27 @@ use mesc::MESC_motor_typedef;
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
-// ACCESS RULES: This struct can ONLY be accessed in an ISR, specifically the
-// ISR that runs balance_loop(). Because of this, I opted to not use a mutex,
+// SAFETY: The `balance` field of this struct can ONLY be accessed in an ISR, specifically
+// the ISR that runs balance_loop(). Because of this, I opted to not use a mutex,
 // for simplicity and performance reasons.
 // RESPECT THESE RULES, OR THE CHANCE OF THE WHEEL MAKING EXPENSIVE SOUNDS RISES
 // EXPONENTIALLY.
-static mut BALANCE_STATE: MaybeUninit<BalanceState> = MaybeUninit::uninit();
+static mut CONTROL_STATE: MaybeUninit<State> = MaybeUninit::uninit();
 
-static CONTROL_STATE: StaticCell<State> = StaticCell::new();
 #[for_role("combined")]
 type PlatformCoreLink<'a> = MemChannelCoreLink<'a>;
 static CONTROL_CORELINK: StaticCell<PlatformCoreLink> = StaticCell::new();
 
 #[allow(static_mut_refs, unused)]
-fn balance_state() -> &'static mut BalanceState {
-    unsafe { (&mut *BALANCE_STATE.as_mut_ptr()) }
+fn state() -> &'static mut State {
+    unsafe { (&mut *CONTROL_STATE.as_mut_ptr()) }
 }
 
 #[allow(static_mut_refs)]
 pub fn init() {
-    let mut balance_state = BalanceState::default();
-    balance_state.config = bsp::BALANCE_CONF;
-    balance_state.init();
+    // FIXME: redo as new() call
     unsafe {
-        BALANCE_STATE.write(balance_state);
+        CONTROL_STATE.write(State::new());
     }
     // TODO: Try to figure out how to do the hardware config in Rust instead of a C header
 
@@ -47,9 +44,9 @@ pub fn init() {
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
 pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
-    let state = CONTROL_STATE.init(State::default());
     let corelink = CONTROL_CORELINK.init(link);
-    spawner.spawn(main_task(state, corelink).expect("failed to start control main task"));
+    spawner
+        .spawn(main_task(state(), corelink).expect("failed to start control main task"));
 }
 
 /// BALANCE_STATE MUST be initialized when this function runs.
@@ -58,7 +55,9 @@ pub fn balance_loop() {
     // mesc::houseKeeping(mesc::get_motor());
 
     let motor = crate::get_motor();
-    motor.FOC.Idq_req.q = balance_state().iterate(core_control::ahrs::IMUData::default());
+    motor.FOC.Idq_req.q = state()
+        .balance
+        .iterate(core_control::ahrs::IMUData::default());
 }
 
 #[embassy_executor::task]

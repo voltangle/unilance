@@ -70,6 +70,12 @@ pub enum Message {
         /// Total mileage that the sender has previously remembered.
         stored_total_mileage: f32,
     },
+    /// Asks all nodes on the bus to, well, introduce themselves, aka send out the
+    /// [Message::Hello] message.
+    ///
+    /// This is a message that is sent to everyone, aka the destination ID is the max value
+    /// it can possibly be (filled with ones).
+    IntroduceYourselves,
     /// Can be sent by any system node. Denotes a generic boot failure.
     // TODO: make it also contain the reason for failure
     BootFailure,
@@ -79,7 +85,7 @@ pub enum Message {
     /// always be parsed by a corresponding enum.
     Notify {
         #[serde(with = "serde_arrays")]
-        data: [u8; 63]
+        data: [u8; 63],
     },
     /// Akin to a "write register". The key is a value from an enum belonging to the node
     /// that this message is sent to, for example, ControlValueKey.
@@ -89,17 +95,25 @@ pub enum Message {
         value: [u8; 58],
     },
     /// Akin to a "read register". The key is a value from an enum belonging to the node
-    /// that this message is sent to, for example, ControlValueKey.
+    /// that this message is sent to, for example, [ControlValueKey].
     ReadValue {
         key: u32,
     },
+    WriteValueAck {
+        key: u32,
+    },
+    ReadValueAck {
+        key: u32,
+        #[serde(with = "serde_arrays")]
+        value: [u8; 58],
+    },
     WriteValueNack {
         key: u32,
-        reason: ValueNackReason
+        reason: ValueNackReason,
     },
     ReadValueNack {
         key: u32,
-        reason: ValueNackReason
+        reason: ValueNackReason,
     },
     /// Request to transmit a file from one node to another. The other node has to respond
     /// with either FileTransmissionStartApproved or FileTransmissionStartDenied.
@@ -182,7 +196,8 @@ pub enum FileTransmissionNackReason {
 pub enum ValueNackReason {
     Unspecified,
     NotAllowed,
-    NoSuchKey
+    NoSuchKey,
+    BadPayload,
 }
 
 impl Message {

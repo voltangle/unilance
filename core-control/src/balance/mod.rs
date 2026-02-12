@@ -1,9 +1,8 @@
 mod algo;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct BalanceState {
     pub config: BalanceConfig,
-    pub run_config: BalanceRuntimeConfig,
     pub(crate) dt_sec: f32,
 
     pub(crate) setpoint: f32,
@@ -12,7 +11,7 @@ pub struct BalanceState {
     pub(crate) rideassist: RideAssistState,
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) struct RideAssistState {
     pub(crate) prev_state: RideAssistCoreState,
     pub(crate) state: RideAssistCoreState,
@@ -21,7 +20,7 @@ pub(crate) struct RideAssistState {
     pub(crate) state_transition_start_setpoint: f32,
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum RideAssistCoreState {
     Acceleration,
     #[default]
@@ -29,25 +28,11 @@ pub(crate) enum RideAssistCoreState {
     Braking,
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub(crate) enum RideAssistAccelerationState {
     #[default]
     Slight,
     Hard,
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct BalanceRuntimeConfig {
-    /// What is regarded as the "zero" of a setpoint. Usually translated to the
-    /// "pedal angle" setting for the user. Radians
-    pub setpoint_zero: f32,
-    pub rideassist: RideAssistRuntimeConfig,
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub struct RideAssistRuntimeConfig {
-    /// If disabled, Ride Assist calculations will be skipped in iterate().
-    pub enable: bool,
 }
 
 // TODO: Figure out proper tuning settings
@@ -55,18 +40,22 @@ pub struct RideAssistRuntimeConfig {
 // is not "hard, medium, soft", but rather a value from 0 to 100. Same for everything else
 // that is applicable.
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct BalanceConfig {
     pub kp: u16,
     pub kp_expo: f32,
     pub ki: u16,
-    pub kd_forward: u16,
-    pub kd_backward: u16,
+    pub kd_fore: u16,
+    pub kd_aft: u16,
 
     /// Delta time, or how much time passes between ISR triggers. Microseconds
     pub dt: u16,
 
     pub rideassist: RideAssistConfig,
+
+    /// What is regarded as the "zero" of a setpoint. Usually translated to the
+    /// "pedal angle" setting for the user. Radians
+    pub setpoint_zero: f32,
 
     pub integral_max: f32,
     pub integral_min: f32,
@@ -79,8 +68,10 @@ pub struct BalanceConfig {
     pub out_max: u16,
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct RideAssistConfig {
+    /// If disabled, Ride Assist calculations will be skipped in iterate().
+    pub enable: bool,
     /// What's the differentiation point between "slight" and "hard" acceleration. m/s^2
     pub accel_power_threshold: f32,
     /// Threshold at which it transitions states to and from acceleration. m/s^2

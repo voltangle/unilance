@@ -12,8 +12,8 @@ use embassy_stm32::gpio::OutputType;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
-    AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv,
-    PllSource, RtcClockSource, Sysclk,
+    AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource,
+    RtcClockSource, Sysclk,
 };
 use embassy_stm32::spi::Spi;
 use embassy_stm32::time::Hertz;
@@ -22,6 +22,7 @@ use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
 use mesc::MESC_PWM_IRQ_handler;
+use proto::corelink::control::ControlValueKey;
 
 /*
  * BSP for the Begode ET Max electric unicycle motherboard.
@@ -75,25 +76,9 @@ use mesc::MESC_PWM_IRQ_handler;
 // how to make it all coexist
 
 pub const STARTUP_DELAY_MS: u64 = 1500;
-// FIXME: NO BALANCE CONFIG, do at least a basic tune
-pub const BALANCE_CONF: BalanceConfig = BalanceConfig {
-    kp: 0,
-    kp_expo: 0.0,
-    ki: 0,
-    kd_forward: 0,
-    kd_backward: 0,
-    dt: 0,
-    rideassist: RideAssistConfig {
-        accel_power_threshold: 0.0,
-        accel_state_threshold: 0.0,
-        braking_state_threshold: 0.0,
-        state_hysteresis: 0,
-    },
-    integral_min: 0.0,
-    integral_max: 0.0,
-    out_min: 0,
-    out_max: 0,
-};
+
+// TODO: Figure out how to store the balance configuration settings
+// Maybe do as an array of tuples that has all control value assignments
 
 static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
 static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
@@ -457,6 +442,9 @@ impl PlatformConfig for Config {
 #[interrupt]
 fn TIM8_UP_TIM13() {
     rtos_trace::trace::isr_enter();
+    // TODO: refactor out to core-control
+    // Ideally, the port should have no knowledge of the FOC backend, but that's for the
+    // future stuffs, when I will need it
 
     let motor = crate::get_motor();
     adc_dma_read();
