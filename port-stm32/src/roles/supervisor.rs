@@ -15,6 +15,8 @@ static SUPERVISOR_STATE: StaticCell<Mutex<NoopRawMutex, State>> = StaticCell::ne
 #[for_role("combined")]
 type PlatformCoreLink<'a> = MemChannelCoreLink<'a>;
 static SUPERVISOR_CORELINK: StaticCell<PlatformCoreLink> = StaticCell::new();
+
+// TODO: All of this littlefs shit is very much "get out of my sight". Redo properly
 static LITTLEFS_STORAGE: StaticCell<RamStorage> = StaticCell::new();
 static LITTLEFS_ALLOC: StaticCell<Allocation<RamStorage>> = StaticCell::new();
 static LITTLEFS: StaticCell<Mutex<NoopRawMutex, Filesystem<'static, RamStorage>>> =
@@ -109,4 +111,22 @@ impl Storage for RamStorage {
         self.mem[off..off + len].fill(0xFF);
         Ok(len)
     }
+}
+
+// TODO: make it not so retarded
+
+#[derive(Clone, Copy)]
+pub struct ControlConfig {
+    pub kp: u16,
+    pub kp_expo: f32,
+    pub ki: u16,
+    pub kd_fore: u16,
+    pub kd_aft: u16,
+    pub setpoint_zero: f32,
+    pub integral_max: f32,
+    pub integral_min: f32,
+
+    pub max_phase_current: u16,
+    pub min_phase_current: u16,
+
 }
