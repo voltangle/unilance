@@ -6,8 +6,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,10 +13,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arvenora.lancemate.viewmodel.ConnectionManagerViewModel
@@ -28,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import lancemate.composeapp.generated.resources.Res
 import lancemate.composeapp.generated.resources.bluetooth
+import lancemate.composeapp.generated.resources.cloud
 import lancemate.composeapp.generated.resources.usb
 import org.jetbrains.compose.resources.painterResource
 
@@ -41,6 +41,7 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
         val options = ConnectionMethod.entries.toTypedArray()
         val icons = listOf(
             Res.drawable.bluetooth,
+            Res.drawable.cloud,
             Res.drawable.usb,
         )
 
@@ -55,24 +56,29 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
                 style = MaterialTheme.typography.displaySmallEmphasized
             )
         }
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(horizontal = 8.dp).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
             options.forEachIndexed { index, method ->
-                SegmentedButton(
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index, count = options.size
-                    ),
-                    onClick = { viewModel.setMethod(method) },
-                    selected = method == viewModel.method.value,
-                    label = {
-                        Row {
-                            Icon(painterResource(icons[index]), "")
-                            Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                            Text(method.name)
-                        }
-                    })
+                ToggleButton(
+                    checked = viewModel.method.value == method,
+                    onCheckedChange = { viewModel.setMethod(method)},
+                    modifier = Modifier.semantics { role = Role.RadioButton }.weight(1f),
+                    shapes =
+                        when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
+                ) {
+                    Icon(painterResource(icons[index]), "")
+                    Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
+                    Text(method.name)
+                }
             }
         }
-        AnimatedVisibility(viewModel.method.value == ConnectionMethod.Bluetooth) {
+        AnimatedVisibility(viewModel.method.value == ConnectionMethod.BLE) {
             LazyColumn(
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).animateContentSize(),
             ) {
@@ -98,6 +104,9 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
                     )
                 }
             }
+        }
+        AnimatedVisibility(viewModel.method.value == ConnectionMethod.TCP) {
+            Text("TODO: TCP")
         }
         AnimatedVisibility(viewModel.method.value == ConnectionMethod.USB) {
             Text("TODO: USB")

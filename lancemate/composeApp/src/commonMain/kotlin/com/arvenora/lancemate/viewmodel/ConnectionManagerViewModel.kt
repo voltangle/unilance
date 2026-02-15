@@ -1,18 +1,13 @@
 package com.arvenora.lancemate.viewmodel
 
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
 enum class ConnectionMethod {
-    Bluetooth,
+    BLE,
+    TCP,
     USB
 }
 
@@ -24,7 +19,7 @@ enum class ConnectionState {
 
 class ConnectionManagerViewModel : ViewModel() {
     var connectionState = mutableStateOf(ConnectionState.NotConnected)
-    var method = mutableStateOf(ConnectionMethod.Bluetooth)
+    var method = mutableStateOf(ConnectionMethod.BLE)
         private set
     var showConnectionSheet = mutableStateOf(false)
     var bleDevices = mutableStateListOf("Device 1", "Device 2", "Device 3", "Device 4", "Device 5", "Device 6", "Device 7", "Device 8", "Device 9")

@@ -291,7 +291,7 @@ fun FAB(
         onClick = { connectionManagerVM.showConnectionSheet.value = true },
         icon = {
             when (connectionManagerVM.method.value) {
-                ConnectionMethod.Bluetooth -> {
+                ConnectionMethod.BLE -> {
                     if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
                         Icon(
                             painterResource(Res.drawable.bluetooth_connected),
@@ -313,6 +313,18 @@ fun FAB(
                     } else {
                         Icon(
                             painterResource(Res.drawable.usb_off), "Unconnected via USB"
+                        )
+                    }
+                }
+
+                ConnectionMethod.TCP -> {
+                    if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
+                        Icon(
+                            painterResource(Res.drawable.cloud), "Connected via TCP"
+                        )
+                    } else {
+                        Icon(
+                            painterResource(Res.drawable.cloud_off), "Unconnected via TCP"
                         )
                     }
                 }
