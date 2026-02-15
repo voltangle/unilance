@@ -66,6 +66,7 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
             implementation(libs.flatlaf)
+            implementation(libs.advancedMenubar)
         }
         iosMain.dependencies {
             // TODO: No idea if I will actually need this guy (I think this is the IMU

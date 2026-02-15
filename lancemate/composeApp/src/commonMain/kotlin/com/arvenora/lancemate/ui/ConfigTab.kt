@@ -1,11 +1,11 @@
 package com.arvenora.lancemate.ui
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.entryProvider
@@ -35,6 +36,20 @@ import org.jetbrains.compose.resources.painterResource
 fun ConfigTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
     val strategy = rememberListDetailSceneStrategy<Any>()
     val overscrollEffect = rememberOverscrollEffect()
+
+    val rootItems = listOf(
+        "Section 1",
+        "Section 2",
+        "Section 3",
+        "Section 4",
+        "Section 5",
+        "Section 6",
+        "Section 7",
+        "Section 8",
+        "Section 9",
+        "Section 10",
+    )
+
     NavDisplay(
         backStack = backStack,
         onBack = { backStack.removeLastOrNull() },
@@ -67,23 +82,26 @@ fun ConfigTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
                     })
             ) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
+                        .clip(ListItemDefaults.shapes().selectedShape),
                     overscrollEffect = overscrollEffect,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    items((0..10).count()) { v ->
-                        ListItem(
-                            modifier = Modifier.clickable {
+                    itemsIndexed(rootItems) { index, v ->
+                        SegmentedListItem(
+                            onClick = {
                                 if (backStack.size > 1) {
-                                    backStack[1] = ConfigDetail(id = v)
+                                    backStack[1] = ConfigDetail(id = index)
                                 } else {
-                                    backStack.add(ConfigDetail(id = v))
+                                    backStack.add(ConfigDetail(id = index))
                                 }
                             },
-                            colors = if (isExpanded) ListItemDefaults.colors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer
-                            ) else ListItemDefaults.colors(),
-                            headlineContent = { Text("Section $v", fontSize = 20.sp) },
+                            selected = backStack.getOrNull(1) == ConfigDetail(id = index),
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseOnSurface),
+                            shapes = ListItemDefaults.segmentedShapes(
+                                index = index, count = rootItems.size
+                            ),
+                            content = { Text("Section $v", fontSize = 20.sp) },
                             supportingContent = { Text("Section description") },
                             leadingContent = {
                                 Icon(

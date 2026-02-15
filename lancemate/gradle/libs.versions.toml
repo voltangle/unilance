@@ -5,19 +5,20 @@ agp = "8.12.3"
 android-compileSdk = "36"
 android-minSdk = "33"
 android-targetSdk = "36"
-androidx-activity = "1.12.3"
+androidx-activity = "1.12.4"
 androidx-lifecycle = "2.9.6"
-blueFalcon = "2.5.0"
+blueFalcon = "2.5.1"
 composeHotReload = "1.0.0"
-composeMultiplatform = "1.10.0"
+composeMultiplatform = "1.11.0-alpha02"
 kotlin = "2.3.10"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization-core = "1.10.0"
-material3 = "1.10.0-alpha05"
-navigation3Ui = "1.0.0-alpha06"
+material3 = "1.11.0-alpha02"
+navigation3Ui = "1.1.0-alpha02"
 moko-permissions = "0.20.1"
 koalaplot = "0.11.0"
 flatlaf = "3.7"
+advancedMenubar = "0.1.0-alpha03"
 
 [libraries]
 blue-falcon = { module = "dev.bluefalcon:blue-falcon", version.ref = "blueFalcon" }
@@ -30,8 +31,8 @@ compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.re
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
 compose-material3-adaptive = { module = "org.jetbrains.compose.material3.adaptive:adaptive", version.ref = "adaptive" }
-compose-material3-navigation3 = { group = "org.jetbrains.compose.material3.adaptive", name = "adaptive-navigation3", version.ref = "adaptive" }
-compose-material3-adaptive-navigationSuite = { group = "org.jetbrains.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "navigationSuite" }
+compose-material3-navigation3 = { module = "org.jetbrains.compose.material3.adaptive:adaptive-navigation3", version.ref = "adaptive" }
+compose-material3-adaptive-navigationSuite = { module = "org.jetbrains.compose.material3:material3-adaptive-navigation-suite", version.ref = "navigationSuite" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
@@ -46,6 +47,7 @@ moko-permissions-motion = { module = "dev.icerock.moko:permissions-motion", vers
 moko-permissions-location = { module = "dev.icerock.moko:permissions-location", version.ref = "moko-permissions" }
 koalaplot = { module = "io.github.koalaplot:koalaplot-core", version.ref = "koalaplot" }
 flatlaf = { module = "com.formdev:flatlaf", version.ref = "flatlaf" }
+advancedMenubar = { module = "dev.hansholz:advanced-menubar", version.ref = "advancedMenubar" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
