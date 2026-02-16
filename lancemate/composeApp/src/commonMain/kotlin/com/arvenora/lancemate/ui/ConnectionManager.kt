@@ -56,37 +56,46 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
         AnimatedVisibility(viewModel.connectionState == ConnectionState.Connecting) {
             LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
-        AnimatedVisibility(viewModel.connectionState == ConnectionState.Connected) {
-            Column {
+        AnimatedContent(viewModel.connectionState) {
+            if (it == ConnectionState.Connected) {
+                Column {
+                    Text(
+                        text = "Connected devices",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp, start = 8.dp)
+                    )
+                    SegmentedListItem(
+                        leadingContent = {
+                            Icon(
+                                painterResource(Res.drawable.bluetooth),
+                                contentDescription = "Localized description",
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        },
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseOnSurface),
+                        shapes = ListItemDefaults.segmentedShapes(0, 0),
+                        selected = true,
+                        onClick = {
+                            scope.launch {
+                                viewModel.disconnectFromBleDevice()
+                            }
+                        },
+                        content = {
+                            viewModel.connectedDevice?.let {
+                                Text(
+                                    it, fontSize = 20.sp
+                                )
+                            }
+                        },
+                    )
+                }
+            } else {
                 Text(
-                    text = "Connected devices",
+                    text = "Not connected to any device",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp, start = 8.dp)
-                )
-                SegmentedListItem(
-                    leadingContent = {
-                        Icon(
-                            painterResource(Res.drawable.bluetooth),
-                            contentDescription = "Localized description",
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    },
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseOnSurface),
-                    shapes = ListItemDefaults.segmentedShapes(0, 0),
-                    selected = true,
-                    onClick = {
-                        scope.launch {
-                            viewModel.disconnectFromBleDevice()
-                        }
-                    },
-                    content = {
-                        viewModel.connectedDevice?.let {
-                            Text(
-                                it, fontSize = 20.sp
-                            )
-                        }
-                    },
                 )
             }
         }
