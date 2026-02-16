@@ -55,7 +55,7 @@ fun FirmwareTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
         ) {
             LazyVerticalGrid(
                 modifier = Modifier.fillMaxWidth(),
-                columns = GridCells.Adaptive(150.dp),
+                columns = GridCells.Fixed(2),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {

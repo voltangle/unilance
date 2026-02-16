@@ -1,10 +1,14 @@
 package com.arvenora.lancemate
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -12,13 +16,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.window.core.layout.WindowSizeClass
 import com.arvenora.lancemate.nav.Root
 import com.arvenora.lancemate.platform.platformSystemColorScheme
 import com.arvenora.lancemate.ui.*
+import com.arvenora.lancemate.viewmodel.AppViewModel
 import com.arvenora.lancemate.viewmodel.ConnectionManagerViewModel
-import com.arvenora.lancemate.viewmodel.ConnectionMethod
 import com.arvenora.lancemate.viewmodel.ConnectionState
 import kotlinx.coroutines.launch
 import lancemate.composeapp.generated.resources.*
@@ -32,7 +37,10 @@ enum class RootNavTarget {
 @Composable
 @Preview
 fun App() {
-    var selectedItem by remember { mutableStateOf(RootNavTarget.LiveData) }
+    val viewModel = viewModel { AppViewModel() }
+    val connectionManagerVM =
+        viewModel { ConnectionManagerViewModel(viewModel.snackbarHostState) }
+
     val navItems = listOf(
         Triple(RootNavTarget.LiveData, Res.drawable.ssid_chart, Res.drawable.ssid_chart),
         Triple(
@@ -44,7 +52,7 @@ fun App() {
     )
     val scope = rememberCoroutineScope()
     val sizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val connectionSheetState = rememberModalBottomSheetState()
+    val connectionSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val backStacks = listOf(
         Pair(RootNavTarget.LiveData, remember { mutableStateListOf<Any>(Root) }),
@@ -66,10 +74,16 @@ fun App() {
             WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND
         )
 
-    val connectionManagerVM = viewModel { ConnectionManagerViewModel() }
 
     MaterialExpressiveTheme(colorScheme = platformSystemColorScheme()) {
-        Scaffold(containerColor = MaterialTheme.colorScheme.surfaceContainer) { contentPadding ->
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            snackbarHost = {
+                SnackbarHost(
+                    hostState = viewModel.snackbarHostState,
+                    modifier = Modifier.zIndex(1000f)
+                )
+            }) { contentPadding ->
             Row(
                 Modifier.fillMaxSize().padding(
                     start = contentPadding.calculateLeftPadding(
@@ -142,15 +156,15 @@ fun App() {
                                 icon = {
                                     Icon(
                                         painterResource(
-                                            if (selectedItem.ordinal == index) item.third
+                                            if (viewModel.rootNavTarget.ordinal == index) item.third
                                             else item.second
                                         ),
                                         contentDescription = item.first.name,
                                     )
                                 },
                                 label = { Text(item.first.name) },
-                                selected = selectedItem.ordinal == index,
-                                onClick = { selectedItem = item.first },
+                                selected = viewModel.rootNavTarget.ordinal == index,
+                                onClick = { viewModel.rootNavTarget = item.first },
                             )
                         }
                     }
@@ -172,15 +186,17 @@ fun App() {
                                         icon = {
                                             Icon(
                                                 painterResource(
-                                                    if (selectedItem.ordinal == index) item.third
+                                                    if (viewModel.rootNavTarget.ordinal == index) item.third
                                                     else item.second
                                                 ),
                                                 contentDescription = item.first.name,
                                             )
                                         },
                                         label = { Text(item.first.name) },
-                                        selected = selectedItem.ordinal == index,
-                                        onClick = { selectedItem = item.first },
+                                        selected = viewModel.rootNavTarget.ordinal == index,
+                                        onClick = {
+                                            viewModel.rootNavTarget = item.first
+                                        },
                                     )
                                 }
                             }
@@ -195,7 +211,7 @@ fun App() {
                                 state = rememberTooltipState(),
                             ) {
                                 FAB(
-                                    expanded = connectionManagerVM.connectionState.value != ConnectionState.Connected,
+                                    expanded = connectionManagerVM.connectionState != ConnectionState.Connected,
                                     inNavRail = false,
                                     connectionManagerVM = connectionManagerVM,
                                 )
@@ -205,14 +221,14 @@ fun App() {
                         TopBar(
                             isExpandedSize,
                             scrollBehavior,
-                            backStacks.first { v -> v.first == selectedItem }.second
+                            backStacks.first { v -> v.first == viewModel.rootNavTarget }.second
                         )
                     }) { contentPadding ->
                     Box(modifier = Modifier.padding(contentPadding)) {
-                        AppContent(isExpandedSize, selectedItem, backStacks)
+                        AppContent(isExpandedSize, viewModel.rootNavTarget, backStacks)
                     }
                     if (isExpandedSize) {
-                        if (connectionManagerVM.showConnectionSheet.value) {
+                        if (connectionManagerVM.showConnectionSheet) {
                             Dialog(onDismissRequest = { connectionManagerVM.hideSheet() }) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth()
@@ -226,7 +242,7 @@ fun App() {
                             }
                         }
                     } else {
-                        if (connectionManagerVM.showConnectionSheet.value) {
+                        if (connectionManagerVM.showConnectionSheet) {
                             ModalBottomSheet(
                                 onDismissRequest = { connectionManagerVM.hideSheet() },
                                 sheetState = connectionSheetState
@@ -261,11 +277,11 @@ fun AppContent(
         }
 
         RootNavTarget.Filesystem -> {
-            Text("Filesystem")
+            FilesystemTab(isExpanded, currentBackStack)
         }
 
         RootNavTarget.CORElink -> {
-            Text("Comms bus")
+            CoreLinkTab(isExpanded, currentBackStack)
         }
 
         RootNavTarget.Firmware -> {
@@ -288,50 +304,24 @@ fun FAB(
             0.dp, 0.dp, 0.dp, 0.dp
         ) else FloatingActionButtonDefaults.elevation(),
         expanded = expanded,
-        onClick = { connectionManagerVM.showConnectionSheet.value = true },
+        onClick = { connectionManagerVM.showConnectionSheet = true },
         icon = {
-            when (connectionManagerVM.method.value) {
-                ConnectionMethod.BLE -> {
-                    if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
-                        Icon(
-                            painterResource(Res.drawable.bluetooth_connected),
-                            "Connected via BLE"
-                        )
-                    } else {
-                        Icon(
-                            painterResource(Res.drawable.bluetooth),
-                            "Not connected via BLE"
-                        )
-                    }
-                }
-
-                ConnectionMethod.USB -> {
-                    if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
-                        Icon(
-                            painterResource(Res.drawable.usb), "Connected via USB"
-                        )
-                    } else {
-                        Icon(
-                            painterResource(Res.drawable.usb_off), "Unconnected via USB"
-                        )
-                    }
-                }
-
-                ConnectionMethod.TCP -> {
-                    if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
-                        Icon(
-                            painterResource(Res.drawable.cloud), "Connected via TCP"
-                        )
-                    } else {
-                        Icon(
-                            painterResource(Res.drawable.cloud_off), "Unconnected via TCP"
-                        )
-                    }
+            AnimatedContent(connectionManagerVM.connectionState) {
+                if (it == ConnectionState.Connected) {
+                    Icon(
+                        painterResource(Res.drawable.link_2),
+                        "Connected"
+                    )
+                } else {
+                    Icon(
+                        painterResource(Res.drawable.link_off),
+                        "Not connected"
+                    )
                 }
             }
         },
         text = {
-            if (connectionManagerVM.connectionState.value == ConnectionState.Connected) {
+            if (connectionManagerVM.connectionState == ConnectionState.Connected) {
                 Text("Connected")
             } else {
                 Text("Connect")
