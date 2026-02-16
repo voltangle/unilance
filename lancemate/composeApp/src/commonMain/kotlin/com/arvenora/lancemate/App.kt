@@ -77,8 +77,7 @@ fun App() {
 
     MaterialExpressiveTheme(colorScheme = platformSystemColorScheme()) {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            snackbarHost = {
+            containerColor = MaterialTheme.colorScheme.surfaceContainer, snackbarHost = {
                 SnackbarHost(
                     hostState = viewModel.snackbarHostState,
                     modifier = Modifier.zIndex(1000f)
@@ -231,8 +230,7 @@ fun App() {
                         if (connectionManagerVM.showConnectionSheet) {
                             Dialog(onDismissRequest = { connectionManagerVM.hideSheet() }) {
                                 Card(
-                                    modifier = Modifier.fillMaxWidth()
-                                        .padding(16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                                     shape = RoundedCornerShape(16.dp),
                                 ) {
                                     Box(modifier = Modifier.padding(16.dp)) {
@@ -309,22 +307,22 @@ fun FAB(
             AnimatedContent(connectionManagerVM.connectionState) {
                 if (it == ConnectionState.Connected) {
                     Icon(
-                        painterResource(Res.drawable.link_2),
-                        "Connected"
+                        painterResource(Res.drawable.link_2), "Connected"
                     )
                 } else {
                     Icon(
-                        painterResource(Res.drawable.link_off),
-                        "Not connected"
+                        painterResource(Res.drawable.link_off), "Not connected"
                     )
                 }
             }
         },
         text = {
-            if (connectionManagerVM.connectionState == ConnectionState.Connected) {
-                Text("Connected")
-            } else {
-                Text("Connect")
+            AnimatedContent(connectionManagerVM.connectionState) {
+                if (it == ConnectionState.Connected) {
+                    Text("Connected")
+                } else {
+                    Text("Connect")
+                }
             }
         })
 }

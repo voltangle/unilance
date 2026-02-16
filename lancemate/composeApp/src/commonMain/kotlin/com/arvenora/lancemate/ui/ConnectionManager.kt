@@ -91,7 +91,7 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
             }
         }
         Row(
-            Modifier.padding(horizontal = 8.dp).fillMaxWidth(),
+            Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         ) {
             options.forEachIndexed { index, method ->
