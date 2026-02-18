@@ -57,7 +57,7 @@ pub fn balance_loop() {
     let motor = crate::get_motor();
     motor.FOC.Idq_req.q = state()
         .balance
-        .iterate(core_control::ahrs::IMUData::default());
+        .iterate(core_control::imu::IMUData::default());
 }
 
 #[embassy_executor::task]
