@@ -51,7 +51,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation(libs.blue.falcon)
+            implementation(libs.kable)
             implementation(libs.navigation3.ui)
             implementation(libs.compose.material3.navigation3)
             implementation(libs.compose.material3.adaptive)
@@ -130,7 +130,7 @@ tasks.matching { it.name == "syncComposeResourcesForIos" }
 configurations.configureEach {
     resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.skiko") {
-            useVersion("0.9.41") // example: pick one version and keep it consistent
+            useVersion("0.9.41")
             because("Avoid Skiko JVM/native mismatch (MetalApiKt JNI symbols)")
         }
     }

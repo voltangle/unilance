@@ -1,6 +1,7 @@
 package com.arvenora.lancemate
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -210,9 +211,9 @@ fun App() {
                                 state = rememberTooltipState(),
                             ) {
                                 FAB(
-                                    expanded = connectionManagerVM.connectionState != ConnectionState.Connected,
+                                    expanded = !connectionManagerVM.anyConnectedDevices,
                                     inNavRail = false,
-                                    connectionManagerVM = connectionManagerVM,
+                                    viewModel = connectionManagerVM,
                                 )
                             }
                         }
@@ -220,8 +221,7 @@ fun App() {
                         TopBar(
                             isExpandedSize,
                             scrollBehavior,
-                            backStacks.first { v -> v.first == viewModel.rootNavTarget }.second
-                        )
+                            backStacks.first { v -> v.first == viewModel.rootNavTarget })
                     }) { contentPadding ->
                     Box(modifier = Modifier.padding(contentPadding)) {
                         AppContent(isExpandedSize, viewModel.rootNavTarget, backStacks)
@@ -231,6 +231,7 @@ fun App() {
                             Dialog(onDismissRequest = { connectionManagerVM.hideSheet() }) {
                                 Card(
                                     modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
                                     shape = RoundedCornerShape(16.dp),
                                 ) {
                                     Box(modifier = Modifier.padding(16.dp)) {
@@ -263,66 +264,42 @@ fun AppContent(
     selectedItem: RootNavTarget,
     backStacks: List<Pair<RootNavTarget, SnapshotStateList<Any>>>
 ) {
-    val currentBackStack =
+    // This is done as a lambda opposed to just a saved value so that the current backstack
+    // is computed at the exact moment the needed tab is shown. The app crashed once
+    // when changing tabs from Config to Live Data with an error "Unknown display
+    // ConfigDetail(...)"  or something, which meant that a race condition somehow occurred.
+    // This approach should *probably* protect from such a problem.
+    val currentBackStack = {
         backStacks.first { value -> value.first == selectedItem }.second
-    when (selectedItem) {
-        RootNavTarget.LiveData -> {
-            LiveDataTab(isExpanded, currentBackStack)
-        }
+    }
+    AnimatedContent(
+        selectedItem,
+        // Original transition spec, just with some variables changed around
+        transitionSpec = {
+            (fadeIn(animationSpec = tween(200, delayMillis = 90)) + scaleIn(
+                initialScale = 0.96f, animationSpec = tween(200, delayMillis = 90)
+            )).togetherWith(fadeOut(animationSpec = tween(90)))
+        }) {
+        when (it) {
+            RootNavTarget.LiveData -> {
+                LiveDataTab(isExpanded, currentBackStack())
+            }
 
-        RootNavTarget.Config -> {
-            ConfigTab(isExpanded, currentBackStack)
-        }
+            RootNavTarget.Config -> {
+                ConfigTab(isExpanded, currentBackStack())
+            }
 
-        RootNavTarget.Filesystem -> {
-            FilesystemTab(isExpanded, currentBackStack)
-        }
+            RootNavTarget.Filesystem -> {
+                FilesystemTab(isExpanded, currentBackStack())
+            }
 
-        RootNavTarget.CORElink -> {
-            CoreLinkTab(isExpanded, currentBackStack)
-        }
+            RootNavTarget.CORElink -> {
+                CoreLinkTab(isExpanded, currentBackStack())
+            }
 
-        RootNavTarget.Firmware -> {
-            FirmwareTab(isExpanded, currentBackStack)
+            RootNavTarget.Firmware -> {
+                FirmwareTab(isExpanded, currentBackStack())
+            }
         }
     }
-}
-
-
-@Composable
-fun FAB(
-    modifier: Modifier = Modifier,
-    expanded: Boolean,
-    inNavRail: Boolean,
-    connectionManagerVM: ConnectionManagerViewModel
-) {
-    ExtendedFloatingActionButton(
-        modifier = modifier,
-        elevation = if (inNavRail) FloatingActionButtonDefaults.elevation(
-            0.dp, 0.dp, 0.dp, 0.dp
-        ) else FloatingActionButtonDefaults.elevation(),
-        expanded = expanded,
-        onClick = { connectionManagerVM.showConnectionSheet = true },
-        icon = {
-            AnimatedContent(connectionManagerVM.connectionState) {
-                if (it == ConnectionState.Connected) {
-                    Icon(
-                        painterResource(Res.drawable.link_2), "Connected"
-                    )
-                } else {
-                    Icon(
-                        painterResource(Res.drawable.link_off), "Not connected"
-                    )
-                }
-            }
-        },
-        text = {
-            AnimatedContent(connectionManagerVM.connectionState) {
-                if (it == ConnectionState.Connected) {
-                    Text("Connected")
-                } else {
-                    Text("Connect")
-                }
-            }
-        })
 }

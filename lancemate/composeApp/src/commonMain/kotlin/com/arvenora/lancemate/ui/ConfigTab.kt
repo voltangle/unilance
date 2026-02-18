@@ -81,9 +81,12 @@ fun ConfigTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
                         }
                     })
             ) {
+                val modifier = Modifier.fillMaxSize()
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
-                        .clip(ListItemDefaults.shapes().selectedShape),
+                    modifier = (if (isExpanded) modifier.padding(
+                        start = 8.dp, bottom = 20.dp
+                    )
+                    else modifier.padding(horizontal = 8.dp)).clip(ListItemDefaults.shapes().selectedShape),
                     overscrollEffect = overscrollEffect,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
@@ -97,7 +100,9 @@ fun ConfigTab(isExpanded: Boolean, backStack: SnapshotStateList<Any>) {
                                 }
                             },
                             selected = backStack.getOrNull(1) == ConfigDetail(id = index),
-                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseOnSurface),
+                            colors = ListItemDefaults.colors(
+                                containerColor = if (isExpanded) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.inverseOnSurface
+                            ),
                             shapes = ListItemDefaults.segmentedShapes(
                                 index = index, count = rootItems.size
                             ),

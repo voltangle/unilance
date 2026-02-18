@@ -8,10 +8,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
@@ -24,10 +25,7 @@ import com.arvenora.lancemate.viewmodel.ConnectionMethod
 import com.arvenora.lancemate.viewmodel.ConnectionState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import lancemate.composeapp.generated.resources.Res
-import lancemate.composeapp.generated.resources.bluetooth
-import lancemate.composeapp.generated.resources.cloud
-import lancemate.composeapp.generated.resources.usb
+import lancemate.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -48,16 +46,11 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
             "Connection manager", style = MaterialTheme.typography.displaySmallEmphasized
         )
         val listState = rememberLazyListState()
-        LaunchedEffect(viewModel.connectionState) {
-            if (viewModel.connectionState == ConnectionState.Connected) {
-                listState.animateScrollToItem(0)
-            }
-        }
-        AnimatedVisibility(viewModel.connectionState == ConnectionState.Connecting) {
+        AnimatedVisibility(viewModel.showLoading) {
             LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
-        AnimatedContent(viewModel.connectionState) {
-            if (it == ConnectionState.Connected) {
+        AnimatedContent(viewModel.anyConnectedDevices) {
+            if (it) {
                 Column {
                     Text(
                         text = "Connected devices",
@@ -65,30 +58,43 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp, start = 8.dp)
                     )
-                    SegmentedListItem(
-                        leadingContent = {
-                            Icon(
-                                painterResource(Res.drawable.bluetooth),
-                                contentDescription = "Localized description",
-                                modifier = Modifier.padding(start = 8.dp),
+                    LazyColumn {
+                        items(viewModel.devices) { device ->
+                            SegmentedListItem(
+                                leadingContent = {
+                                    Icon(
+                                        painterResource(Res.drawable.bluetooth),
+                                        contentDescription = "Localized description",
+                                        modifier = Modifier.padding(start = 8.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                },
+                                trailingContent = {
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            viewModel.disconnectFromDevice(device)
+                                        }
+                                    }) {
+                                        Icon(painterResource(Res.drawable.close), "")
+                                    }
+                                },
+                                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                                shapes = ListItemDefaults.segmentedShapes(0, 0),
+                                selected = true,
+                                onClick = {
+                                    // TODO: this should probably select the currently "active"
+                                    // device, aka the one we're communicating with right now
+                                },
+                                content = {
+                                    Text(
+                                        device.name,
+                                        fontSize = 20.sp,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                },
                             )
-                        },
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseOnSurface),
-                        shapes = ListItemDefaults.segmentedShapes(0, 0),
-                        selected = true,
-                        onClick = {
-                            scope.launch {
-                                viewModel.disconnectFromBleDevice()
-                            }
-                        },
-                        content = {
-                            viewModel.connectedDevice?.let {
-                                Text(
-                                    it, fontSize = 20.sp
-                                )
-                            }
-                        },
-                    )
+                        }
+                    }
                 }
             } else {
                 Text(
@@ -120,63 +126,75 @@ fun ConnectionManager(viewModel: ConnectionManagerViewModel, scope: CoroutineSco
                 }
             }
         }
-        AnimatedContent(viewModel.method) {
-            when (it) {
+        AnimatedContent(viewModel.method) { method ->
+            when (method) {
                 ConnectionMethod.BLE -> {
-                    Column {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(
+                            ListItemDefaults.SegmentedGap
+                        ),
+                    ) {
+                        Text(
+                            text = "Devices",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                bottom = 8.dp, start = 8.dp
+                            )
+                        )
                         LazyColumn(
                             modifier = Modifier.clip(ListItemDefaults.shapes().selectedShape)
                                 .animateContentSize(),
                             state = listState,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(
+                                ListItemDefaults.SegmentedGap
+                            ),
                         ) {
-                            item(key = "devices") {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(
-                                        ListItemDefaults.SegmentedGap
-                                    ),
-                                ) {
-                                    Text(
-                                        text = "Devices",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(
-                                            bottom = 8.dp, start = 8.dp
-                                        )
+                            itemsIndexed(viewModel.devices) { index, device ->
+                                if (device.state != ConnectionState.Connected) {
+                                    SegmentedListItem(
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = tween(durationMillis = 250),
+                                            fadeOutSpec = tween(durationMillis = 250),
+                                            placementSpec = spring(
+                                                stiffness = Spring.StiffnessLow,
+                                                dampingRatio = Spring.DampingRatioMediumBouncy
+                                            )
+                                        ),
+                                        leadingContent = {
+                                            Icon(
+                                                painterResource(Res.drawable.bluetooth),
+                                                contentDescription = "Localized description",
+                                                modifier = Modifier.padding(start = 8.dp),
+                                            )
+                                        },
+                                        colors = ListItemDefaults.colors(
+                                            // why the fuck do I need to make it inverse bro
+                                            containerColor = MaterialTheme.colorScheme.inverseOnSurface
+                                        ),
+                                        shapes = ListItemDefaults.segmentedShapes(
+                                            // I agree, this is kinda a bug. When not all
+                                            // devices are "connected" devices (and almost
+                                            // always it is), it will do wrong shapes.
+                                            // But consider this, the LazyList itself
+                                            // also has a clip with the exact same
+                                            // shape as this guy, so the list will look
+                                            // correct anyway
+                                            index = index,
+                                            count = viewModel.devices.size
+                                        ),
+                                        selected = false,
+                                        onClick = {
+                                            scope.launch {
+                                                viewModel.connectToDevice(device)
+                                            }
+                                        },
+                                        content = {
+                                            Text(
+                                                device.name, fontSize = 20.sp
+                                            )
+                                        },
                                     )
-                                    viewModel.bleDevices.forEachIndexed { index, device ->
-                                        SegmentedListItem(
-                                            modifier = Modifier.animateItem(
-                                                fadeInSpec = tween(durationMillis = 250),
-                                                fadeOutSpec = tween(durationMillis = 250),
-                                                placementSpec = spring(
-                                                    stiffness = Spring.StiffnessLow,
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy
-                                                )
-                                            ),
-                                            leadingContent = {
-                                                Icon(
-                                                    painterResource(Res.drawable.bluetooth),
-                                                    contentDescription = "Localized description",
-                                                    modifier = Modifier.padding(start = 8.dp),
-                                                )
-                                            },
-                                            colors = ListItemDefaults.colors(
-                                                containerColor = MaterialTheme.colorScheme.inverseOnSurface
-                                            ),
-                                            shapes = ListItemDefaults.segmentedShapes(
-                                                index = index,
-                                                count = viewModel.bleDevices.size
-                                            ),
-                                            selected = viewModel.connectedDevice == device,
-                                            onClick = {
-                                                scope.launch {
-                                                    viewModel.connectToBleDevice(device)
-                                                }
-                                            },
-                                            content = { Text(device, fontSize = 20.sp) },
-                                        )
-                                    }
                                 }
                             }
                         }
