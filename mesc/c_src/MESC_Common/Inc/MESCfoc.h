@@ -727,6 +727,7 @@ enum MESC_MTPAMode {
 typedef struct {
     bool use_hall_start;
     bool use_lr_observer;
+    bool use_phase_sensors;
     uint8_t mtpa_mode;
     bool use_phase_balancing;
     bool has_motor_temp_sensor;

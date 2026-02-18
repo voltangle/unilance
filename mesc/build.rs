@@ -1,3 +1,5 @@
+#![feature(string_remove_matches)]
+
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
@@ -38,6 +40,17 @@ fn main() {
 
     for include in &arm_gcc_toolchain_includes {
         build.include(include);
+    }
+
+    for var in std::env::vars() {
+        // assumes the fact that any features declared in the [features] section
+        // of Cargo.toml are MESC defines in disguise
+        if var.0.starts_with("CARGO_FEATURE_") {
+            let mut name = var.0.clone();
+            name.remove_matches("CARGO_FEATURE_");
+
+            build.define(&name, None);
+        }
     }
 
     build

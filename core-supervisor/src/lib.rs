@@ -12,8 +12,8 @@ use proto::corelink::{CoreLink, Message};
 use crate::info::FW_VERSION;
 
 mod info;
-mod storage;
 pub mod input;
+mod storage;
 
 // Random entries just so its filled with something
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]

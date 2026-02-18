@@ -1,8 +1,8 @@
 #![no_std]
 
-use mesc::MESC_motor_typedef;
 use embassy_time::{Duration, Ticker};
 use heapless::{Vec, VecView};
+use mesc::MESC_motor_typedef;
 use proto::corelink::control::ControlValueKey;
 use proto::corelink::{
     CoreLink, FileTransmissionDeniedReason, FileTransmissionNackReason, Message,

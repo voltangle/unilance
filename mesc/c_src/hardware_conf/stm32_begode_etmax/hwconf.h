@@ -24,7 +24,6 @@
 #define R_VBUS_BOTTOM 1500.0f             // Phase and Vbus voltage sensors
 #define R_VBUS_TOP 82000.0f
 #define OPGAIN 16.0f
-#define USE_INTERNAL_OPAMPS
 #define ADC_OFFSET_DEFAULT 1870.0f;
 
 #define MAX_ID_REQUEST 10.0f
@@ -32,16 +31,11 @@
 
 #define SEVEN_SECTOR  // Normal SVPWM implemented as midpoint clamp. If not defined, you
                       // will get 5 sector, bottom clamp
-// #define DEADTIME_COMP
 #define DEADTIME_COMP_V \
     5  // Arbitrary value for now, needs parametising.
        // Basically this is half the time between MOSoff and MOSon
        // and needs determining experimentally, either with openloop
        // sin wave drawing or by finding the zero current switching "power knee point"
-
-// Inputs
-#define GET_THROTTLE_INPUT \
-    _motor->Raw.ADC_in_ext1 = hadc2.Instance->JDR4;  // Throttle for MP2 with F405 pill
 
 // Use the Ebike Profile tool
 // #define USE_PROFILE

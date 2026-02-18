@@ -453,34 +453,34 @@ void fastLoop(MESC_motor_typedef* _motor) {
             break;
 
         case MOTOR_STATE_TRACKING:
-#ifdef HAS_PHASE_SENSORS
-            // Track using BEMF from phase sensors
-            MESCpwm_generateBreak(_motor);
-            getRawADCVph(_motor);
-            ADCPhaseConversion(_motor);
-            MESCTrack(_motor);
-            switch (_motor->MotorSensorMode) {
-                case MOTOR_SENSOR_MODE_HALL:
-                    hallAngleEstimator(_motor);
-                    angleObserver(_motor);
-                    break;
-                case MOTOR_SENSOR_MODE_SENSORLESS:
-                    MESCfluxobs_run(_motor);
-                    if (_motor->options.use_hall_start) {
-                        HallFluxMonitor(_motor);
-                    }
-                    break;
-                case MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER:
-                    _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
-                    break;
-                case MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER:
-                    getIncEncAngle(_motor);
-                    _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
-                    break;
-                default:
-                    break;
+            if (_motor->options.use_phase_sensors) {
+                // Track using BEMF from phase sensors
+                MESCpwm_generateBreak(_motor);
+                getRawADCVph(_motor);
+                ADCPhaseConversion(_motor);
+                MESCTrack(_motor);
+                switch (_motor->MotorSensorMode) {
+                    case MOTOR_SENSOR_MODE_HALL:
+                        hallAngleEstimator(_motor);
+                        angleObserver(_motor);
+                        break;
+                    case MOTOR_SENSOR_MODE_SENSORLESS:
+                        MESCfluxobs_run(_motor);
+                        if (_motor->options.use_hall_start) {
+                            HallFluxMonitor(_motor);
+                        }
+                        break;
+                    case MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER:
+                        _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
+                        break;
+                    case MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER:
+                        getIncEncAngle(_motor);
+                        _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
+                        break;
+                    default:
+                        break;
+                }
             }
-#endif
 
             break;
 
@@ -1483,16 +1483,16 @@ void slowLoop(MESC_motor_typedef* _motor) {
                     _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
                 }
                 if (fabsf(_motor->FOC.Idq_prereq.q) > 0.2f) {
-#ifdef HAS_PHASE_SENSORS
-                    if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_FOC) {
-                        _motor->MotorState = MOTOR_STATE_RUN;
-                    } else if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_BLDC) {
-                        _motor->MotorState = MOTOR_STATE_RUN_BLDC;
+                    if (_motor->options.use_phase_sensors) {
+                        if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_FOC) {
+                            _motor->MotorState = MOTOR_STATE_RUN;
+                        } else if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_BLDC) {
+                            _motor->MotorState = MOTOR_STATE_RUN_BLDC;
+                        }
+                    } else {
+                        _motor->MotorState = MOTOR_STATE_RECOVERING;
+                        break;
                     }
-#else
-                    _motor->MotorState = MOTOR_STATE_RECOVERING;
-                    break;
-#endif
                     // fallthrough to RUN, no break!
                 } else {
                     // Remain in tracking
