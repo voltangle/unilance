@@ -135,3 +135,4 @@ make it use functions defined in Rust instead
     - [ ] Begode charge board UART
     - [ ] Begode per-pack I2C
 - [ ] Rewrite MESC to be in Rust and do away with C in the codebase (maybe)
+- [ ] Remove temperature sensor handling from MESC, make Rust handle it instead
