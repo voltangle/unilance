@@ -18,7 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 pub struct Motor<'a> {
     /// It is only done as a mutable reference so that it can be easily constructed
     /// in MESChal functions.
-    instance: &'a mut MESC_motor_typedef,
+    pub instance: &'a mut MESC_motor_typedef,
 }
 
 impl Motor<'_> {

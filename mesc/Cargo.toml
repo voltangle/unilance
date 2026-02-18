@@ -13,3 +13,4 @@ bindgen = "0.72.1"
 cc = { version = "1.2.52", features = ["parallel"] }
 
 [features]
+has-phase-sensors = []
