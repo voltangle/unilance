@@ -189,7 +189,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         None,
         None,
         Hertz::khz(10),
-        CountingMode::EdgeAlignedDown, // TODO: I will need to check what's up with this
+        CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
 
