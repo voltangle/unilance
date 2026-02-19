@@ -13,8 +13,8 @@ use crate::balance::{BalanceConfig, BalanceState};
 use crate::corelink::handle_corelink;
 use crate::info::FW_VERSION;
 
-pub mod ahrs;
 pub mod balance;
+pub mod imu;
 mod corelink;
 mod info;
 

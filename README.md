@@ -122,6 +122,7 @@ make it use functions defined in Rust instead
 - [ ] Allow to run core-supervisor in a "simulator", to test UI interactions
 - [ ] Auto shutoff timer on idle
 - [ ] Add current limiting via Ibus to MESC
+- [ ] Motor temperature estimation using calculated resistance
 - [ ] Testing
 - [ ] Balance algorithm
     - [x] PI2D (Progressive + Integral + Double (sided) Derivative)
@@ -133,3 +134,5 @@ make it use functions defined in Rust instead
 - [ ] Support for different Smart BMSes
     - [ ] Begode charge board UART
     - [ ] Begode per-pack I2C
+- [ ] Rewrite MESC to be in Rust and do away with C in the codebase (maybe)
+- [ ] Remove temperature sensor handling from MESC, make Rust handle it instead
