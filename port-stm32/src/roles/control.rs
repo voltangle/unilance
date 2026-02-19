@@ -1,5 +1,5 @@
 use crate::bsp;
-use crate::roles::{MemChannelCoreLink, control};
+use crate::roles::MemChannelCoreLink;
 use core::mem::MaybeUninit;
 use core_control::State;
 use core_control::balance::BalanceState;
@@ -21,7 +21,7 @@ static CONTROL_CORELINK: StaticCell<PlatformCoreLink> = StaticCell::new();
 
 /// Returns a mutable reference to the static State instance.
 #[allow(static_mut_refs, unused)]
-fn get_state() -> &'static mut State {
+pub fn get_state() -> &'static mut State {
     unsafe { (&mut *CONTROL_STATE.as_mut_ptr()) }
 }
 
@@ -46,7 +46,7 @@ pub fn balance_loop() {
     // FIXME: MESC doesn't expose this, make it work later
     // mesc::houseKeeping(mesc::get_motor());
 
-    control::get_state().motor.request_q(
+    get_state().motor.request_q(
         get_state()
             .balance
             .update(core_control::ahrs::SpacialState::default()),
