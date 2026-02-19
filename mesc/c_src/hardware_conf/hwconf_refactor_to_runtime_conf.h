@@ -1,11 +1,3 @@
-#define DEADTIME_COMP
-
-// Normal SVPWM implemented as midpoint clamp. If not defined, you will get 5 sector,
-// bottom clamp
-#define SEVEN_SECTOR
-
-#define INTERPOLATE_V7_ANGLE
-
 // If not enabled, it assumes that Ld and Lq are equal, which is fine usually.
 #define USE_SALIENT_OBSERVER
 
