@@ -44,4 +44,19 @@ impl Motor {
             MESC_PWM_IRQ_handler(&mut self.motor);
         }
     }
+
+    pub fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16) {
+        self.motor.Raw.Iu = i_u;
+        self.motor.Raw.Iv = i_v;
+        self.motor.Raw.Iw = i_w;
+        self.motor.Raw.Vbus = v_bus;
+    }
+
+    pub fn request_q(&mut self, i_q: f32) {
+        self.motor.FOC.Idq_req.q = i_q;
+    }
+
+    pub fn request_d(&mut self, i_d: f32) {
+        self.motor.FOC.Idq_req.d = i_d;
+    }
 }

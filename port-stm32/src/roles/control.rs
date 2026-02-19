@@ -1,5 +1,5 @@
 use crate::bsp;
-use crate::roles::MemChannelCoreLink;
+use crate::roles::{MemChannelCoreLink, control};
 use core::mem::MaybeUninit;
 use core_control::State;
 use core_control::balance::BalanceState;
@@ -43,14 +43,14 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn balance_loop() {
-    // TODO: MESC doesn't expose this, make it work later
+    // FIXME: MESC doesn't expose this, make it work later
     // mesc::houseKeeping(mesc::get_motor());
 
-    // FIXME: has to use the mesc::Motor abstraction
-    // let motor = crate::get_motor();
-    // motor.FOC.Idq_req.q = get_state()
-    //     .balance
-    //     .update(core_control::ahrs::IMUData::default());
+    control::get_state().motor.request_q(
+        get_state()
+            .balance
+            .update(core_control::ahrs::SpacialState::default()),
+    );
 }
 
 pub fn motor_loop() {

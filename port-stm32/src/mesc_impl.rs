@@ -54,9 +54,7 @@ pub extern "C" fn MESChal_getTimerHz() -> u32 {
 // struct from the rs_motor pointer in MESC_motor_typedef. Pointers should be the same
 // size, so transmute should be fine.
 fn c_motor_as_rs(motor: &mut MESC_motor_typedef) -> &mut Motor {
-    unsafe {
-        mem::transmute(motor)
-    }
+    unsafe { mem::transmute(motor) }
 }
 
 // TODO: Implement all these with functions from the BSP

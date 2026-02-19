@@ -457,17 +457,15 @@ fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
 #[allow(static_mut_refs)]
 fn adc_dma_read() {
     unsafe {
-        // FIXME: refactor to mesc::Motor abstraction
-        // let motor = crate::get_motor();
-        // motor.Raw.Iv = 2048;
+        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
+        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
+        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
 
-        // let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
-        // motor.Raw.Iu = adc1_buf[0]; // I_phaseA
-
-        // let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
-        // motor.Raw.Vbus = adc2_buf[1]; // V_battery
-
-        // let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
-        // motor.Raw.Iw = adc3_buf[0];
+        control::get_state().motor.set_raw_adc(
+            adc1_buf[0], // I_phaseA
+            2048,        // Phase B doesn't have a sensor attached
+            adc2_buf[1], // I_phaseC
+            adc3_buf[0], // V_battery
+        );
     }
 }

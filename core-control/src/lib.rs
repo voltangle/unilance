@@ -37,8 +37,8 @@ pub enum FaultType {
 }
 
 pub struct State {
-    state: SystemState,
-    motor: mesc::Motor,
+    pub state: SystemState,
+    pub motor: mesc::Motor,
     pub balance: BalanceState,
 }
 
