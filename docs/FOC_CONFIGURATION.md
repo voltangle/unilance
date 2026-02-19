@@ -34,10 +34,43 @@ Needs determining through `TEST_TYP_DEAD_TIME_IDENT`. (TODO: find out what it is
 
 TODO: document
 
+## Use salient observer (`motor->options.use_salient_observer`)
+
+> Formerly `USE_SALIENT_OBSERVER`
+
+If not enabled, it assumes that Ld and Lq are equal, which is fine usually.
+
 ## Non-linear centering gain (`motor->m.non_linear_centering_gain`)
 
 > Type: f32
 
 TODO: document
 
-## 
+## Absolute max phase current (`motor->limits.abs_max_phase_current`)
+
+Current which throws an overcurrent error (`ERROR_OVERCURRENT_PH(A|B|C)`).
+
+## Absolute max bus voltage (`motor->limits.abs_max_bus_voltage`)
+
+Input voltage that throws an overvoltage error (`ERROR_OVERVOLTAGE`).
+
+## LR observer current (not yet made)
+
+Inject this much current into the d-axis at the slowloop frequency and observe the change
+in Vd and Vq Needs to be a small current that does not have much effect on the running
+parameters.
+
+Recommended default value: 0.1 * `MAX_IQ_REQUEST`.
+
+## Square root circle limiter (`motor->options.sqrt_circle_lim`)
+
+> Values: `SQRT_CIRCLE_LIM_OFF`, `SQRT_CIRCLE_LIM_ON`, `SQRT_CIRCLE_LIM_VD`
+
+Use LIM_ON for high PWM frequency (less clock cycles) or try if stability issues seen with
+Vd favouring option (unlikely). Use LIM_VD with field weakening.
+
+## MTPA mode (`motor->options.mtpa_mode`)
+
+> Values: `MESC_MTPA_NONE`, `MESC_MTPA_REQ`, `MESC_MTPA_MAG`, `MESC_MTPA_Q`
+
+Maximum Torque Per Amp (MTPA). Check out `MESCfoc.c` for more details on how this works.

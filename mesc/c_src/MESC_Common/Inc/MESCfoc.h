@@ -710,6 +710,17 @@ enum MESC_MTPAMode {
     MESC_MTPA_Q = 3
 };
 
+typedef enum MESC_ObserverCentering {
+    MESC_ObserverCentering_None = 0,
+    MESC_ObserverCentering_NonLinear = 1,
+    MESC_ObserverCentering_Clamped = 2,
+} MESC_ObserverCentering_t;
+
+typedef struct {
+    float abs_max_phase_current;
+    float abs_max_bus_voltage;
+} MESC_limits_t;
+
 typedef struct {
     bool use_hall_start;
     bool use_lr_observer;
@@ -721,8 +732,10 @@ typedef struct {
     bool interpolate_v7_angle;
     uint8_t mtpa_mode;
     uint8_t field_weakening;
+    float field_weakening_threshold;
     uint8_t sqrt_circle_lim;
     uint8_t observer_type;
+    MESC_ObserverCentering_t observer_centering;
     uint8_t pwm_type;
     // FIXME: remove together with slowLoop
     uint8_t MESC_APP_type;
@@ -765,6 +778,7 @@ typedef struct {
     input_vars_t input_vars;
     MESClrobs_s lrobs;
     MESC_OptionFlags_s options;
+    MESC_limits_t limits;
     bool conf_is_valid;
 } MESC_motor_typedef;
 

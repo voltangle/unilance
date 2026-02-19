@@ -1317,23 +1317,25 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
     // This is important since using the board ABS_MAX may mean the motor DC resistance is
     // high enough that a fault never trips it.
     g_hw_setup.Imax = _motor->input_vars.max_request_Idq.q * 1.5f;
-    if ((g_hw_setup.Imax * 0.5f) < (0.1f * ABS_MAX_PHASE_CURRENT)) {
-        g_hw_setup.Imax =
-            _motor->input_vars.max_request_Idq.q + 0.1f * ABS_MAX_PHASE_CURRENT;
+    if ((g_hw_setup.Imax * 0.5f) < (0.1f * _motor->limits.abs_max_phase_current)) {
+        g_hw_setup.Imax = _motor->input_vars.max_request_Idq.q +
+                          0.1f * _motor->limits.abs_max_phase_current;
     }
     if (g_hw_setup.Imax >
-        ABS_MAX_PHASE_CURRENT) {  // Clamp the current limit to the board max
-        g_hw_setup.Imax = ABS_MAX_PHASE_CURRENT;
+        _motor->limits
+            .abs_max_phase_current) {  // Clamp the current limit to the board max
+        g_hw_setup.Imax = _motor->limits.abs_max_phase_current;
     }
     // Set the over voltage limit dynamically, so that rapid spikes above the bus voltage
     // are trapped. This should be more convenient for working with PSUs and batteries
     // interchangeably
     if (fabsf(_motor->FOC.Idq_req.q) < 1.0f) {
-        g_hw_setup.Vmax = 0.995f * g_hw_setup.Vmax +
-                          0.005f * (_motor->Conv.Vbus + 0.15f * ABS_MAX_BUS_VOLTAGE);
+        g_hw_setup.Vmax =
+            0.995f * g_hw_setup.Vmax +
+            0.005f * (_motor->Conv.Vbus + 0.15f * _motor->limits.abs_max_bus_voltage);
     }
-    if (g_hw_setup.Vmax > ABS_MAX_BUS_VOLTAGE) {
-        g_hw_setup.Vmax = ABS_MAX_BUS_VOLTAGE;
+    if (g_hw_setup.Vmax > _motor->limits.abs_max_bus_voltage) {
+        g_hw_setup.Vmax = _motor->limits.abs_max_bus_voltage;
     }
 }
 
