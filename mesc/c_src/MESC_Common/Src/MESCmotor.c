@@ -45,5 +45,4 @@ void motor_init(MESC_motor_typedef* motor) {
     motor->m.flux_linkage_min = MIN_FLUX_LINKAGE;
     motor->m.flux_linkage_max = MAX_FLUX_LINKAGE;
     motor->m.flux_linkage_gain = FLUX_LINKAGE_GAIN;
-    motor->m.non_linear_centering_gain = NON_LINEAR_CENTERING_GAIN;
 }

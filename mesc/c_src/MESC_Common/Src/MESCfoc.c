@@ -86,242 +86,235 @@ static void clampBatteryPower(MESC_motor_typedef* _motor);
 static void ThrottleTemperature(MESC_motor_typedef* _motor);
 static void FWRampDown(MESC_motor_typedef* _motor);
 
-void MESCfoc_Init(MESC_motor_typedef* _motor) {
-    _motor->safe_start[0] = SAFE_START_DEFAULT;
-
-    _motor->MotorState = MOTOR_STATE_IDLE;
-
-    _motor->offset.Iu = ADC_OFFSET_DEFAULT;
-    _motor->offset.Iv = ADC_OFFSET_DEFAULT;
-    _motor->offset.Iw = ADC_OFFSET_DEFAULT;
-
-    _motor->FOC.deadtime_comp = DEADTIME_COMP_V;
-
-    _motor->MotorState = MOTOR_STATE_INITIALISING;
-
-    // At this stage, we initialise the options
-    _motor->MotorControlType = MOTOR_CONTROL_TYPE_FOC;
-    _motor->ControlMode = DEFAULT_CONTROL_MODE;
-
-    _motor->MotorSensorMode = DEFAULT_SENSOR_MODE;
-    _motor->SLStartupSensor = DEFAULT_STARTUP_SENSOR;
-    _motor->HFI.Type = DEFAULT_HFI_TYPE;
-    if (_motor->SLStartupSensor != STARTUP_SENSOR_HFI) {
-        _motor->HFI.Type = HFI_TYPE_NONE;
-    }
-    _motor->meas.hfi_voltage = HFI_VOLTAGE;
-
-    _motor->meas.measure_current = I_MEASURE;
-    _motor->meas.measure_voltage = V_MEASURE;
-    _motor->meas.measure_closedloop_current = I_MEASURE_CLOSEDLOOP;
-    _motor->FOC.pwm_frequency = PWM_FREQUENCY;
-
-    // Init Hall sensor
-    _motor->hall.dir = 1.0f;
-    _motor->hall.ticks_since_last_observer_change = 65535.0f;
-    _motor->hall.last_observer_period = 65536.0f;
-    _motor->hall.one_on_last_observer_period = 1.0f;
-    _motor->hall.angular_velocity = 0.0f;
-    _motor->hall.angle_step = 0.0f;
-
-    // options
-    // Initialise the hall start
-#ifdef USE_HALL_START
-    _motor->options.use_hall_start = true;
-#else
-    _motor->options.use_hall_start = false;
-#endif
-    _motor->FOC.hall_IIR = HALL_IIR;   // decay constant for the hall start preload
-    _motor->FOC.hall_IIR = HALL_IIRN;  // decay constant for the hall start preload
-    _motor->FOC.hall_transition_V =
-        HALL_VOLTAGE_THRESHOLD;  // transition voltage above which the hall sensors are
-                                 // not doing any preloading
-
-#ifdef USE_LR_OBSERVER
-    _motor->options.use_lr_observer = true;
-#else
-    _motor->options.use_lr_observer = false;
-#endif
-
-#ifdef USE_MTPA
-    _motor->options.mtpa_mode = MESC_MTPA_MAG;
-#else
-    _motor->options.mtpa_mode = MESC_MTPA_NONE;
-#endif
-
-#ifdef USE_HIGHHOPES_PHASE_BALANCING
-    _motor->options.use_phase_balancing = true;
-#else
-    _motor->options.use_phase_balancing = false;
-#endif
-
-    _motor->options.field_weakening = FIELD_WEAKENING_OFF;
-#ifdef USE_FIELD_WEAKENING
-    _motor->options.field_weakening = FIELD_WEAKENING_V1;
-#endif
-
-#ifdef USE_FIELD_WEAKENINGV2
-    _motor->options.field_weakening = FIELD_WEAKENING_V2;
-#endif
-
-    _motor->options.observer_type = MXLEMMING_LAMBDA;
-#ifdef USE_ORTEGA_ORIGINAL
-    _motor->options.field_weakening = ORTEGA_ORIGINAL;
-#endif
-
-    _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_OFF;
-#ifdef USE_SQRT_CIRCLE_LIM
-    _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_ON;
-#endif
-
-#ifdef USE_SQRT_CIRCLE_LIM_VD
-    _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_VD;
-#endif
-
-    _motor->options.pwm_type =
-        MESC_PWM_SVPWM;  // Default to combined bottom clamp sinusoidal combinationPWM
-    _motor->FOC.Modulation_max = MAX_MODULATION;
-#ifdef SIN_BOTTOM
-    _motor->options.pwm_type = MESC_PWM_SIN_BOTTOM;
-#endif
-
-    _motor->options.MESC_APP_type = MESC_APP_NONE;  // Default to no app
-#ifdef MESC_APP_VEHICLE
-    _motor->options.MESC_APP_type = MESC_APP_VEHICLE;
-#endif
-
-    // PWM Encoder
-    _motor->FOC.enc_offset = ENCODER_E_OFFSET;
-    _motor->FOC.encoder_polarity_invert = DEFAULT_ENCODER_POLARITY;
-    _motor->FOC.enc_period_count = 1;  // Avoid /0s
-
-    // ABI Incremental encoder
-    _motor->m.enc_counts = 4096;  // Default to this, common for many motors. Avoid div0.
-    _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
-
-    _motor->hall.hall_error = 0;
-    // Init the BLDC
-    _motor->BLDC.com_flux = _motor->m.flux_linkage * 1.65f;  // 0.02f;
-    _motor->BLDC.direction = -1;
-
-    // Init the speed controller
-    _motor->FOC.speed_kp = DEFAULT_SPEED_KP;  // 0.01 = 10A/1000eHz
-    _motor->FOC.speed_ki =
-        DEFAULT_SPEED_KI;  // Trickier to set since we want this to be proportional to the
-                           // ramp speed? Not intuitive? Try 0.1; ramp in 1/10 of a second
-                           // @100Hz.
-    // Init the Duty controller
-    _motor->FOC.Duty_scaler =
-        1.0f;  // We want this to be 1.0f for everything except duty control mode.
-    // Init the PLL values
-    _motor->FOC.PLL_kp = PLL_KP;
-    _motor->FOC.PLL_ki = PLL_KI;
-    //	//Init the POS values
-    _motor->pos.Kp = POS_KP;
-    _motor->pos.Ki = POS_KI;
-    _motor->pos.Kd = POS_KD;
-
-    // init the PLL observer
-    _motor->FOC.BEMF_kp = -0.25;
-    _motor->FOC.BEMF_ki = 0.001;
-
-    //
-    _motor->Raw.MOS_temp.V = 3.3f;
-    _motor->Raw.MOS_temp.R_F = MESC_TEMP_MOS_R_F;
-    _motor->Raw.MOS_temp.adc_range = 4096;
-    _motor->Raw.MOS_temp.method = MESC_TEMP_MOS_METHOD;
-    _motor->Raw.MOS_temp.schema = MESC_TEMP_MOS_SCHEMA;
-    _motor->Raw.MOS_temp.parameters.SH.Beta = MESC_TEMP_MOS_SH_BETA;
-    _motor->Raw.MOS_temp.parameters.SH.r = MESC_TEMP_MOS_SH_R;
-    _motor->Raw.MOS_temp.parameters.SH.T0 = CVT_CELSIUS_TO_KELVIN_F(25.0f);
-    _motor->Raw.MOS_temp.parameters.SH.R0 = MESC_TEMP_MOS_SH_R0;
-    _motor->Raw.MOS_temp.limit.Tmin = CVT_CELSIUS_TO_KELVIN_F(-15.0f);
-    _motor->Raw.MOS_temp.limit.Thot = CVT_CELSIUS_TO_KELVIN_F(80.0f);
-    _motor->Raw.MOS_temp.limit.Tmax = CVT_CELSIUS_TO_KELVIN_F(100.0f);
-
-    _motor->Raw.Motor_temp.V = 3.3f;
-    _motor->Raw.Motor_temp.R_F = MESC_TEMP_MOTOR_R_F;
-    _motor->Raw.Motor_temp.adc_range = 4096;
-    _motor->Raw.Motor_temp.method = MESC_TEMP_MOTOR_METHOD;
-    _motor->Raw.Motor_temp.schema = MESC_TEMP_MOTOR_SCHEMA;
-    _motor->Raw.Motor_temp.parameters.SH.Beta = MESC_TEMP_MOTOR_SH_BETA;
-    _motor->Raw.Motor_temp.parameters.SH.r = MESC_TEMP_MOTOR_SH_R;
-    _motor->Raw.Motor_temp.parameters.SH.T0 = CVT_CELSIUS_TO_KELVIN_F(25.0f);
-    _motor->Raw.Motor_temp.parameters.SH.R0 = MESC_TEMP_MOTOR_SH_R0;
-    _motor->Raw.Motor_temp.limit.Tmin = CVT_CELSIUS_TO_KELVIN_F(-15.0f);
-    _motor->Raw.Motor_temp.limit.Thot = CVT_CELSIUS_TO_KELVIN_F(80.0f);
-    _motor->Raw.Motor_temp.limit.Tmax = CVT_CELSIUS_TO_KELVIN_F(100.0f);
-
-    // Initialise the FOC parameters
-    // Init the FW
-    _motor->FOC.FW_curr_max =
-        FIELD_WEAKENING_CURRENT;  // test number, to be stored in user settings
-
-    // Init the current controller
-    _motor->FOC.Current_bandwidth = CURRENT_BANDWIDTH;
-
-    _motor->FOC.ortega_gain = 1000000.0f;
-
-    MESClrobs_Init(_motor);
-
-    mesc_init_1(_motor);
-
-#ifdef USE_INIT_DELAY
-    MESChal_delayMs(1000);  // Give the everything else time to start up (e.g. throttle,
-                            // controller, PWM source...)
-#endif
-
-    mesc_init_2(_motor);
-
-    hw_init(_motor);  // Populate the resistances, gains etc of the PCB - edit within
-                      // this function if compiling for other PCBs
-// Reconfigure dead times
-// This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
-#ifdef CUSTOM_DEADTIME
-    MESChal_setDeadtimeNs(_motor, CUSTOM_DEADTIME);
-#endif
-
-    // Start the PWM channels, reset the counter to zero each time to avoid
-    // triggering the ADC, which in turn triggers the ISR routine and wrecks the
-    // startup
-    mesc_init_3(_motor);
-    // Set the keybits
-    _motor->key_bits = UNINITIALISED_KEY + KILLSWITCH_KEY + SAFESTART_KEY;
-
-    while (_motor->MotorState == MOTOR_STATE_INITIALISING) {
-        // At this point, the ADCs have started and we want nothing to happen until
-        // initialisation complete
-        MESCpwm_generateBreak(_motor);
-    }
-    calculateGains(_motor);
-    calculateVoltageGain(_motor);
-
-#ifdef LOGGING
-    _motor->logging.lognow = 1;
-#endif
-
-#ifdef USE_SPI_ENCODER
-    _motor->FOC.enc_offset = ENCODER_E_OFFSET;
-#endif
-
-    MESCinput_Init(_motor);
-
-    //_motor->mtimer.Instance->BDTR |=TIM_BDTR_MOE;
-    // initialising the comparators triggers the break state,
-    // so turn it back on
-    // At this point we just let the whole thing run off into interrupt land, and
-    // the fastLoop() starts to be triggered by the ADC conversion complete
-    // interrupt
-
-    _motor->conf_is_valid = true;
-
-    // Lock it in initialising while the offsets not completed
-    //	while(_motor->key_bits & UNINITIALISED_KEY){
-    //		_motor->MotorState = MOTOR_STATE_INITIALISING;
-    //		HAL_Delay(0);
-    //		generateBreakAll();
-    //	}
-}
+// void MESCfoc_Init(MESC_motor_typedef* _motor) {
+//     _motor->MotorState = MOTOR_STATE_INITIALISING;
+//
+//     // At this stage, we initialise the options
+//     _motor->MotorControlType = MOTOR_CONTROL_TYPE_FOC;
+//     _motor->ControlMode = DEFAULT_CONTROL_MODE;
+//
+//     _motor->MotorSensorMode = DEFAULT_SENSOR_MODE;
+//     _motor->SLStartupSensor = DEFAULT_STARTUP_SENSOR;
+//     _motor->HFI.Type = DEFAULT_HFI_TYPE;
+//     if (_motor->SLStartupSensor != STARTUP_SENSOR_HFI) {
+//         _motor->HFI.Type = HFI_TYPE_NONE;
+//     }
+//     _motor->meas.hfi_voltage = HFI_VOLTAGE;
+//
+//     _motor->meas.measure_current = I_MEASURE;
+//     _motor->meas.measure_voltage = V_MEASURE;
+//     _motor->meas.measure_closedloop_current = I_MEASURE_CLOSEDLOOP;
+//     _motor->FOC.pwm_frequency = PWM_FREQUENCY;
+//
+//     // Init Hall sensor
+//     _motor->hall.dir = 1.0f;
+//     _motor->hall.ticks_since_last_observer_change = 65535.0f;
+//     _motor->hall.last_observer_period = 65536.0f;
+//     _motor->hall.one_on_last_observer_period = 1.0f;
+//     _motor->hall.angular_velocity = 0.0f;
+//     _motor->hall.angle_step = 0.0f;
+//
+//     // options
+//     // Initialise the hall start
+// #ifdef USE_HALL_START
+//     _motor->options.use_hall_start = true;
+// #else
+//     _motor->options.use_hall_start = false;
+// #endif
+//     _motor->FOC.hall_IIR = HALL_IIR;   // decay constant for the hall start preload
+//     _motor->FOC.hall_IIR = HALL_IIRN;  // decay constant for the hall start preload
+//     _motor->FOC.hall_transition_V =
+//         HALL_VOLTAGE_THRESHOLD;  // transition voltage above which the hall sensors are
+//                                  // not doing any preloading
+//
+// #ifdef USE_LR_OBSERVER
+//     _motor->options.use_lr_observer = true;
+// #else
+//     _motor->options.use_lr_observer = false;
+// #endif
+//
+// #ifdef USE_MTPA
+//     _motor->options.mtpa_mode = MESC_MTPA_MAG;
+// #else
+//     _motor->options.mtpa_mode = MESC_MTPA_NONE;
+// #endif
+//
+// #ifdef USE_HIGHHOPES_PHASE_BALANCING
+//     _motor->options.use_phase_balancing = true;
+// #else
+//     _motor->options.use_phase_balancing = false;
+// #endif
+//
+//     _motor->options.field_weakening = FIELD_WEAKENING_OFF;
+// #ifdef USE_FIELD_WEAKENING
+//     _motor->options.field_weakening = FIELD_WEAKENING_V1;
+// #endif
+//
+// #ifdef USE_FIELD_WEAKENINGV2
+//     _motor->options.field_weakening = FIELD_WEAKENING_V2;
+// #endif
+//
+//     _motor->options.observer_type = MXLEMMING_LAMBDA;
+// #ifdef USE_ORTEGA_ORIGINAL
+//     _motor->options.field_weakening = ORTEGA_ORIGINAL;
+// #endif
+//
+//     _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_OFF;
+// #ifdef USE_SQRT_CIRCLE_LIM
+//     _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_ON;
+// #endif
+//
+// #ifdef USE_SQRT_CIRCLE_LIM_VD
+//     _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_VD;
+// #endif
+//
+//     _motor->options.pwm_type =
+//         MESC_PWM_SVPWM;  // Default to combined bottom clamp sinusoidal combinationPWM
+//     _motor->FOC.Modulation_max = MAX_MODULATION;
+// #ifdef SIN_BOTTOM
+//     _motor->options.pwm_type = MESC_PWM_SIN_BOTTOM;
+// #endif
+//
+//     _motor->options.MESC_APP_type = MESC_APP_NONE;  // Default to no app
+// #ifdef MESC_APP_VEHICLE
+//     _motor->options.MESC_APP_type = MESC_APP_VEHICLE;
+// #endif
+//
+//     // PWM Encoder
+//     _motor->FOC.enc_offset = ENCODER_E_OFFSET;
+//     _motor->FOC.encoder_polarity_invert = DEFAULT_ENCODER_POLARITY;
+//     _motor->FOC.enc_period_count = 1;  // Avoid /0s
+//
+//     // ABI Incremental encoder
+//     _motor->m.enc_counts = 4096;  // Default to this, common for many motors. Avoid
+//     div0. _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
+//
+//     _motor->hall.hall_error = 0;
+//     // Init the BLDC
+//     _motor->BLDC.com_flux = _motor->m.flux_linkage * 1.65f;  // 0.02f;
+//     _motor->BLDC.direction = -1;
+//
+//     // Init the speed controller
+//     _motor->FOC.speed_kp = DEFAULT_SPEED_KP;  // 0.01 = 10A/1000eHz
+//     _motor->FOC.speed_ki =
+//         DEFAULT_SPEED_KI;  // Trickier to set since we want this to be proportional to
+//         the
+//                            // ramp speed? Not intuitive? Try 0.1; ramp in 1/10 of a
+//                            second
+//                            // @100Hz.
+//     // Init the Duty controller
+//     _motor->FOC.Duty_scaler =
+//         1.0f;  // We want this to be 1.0f for everything except duty control mode.
+//     // Init the PLL values
+//     _motor->FOC.PLL_kp = PLL_KP;
+//     _motor->FOC.PLL_ki = PLL_KI;
+//     //	//Init the POS values
+//     _motor->pos.Kp = POS_KP;
+//     _motor->pos.Ki = POS_KI;
+//     _motor->pos.Kd = POS_KD;
+//
+//     // init the PLL observer
+//     _motor->FOC.BEMF_kp = -0.25;
+//     _motor->FOC.BEMF_ki = 0.001;
+//
+//     //
+//     _motor->Raw.MOS_temp.V = 3.3f;
+//     _motor->Raw.MOS_temp.R_F = MESC_TEMP_MOS_R_F;
+//     _motor->Raw.MOS_temp.adc_range = 4096;
+//     _motor->Raw.MOS_temp.method = MESC_TEMP_MOS_METHOD;
+//     _motor->Raw.MOS_temp.schema = MESC_TEMP_MOS_SCHEMA;
+//     _motor->Raw.MOS_temp.parameters.SH.Beta = MESC_TEMP_MOS_SH_BETA;
+//     _motor->Raw.MOS_temp.parameters.SH.r = MESC_TEMP_MOS_SH_R;
+//     _motor->Raw.MOS_temp.parameters.SH.T0 = CVT_CELSIUS_TO_KELVIN_F(25.0f);
+//     _motor->Raw.MOS_temp.parameters.SH.R0 = MESC_TEMP_MOS_SH_R0;
+//     _motor->Raw.MOS_temp.limit.Tmin = CVT_CELSIUS_TO_KELVIN_F(-15.0f);
+//     _motor->Raw.MOS_temp.limit.Thot = CVT_CELSIUS_TO_KELVIN_F(80.0f);
+//     _motor->Raw.MOS_temp.limit.Tmax = CVT_CELSIUS_TO_KELVIN_F(100.0f);
+//
+//     _motor->Raw.Motor_temp.V = 3.3f;
+//     _motor->Raw.Motor_temp.R_F = MESC_TEMP_MOTOR_R_F;
+//     _motor->Raw.Motor_temp.adc_range = 4096;
+//     _motor->Raw.Motor_temp.method = MESC_TEMP_MOTOR_METHOD;
+//     _motor->Raw.Motor_temp.schema = MESC_TEMP_MOTOR_SCHEMA;
+//     _motor->Raw.Motor_temp.parameters.SH.Beta = MESC_TEMP_MOTOR_SH_BETA;
+//     _motor->Raw.Motor_temp.parameters.SH.r = MESC_TEMP_MOTOR_SH_R;
+//     _motor->Raw.Motor_temp.parameters.SH.T0 = CVT_CELSIUS_TO_KELVIN_F(25.0f);
+//     _motor->Raw.Motor_temp.parameters.SH.R0 = MESC_TEMP_MOTOR_SH_R0;
+//     _motor->Raw.Motor_temp.limit.Tmin = CVT_CELSIUS_TO_KELVIN_F(-15.0f);
+//     _motor->Raw.Motor_temp.limit.Thot = CVT_CELSIUS_TO_KELVIN_F(80.0f);
+//     _motor->Raw.Motor_temp.limit.Tmax = CVT_CELSIUS_TO_KELVIN_F(100.0f);
+//
+//     // Initialise the FOC parameters
+//     // Init the FW
+//     _motor->FOC.FW_curr_max =
+//         FIELD_WEAKENING_CURRENT;  // test number, to be stored in user settings
+//
+//     // Init the current controller
+//     _motor->FOC.Current_bandwidth = CURRENT_BANDWIDTH;
+//
+//     _motor->FOC.ortega_gain = 1000000.0f;
+//
+//     MESClrobs_Init(_motor);
+//
+//     mesc_init_1(_motor);
+//
+// #ifdef USE_INIT_DELAY
+//     MESChal_delayMs(1000);  // Give the everything else time to start up (e.g.
+//     throttle,
+//                             // controller, PWM source...)
+// #endif
+//
+//     mesc_init_2(_motor);
+//
+//     hw_init(_motor);  // Populate the resistances, gains etc of the PCB - edit within
+//                       // this function if compiling for other PCBs
+// // Reconfigure dead times
+// // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
+// #ifdef CUSTOM_DEADTIME
+//     MESChal_setDeadtimeNs(_motor, CUSTOM_DEADTIME);
+// #endif
+//
+//     // Start the PWM channels, reset the counter to zero each time to avoid
+//     // triggering the ADC, which in turn triggers the ISR routine and wrecks the
+//     // startup
+//     mesc_init_3(_motor);
+//     // Set the keybits
+//     _motor->key_bits = UNINITIALISED_KEY + KILLSWITCH_KEY + SAFESTART_KEY;
+//
+//     while (_motor->MotorState == MOTOR_STATE_INITIALISING) {
+//         // At this point, the ADCs have started and we want nothing to happen until
+//         // initialisation complete
+//         MESCpwm_generateBreak(_motor);
+//     }
+//     calculateGains(_motor);
+//     calculateVoltageGain(_motor);
+//
+// #ifdef LOGGING
+//     _motor->logging.lognow = 1;
+// #endif
+//
+// #ifdef USE_SPI_ENCODER
+//     _motor->FOC.enc_offset = ENCODER_E_OFFSET;
+// #endif
+//
+//     MESCinput_Init(_motor);
+//
+//     //_motor->mtimer.Instance->BDTR |=TIM_BDTR_MOE;
+//     // initialising the comparators triggers the break state,
+//     // so turn it back on
+//     // At this point we just let the whole thing run off into interrupt land, and
+//     // the fastLoop() starts to be triggered by the ADC conversion complete
+//     // interrupt
+//
+//     _motor->conf_is_valid = true;
+//
+//     // Lock it in initialising while the offsets not completed
+//     //	while(_motor->key_bits & UNINITIALISED_KEY){
+//     //		_motor->MotorState = MOTOR_STATE_INITIALISING;
+//     //		HAL_Delay(0);
+//     //		generateBreakAll();
+//     //	}
+// }
 
 void initialiseInverter(MESC_motor_typedef* _motor) {
     static int Iuoff, Ivoff, Iwoff;
@@ -1221,7 +1214,6 @@ void calculateFlux(MESC_motor_typedef* _motor) {
     _motor->m.flux_linkage_max = 1.7f * _motor->m.flux_linkage;
     _motor->m.flux_linkage_min = 0.5f * _motor->m.flux_linkage;
     _motor->m.flux_linkage_gain = 10.0f * sqrtf(_motor->m.flux_linkage);
-    _motor->m.non_linear_centering_gain = NON_LINEAR_CENTERING_GAIN;
 }
 
 void calculateGains(MESC_motor_typedef* _motor) {
@@ -1284,9 +1276,11 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
         0.9f;  // Logic in this is to always ensure headroom for the P term
     _motor->FOC.Vqint_max = _motor->FOC.Vq_max * 0.9f;
 
-    _motor->FOC.FW_threshold = _motor->FOC.Vmag_max * FIELD_WEAKENING_THRESHOLD;
+    _motor->FOC.FW_threshold =
+        _motor->FOC.Vmag_max * _motor->options.field_weakening_threshold;
     _motor->FOC.FW_multiplier =
-        1.0f / (_motor->FOC.Vmag_max * (1.0f - FIELD_WEAKENING_THRESHOLD));
+        1.0f /
+        (_motor->FOC.Vmag_max * (1.0f - _motor->options.field_weakening_threshold));
 
     // When running HFI we want the bandwidth low, so we calculate it
     // with each slow loop depending on whether we are HFIing or not

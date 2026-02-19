@@ -8,8 +8,6 @@
 #ifndef INC_MESC_MOTOR_DEFAULTS_H_
 #define INC_MESC_MOTOR_DEFAULTS_H_
 
-#include "mesc_hal.h"
-
 // #define MCMASTER_70KV_8080
 // #define ANT_120_70_62KV
 // #define CA120

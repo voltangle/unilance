@@ -44,12 +44,8 @@
 
 #include "MESCmotor_state.h"
 #include "MESCtemp.h"
-#include "mesc_hal.h"
 
 // #include "MESCposition.h"
-#define LOGGING
-
-#define FOC_PERIODS (1)
 
 // Default options which can be overwritten by user
 #ifndef PWM_FREQUENCY
@@ -68,16 +64,6 @@
        // library.
 #endif
 
-#ifndef DEADTIME_COMP_V
-#define DEADTIME_COMP_V \
-    0   // Arbitrary value for starting, needs determining through
-        // TEST_TYP_DEAD_TIME_IDENT.
-#endif  // Basically this is half the time between MOSoff and MOSon
-        // and needs dtermining experimentally, either with openloop
-        // sin wave drawing or by finding the zero current switching "power knee point"
-        // Not defining this uses 5 sector and overmodulation compensation
-        // 5 sector is harder on the low side FETs (for now)but offers equal performance
-        // at low speed, better at high speed.
 #ifndef OVERMOD_DT_COMP_THRESHOLD
 #define OVERMOD_DT_COMP_THRESHOLD \
     100  // Prototype concept that allows 100% (possibly greater) modulation by
@@ -728,13 +714,17 @@ typedef struct {
     bool use_hall_start;
     bool use_lr_observer;
     bool use_phase_sensors;
-    uint8_t mtpa_mode;
     bool use_phase_balancing;
+    bool use_deadtime_compensation;
+    bool use_salient_observer;
     bool has_motor_temp_sensor;
+    bool interpolate_v7_angle;
+    uint8_t mtpa_mode;
     uint8_t field_weakening;
     uint8_t sqrt_circle_lim;
     uint8_t observer_type;
     uint8_t pwm_type;
+    // FIXME: remove together with slowLoop
     uint8_t MESC_APP_type;
 } MESC_OptionFlags_s;
 
@@ -767,6 +757,7 @@ typedef struct {
     MESChall_s hall;
     // Pointer to the mesc::Motor Rust struct
     void* rs_motor;
+    // TODO: remove both safe_start and key_bits, useless for my usecase
     int32_t safe_start[2];
     uint32_t key_bits;  // When any of these are low, we keep the motor disabled
     MESClogging_s logging;
@@ -776,12 +767,6 @@ typedef struct {
     MESC_OptionFlags_s options;
     bool conf_is_valid;
 } MESC_motor_typedef;
-
-enum MESCADC {
-    ADCIU,
-    ADCIV,
-    ADCIW,
-};
 
 #define SVPWM_MULTIPLIER \
     1.1547f  // 1/cos30 which comes from the maximum between two 120 degree apart
@@ -891,9 +876,9 @@ void MESChal_phC_setDuty(MESC_motor_typedef* motor, uint16_t duty);
 // the fuck?
 // jokes aside it's only done so calculateGains in MESCfoc.c will work
 void MESChal_phD_setDuty(MESC_motor_typedef* motor, uint16_t duty);
-void MESChal_phA_getDuty(MESC_motor_typedef* motor);
-void MESChal_phB_getDuty(MESC_motor_typedef* motor);
-void MESChal_phC_getDuty(MESC_motor_typedef* motor);
+uint16_t MESChal_phA_getDuty(MESC_motor_typedef* motor);
+uint16_t MESChal_phB_getDuty(MESC_motor_typedef* motor);
+uint16_t MESChal_phC_getDuty(MESC_motor_typedef* motor);
 uint16_t MESChal_getMaxDuty(MESC_motor_typedef* motor);
 void MESChal_setMaxDuty(MESC_motor_typedef* motor, uint16_t duty);
 void MESChal_setPWMFrequency(MESC_motor_typedef* motor, uint32_t freq);

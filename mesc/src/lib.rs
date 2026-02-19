@@ -4,7 +4,10 @@ mod bindings;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
 
-use crate::bindings::{MESC_PWM_IRQ_handler, MESClrobs_Init, fastLoop};
+use crate::bindings::{
+    MESC_PWM_IRQ_handler, MESClrobs_Init, fastLoop,
+    motor_state_e_MOTOR_STATE_INITIALIZING,
+};
 use core::ffi::c_void;
 use core::ptr;
 
@@ -22,20 +25,30 @@ pub struct Motor {
 
 impl Motor {
     pub fn new() -> Self {
-        let mut instance = Self {
+        let mut m = Self {
             motor: MESC_motor_typedef {
                 id: 0,
                 ..Default::default()
             },
         };
-        instance.motor.rs_motor = ptr::from_mut(&mut instance) as *mut c_void;
-        instance
-    }
+        m.motor.rs_motor = ptr::from_mut(&mut m) as *mut c_void;
+        m.motor.MotorState = motor_state_e_MOTOR_STATE_INITIALIZING;
+        m.motor.MotorControlType = motor_control_type_e_MOTOR_CONTROL_TYPE_FOC;
+        // TODO: make the check automatic
+        // So, my idea is to have a list of parameters that have to be explicitly set,
+        // and after the Supervisor finishes sending all configuration options it will
+        // ask to "commit" the config, in this case verify it. If not all required options
+        // were set, Control will respond with a nack and give a list of options that were
+        // not set yet. If it's all good though, Control will set conf_is_valid and
+        // allow the Supervisor to start sending commands, like starting balance or
+        // something.
+        m.motor.conf_is_valid = false;
 
-    pub fn init(&mut self) {
         unsafe {
-            MESClrobs_Init(&mut self.motor);
+            MESClrobs_Init(&mut m.motor);
         }
+
+        return m;
     }
 
     pub fn foc_update(&mut self) {
@@ -60,3 +73,41 @@ impl Motor {
         self.motor.FOC.Idq_req.d = i_d;
     }
 }
+
+// pub struct Hardware {
+//     /// Default ADC offset, aka what value is considered "zero". Applied to members of
+//     /// `motor->offset`.
+//     pub default_adc_offset: u16,
+//     /// Max board current allowable
+//     pub i_max: f32,
+//     /// Max board voltage allowable
+//     pub v_max: f32,
+//     /// Min voltage at which we turn off PWM to avoid brownouts, nastiness.
+//     pub v_min: f32,
+//     /// Shunt resistance, ohms
+//     pub r_shunt: f32,
+//     /// Vbus top divider - Also for switch divider
+//     pub rvbt: f32,
+//     /// Vbus bottom divider - Also for switch divider
+//     pub rvbb: f32,
+//     /// == rvbb / (rvbb + rvbt); resistor divider network gain
+//     pub vbgain: f32,
+//     pub phase_current_pullup: f32,
+//     pub phase_current_series_resistance: f32,
+//     /// OpAmp gain, if external, or internal PGA
+//     pub op_gain: f32,
+//     /// e.g. Rshunt * OpGain * RIphPU / (RIphSR + RIphPU);
+//     /// network gain network * opamp gain - total gain before the current hits the
+//     /// ADC, might want this inverted to avoid using division?
+//     pub i_gain: f32,
+//     /// Current limit that will trigger a software
+//     /// generated break from ADC. Actual current equal to
+//     /// (RawCurrLim-IMid)*3.3/4096/Gain/Rshunt //example
+//     /// (4096-2048)*3.3/(4096*16*0.001)= 103A
+//     pub raw_curr_lim: f32,
+//     /// Voltage limit that will trigger a software
+//     /// generated break from ADC. Actual voltage equal to
+//     /// RawVoltLim*3.3*Divider/4096            //
+//     /// example 2303*3.3/4096*(R1k5+R47k/R1K5)=60V
+//     pub raw_volt_lim: f32
+// }

@@ -25,8 +25,6 @@
 #ifndef MESC_MOTOR_STATE_H
 #define MESC_MOTOR_STATE_H
 
-#include "mesc_hal.h"
-
 typedef enum {
     MOTOR_STATE_INITIALISING = 0,
     // Starting up the inverter, we need to get the offsets for the current sensors and do

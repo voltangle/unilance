@@ -52,25 +52,18 @@ static const float sqrt3_on_2 = 0.866025f;
 // for MESC to run. Ensure that it is followed by the clear timer update
 // interrupt
 void MESC_PWM_IRQ_handler(MESC_motor_typedef* _motor) {
-#ifdef FASTLED
-    FASTLED->BSRR = FASTLEDIO;
-#endif
     uint32_t cycles = MESChal_getCPUCycles();
-    // NOTE: Why is it 0x16, if we're checking for DIR? shouldn't it be 0x8 instead?
-    // I'm yet to figure out what in the name of all thats holy this thing is even doing'
-    // lol
-    if (MESChal_isTimerCountingDown(_motor)) {  // Polling the DIR (direction) bit on the
-                                                // motor counter DIR = 1 = downcounting
+    // NOTE: this is so HFI runs at the PWM frequency. In this case, because
+    // the timer runs in center-aligned mode, effective PWM frequency is half the timer
+    // frequency, and so HFI will run at exactly the PWM frequency as it runs only every
+    // other interrupt.
+    if (MESChal_isTimerCountingDown(_motor)) {
         MESCpwm_Write(_motor);
     } else {
         MESChfi_Run(_motor);
         MESCpwm_Write(_motor);
     }
     _motor->FOC.cycles_pwmloop = CPU_CYCLES - cycles;
-
-#ifdef FASTLED
-    FASTLED->BSRR = FASTLEDIO << 16U;
-#endif
 }
 
 void MESCpwm_Write(MESC_motor_typedef* _motor) {
@@ -86,17 +79,17 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
     // Now we update the sin and cos values, since when we do the inverse
     // transforms, we would like to use the most up to date versions(or even the
     // next predicted version...)
-#ifdef INTERPOLATE_V7_ANGLE
-    if ((fabsf(_motor->FOC.eHz) > 0.005f * _motor->FOC.pwm_frequency) &&
-        (_motor->HFI.inject == 0)) {
-        // Only run it when there is likely to be good speed measurement stability and
-        // actual utility in doing it. At low speed, there is minimal benefit, and
-        // unstable speed estimation could make it worse.
-        // Presently, this causes issues with openloop iteration, and effectively doubles
-        // the speed. TBC
-        _motor->FOC.FOCAngle = _motor->FOC.FOCAngle + 0.5f * _motor->FOC.PLL_int;
+    if (_motor->options.interpolate_v7_angle) {
+        if ((fabsf(_motor->FOC.eHz) > 0.005f * _motor->FOC.pwm_frequency) &&
+            (_motor->HFI.inject == 0)) {
+            // Only run it when there is likely to be good speed measurement stability and
+            // actual utility in doing it. At low speed, there is minimal benefit, and
+            // unstable speed estimation could make it worse.
+            // Presently, this causes issues with openloop iteration, and effectively
+            // doubles the speed. TBC
+            _motor->FOC.FOCAngle = _motor->FOC.FOCAngle + 0.5f * _motor->FOC.PLL_int;
+        }
     }
-#endif
     sin_cos_fast(_motor->FOC.FOCAngle, &_motor->FOC.sincosangle.sin,
                  &_motor->FOC.sincosangle.cos);
 
@@ -173,51 +166,50 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
                                                    mid_value));
 
             // Dead time compensation
-#ifdef DEADTIME_COMP
-            // LICENCE NOTE:
-            // This function deviates slightly from the BSD 3 clause licence.
-            // The work here is entirely original to the MESC FOC project, and not based
-            // on any appnotes, or borrowed from another project. This work is free to
-            // use, as granted in BSD 3 clause, with the exception that this note must
-            // be included in where this code is implemented/modified to use your
-            // variable names, structures containing variables or other minor
-            // rearrangements in place of the original names I have chosen, and credit
-            // to David Molony as the original author must be noted.
-            // The problem with dead time, is that it is essentially a voltage tie through
-            // the body diodes to VBus or ground, depending on the current direction. If
-            // we know the direction of current, and the effective dead time length we can
-            // remove this error, by writing the corrected voltage. This is observed to
-            // improve sinusoidalness of currents, but has a slight audible buzz When the
-            // current is approximately zero, it is hard to resolve the direction, and
-            // therefore the compensation is ineffective. However, no torque is generated
-            // when the current and voltage are close to zero, so no adverse performance
-            // except the buzz.
-            if (_motor->Conv.Iu < -0.030f) {
-                MESChal_phA_setDuty(
-                    _motor, MESChal_phA_getDuty(_motor) - _motor->FOC.deadtime_comp);
+            if (_motor->options.use_deadtime_compensation) {
+                // LICENCE NOTE:
+                // This function deviates slightly from the BSD 3 clause licence.
+                // The work here is entirely original to the MESC FOC project, and not
+                // based on any appnotes, or borrowed from another project. This work is
+                // free to use, as granted in BSD 3 clause, with the exception that this
+                // note must be included in where this code is implemented/modified to use
+                // your variable names, structures containing variables or other minor
+                // rearrangements in place of the original names I have chosen, and credit
+                // to David Molony as the original author must be noted.
+                // The problem with dead time, is that it is essentially a voltage tie
+                // through the body diodes to VBus or ground, depending on the current
+                // direction. If we know the direction of current, and the effective dead
+                // time length we can remove this error, by writing the corrected voltage.
+                // This is observed to improve sinusoidalness of currents, but has a
+                // slight audible buzz When the current is approximately zero, it is hard
+                // to resolve the direction, and therefore the compensation is
+                // ineffective. However, no torque is generated when the current and
+                // voltage are close to zero, so no adverse performance except the buzz.
+                if (_motor->Conv.Iu < -0.030f) {
+                    MESChal_phA_setDuty(
+                        _motor, MESChal_phA_getDuty(_motor) - _motor->FOC.deadtime_comp);
+                }
+                if (_motor->Conv.Iv < -0.030f) {
+                    MESChal_phB_setDuty(
+                        _motor, MESChal_phB_getDuty(_motor) - _motor->FOC.deadtime_comp);
+                }
+                if (_motor->Conv.Iw < -0.030f) {
+                    MESChal_phC_setDuty(
+                        _motor, MESChal_phC_getDuty(_motor) - _motor->FOC.deadtime_comp);
+                }
+                if (_motor->Conv.Iu > -0.030f) {
+                    MESChal_phA_setDuty(
+                        _motor, MESChal_phA_getDuty(_motor) + _motor->FOC.deadtime_comp);
+                }
+                if (_motor->Conv.Iv > -0.030f) {
+                    MESChal_phB_setDuty(
+                        _motor, MESChal_phB_getDuty(_motor) + _motor->FOC.deadtime_comp);
+                }
+                if (_motor->Conv.Iw > -0.030f) {
+                    MESChal_phC_setDuty(
+                        _motor, MESChal_phC_getDuty(_motor) + _motor->FOC.deadtime_comp);
+                }
             }
-            if (_motor->Conv.Iv < -0.030f) {
-                MESChal_phB_setDuty(
-                    _motor, MESChal_phB_getDuty(_motor) - _motor->FOC.deadtime_comp);
-            }
-            if (_motor->Conv.Iw < -0.030f) {
-                MESChal_phC_setDuty(
-                    _motor, MESChal_phC_getDuty(_motor) - _motor->FOC.deadtime_comp);
-            }
-            if (_motor->Conv.Iu > -0.030f) {
-                MESChal_phA_setDuty(
-                    _motor, MESChal_phA_getDuty(_motor) + _motor->FOC.deadtime_comp);
-            }
-            if (_motor->Conv.Iv > -0.030f) {
-                MESChal_phB_setDuty(
-                    _motor, MESChal_phB_getDuty(_motor) + _motor->FOC.deadtime_comp);
-            }
-            if (_motor->Conv.Iw > -0.030f) {
-                MESChal_phC_setDuty(
-                    _motor, MESChal_phC_getDuty(_motor) + _motor->FOC.deadtime_comp);
-            }
-
-#endif
             break;
         case MESC_PWM_SIN:
 

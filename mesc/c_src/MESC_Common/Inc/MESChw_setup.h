@@ -26,7 +26,6 @@
 #define MESChw_setup_H
 
 #include "MESCfoc.h"
-#include "mesc_hal.h"
 
 #define FLASH_STORAGE_PAGE 7
 
