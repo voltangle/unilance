@@ -1,5 +1,6 @@
 version: '3'
 
+# TODO: Rewrite all of this with either a custom build tool or with a Justfile.
 tasks:
   clean:
     cmds:
@@ -19,7 +20,6 @@ tasks:
       CARGO_METHOD: '{{.CARGO_METHOD}}'
     cmds:
       - |
-        TARGET_PORT=stm32 TARGET_NAME=begode_etmax \
         cargo {{.CARGO_METHOD}} -p port-stm32 \
           --no-default-features --features board_begode_etmax \
           --target thumbv7em-none-eabihf {{.CLI_ARGS}}
