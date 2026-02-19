@@ -1,4 +1,4 @@
-/// Processed IMU data.
+/// Spacial state of the system (absolute position, movement rates, etc etc)
 ///
 /// Pitch and roll are absolute positions in space, *_rate ones are self-explanatory,
 /// and *_accel are acceleration values in different directions. These acceleration values
@@ -8,7 +8,7 @@
 /// split between multiple. The X axis always denotes front/back acceleration, Y axis is
 /// left/right, and Z axis is up/down.
 #[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
-pub struct IMUData {
+pub struct SpacialState {
     /// Radians
     pub pitch: f32,
     /// Radians

@@ -18,12 +18,9 @@ use embassy_stm32::Config;
 #[for_role("combined")]
 use embassy_sync::channel::Channel;
 use embassy_time::Timer;
-use mesc::MESC_motor_typedef;
 use proc_macros::for_role;
 
 use {defmt_rtt as _, panic_probe as _};
-
-static mut MESC_MOTOR: MaybeUninit<MESC_motor_typedef> = MaybeUninit::uninit();
 
 static CTRL_TO_SUPV_CHANNEL: CoreChannel = Channel::new();
 static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
@@ -69,16 +66,4 @@ fn make_core_link(is_for_supervisor: bool) -> MemChannelCoreLink<'static> {
 #[for_role("either")]
 fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
     unimplemented!()
-}
-
-#[allow(static_mut_refs)]
-pub fn get_motor() -> &'static mut MESC_motor_typedef {
-    unsafe { &mut (*MESC_MOTOR.as_mut_ptr()) }
-}
-
-#[allow(static_mut_refs)]
-pub fn set_motor(motor: MESC_motor_typedef) {
-    unsafe {
-        MESC_MOTOR.write(motor);
-    }
 }

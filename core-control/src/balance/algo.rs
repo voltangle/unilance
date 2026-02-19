@@ -1,4 +1,4 @@
-use crate::ahrs::IMUData;
+use crate::ahrs::SpacialState;
 use crate::balance::{BalanceState, RideAssistCoreState};
 use micromath::F32Ext;
 
@@ -14,15 +14,15 @@ impl BalanceState {
     }
 
     /// Main balance loop function. Has to be called in ISR, for real time guarantees.
-    pub fn iterate(&mut self, imu_state: IMUData) -> f32 {
-        let pid_out = self.iterate_pid(&imu_state);
+    pub fn update(&mut self, imu_state: SpacialState) -> f32 {
+        let pid_out = self.update_pid(&imu_state);
         if self.config.rideassist.enable {
-            self.iterate_ride_assist(&imu_state, pid_out);
+            self.update_ride_assist(&imu_state, pid_out);
         }
         return pid_out;
     }
 
-    fn iterate_pid(&mut self, pos_state: &IMUData) -> f32 {
+    fn update_pid(&mut self, pos_state: &SpacialState) -> f32 {
         let angle_error = pos_state.pitch - self.setpoint;
 
         let p_term = self.config.kp as f32 * angle_error.powf(self.config.kp_expo as f32);
@@ -52,7 +52,7 @@ impl BalanceState {
     }
 
     /// Doesn't output anything, because its output is actually the internal setpoint.
-    fn iterate_ride_assist(&mut self, pos_state: &IMUData, _current_out: f32) {
+    fn update_ride_assist(&mut self, pos_state: &SpacialState, _current_out: f32) {
         // Check for current state and if any changes are in order
         match self.rideassist.state {
             RideAssistCoreState::Acceleration => {

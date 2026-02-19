@@ -2,7 +2,7 @@
 
 use embassy_time::{Duration, Ticker};
 use heapless::{Vec, VecView};
-use mesc::MESC_motor_typedef;
+use mesc::Motor;
 use proto::corelink::control::ControlValueKey;
 use proto::corelink::{
     CoreLink, FileTransmissionDeniedReason, FileTransmissionNackReason, Message,
@@ -36,10 +36,9 @@ pub enum FaultType {
     FreespinOnStartup,
 }
 
-#[derive(Clone, Copy)]
 pub struct State {
     state: SystemState,
-    motor: MESC_motor_typedef,
+    motor: mesc::Motor,
     pub balance: BalanceState,
 }
 
@@ -48,7 +47,7 @@ impl State {
         Self {
             state: SystemState::Booting,
             balance: BalanceState::new(),
-            motor: MESC_motor_typedef::default(),
+            motor: Motor::new(),
         }
     }
 }
@@ -61,4 +60,8 @@ pub async fn main_task(state: &mut State, link: &mut impl CoreLink) {
         handle_corelink(state, link).await;
         ticker.next().await;
     }
+}
+
+pub fn pwm_isr(state: &mut State) {
+    state.motor.foc_update();
 }

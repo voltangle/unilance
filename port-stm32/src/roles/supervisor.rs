@@ -112,4 +112,3 @@ impl Storage for RamStorage {
         Ok(len)
     }
 }
-
