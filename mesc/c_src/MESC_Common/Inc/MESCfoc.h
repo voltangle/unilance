@@ -44,12 +44,8 @@
 
 #include "MESCmotor_state.h"
 #include "MESCtemp.h"
-#include "mesc_hal.h"
 
 // #include "MESCposition.h"
-#define LOGGING
-
-#define FOC_PERIODS (1)
 
 // Default options which can be overwritten by user
 #ifndef PWM_FREQUENCY
@@ -68,16 +64,6 @@
        // library.
 #endif
 
-#ifndef DEADTIME_COMP_V
-#define DEADTIME_COMP_V \
-    0   // Arbitrary value for starting, needs determining through
-        // TEST_TYP_DEAD_TIME_IDENT.
-#endif  // Basically this is half the time between MOSoff and MOSon
-        // and needs dtermining experimentally, either with openloop
-        // sin wave drawing or by finding the zero current switching "power knee point"
-        // Not defining this uses 5 sector and overmodulation compensation
-        // 5 sector is harder on the low side FETs (for now)but offers equal performance
-        // at low speed, better at high speed.
 #ifndef OVERMOD_DT_COMP_THRESHOLD
 #define OVERMOD_DT_COMP_THRESHOLD \
     100  // Prototype concept that allows 100% (possibly greater) modulation by
@@ -120,9 +106,6 @@
 #define DEFAULT_BATTERY_CURRENT 10.0f
 #endif
 
-#ifndef DEADSHORT_CURRENT
-#define DEADSHORT_CURRENT 30.0f
-#endif
 // HFI related
 #ifndef HFI_VOLTAGE
 #define HFI_VOLTAGE 2.0f
@@ -724,16 +707,37 @@ enum MESC_MTPAMode {
     MESC_MTPA_Q = 3
 };
 
+typedef enum MESC_ObserverCentering {
+    MESC_ObserverCentering_None = 0,
+    MESC_ObserverCentering_NonLinear = 1,
+    MESC_ObserverCentering_Clamped = 2,
+} MESC_ObserverCentering_t;
+
+typedef struct {
+    float abs_max_phase_current;
+    float abs_max_bus_voltage;
+} MESC_limits_t;
+
 typedef struct {
     bool use_hall_start;
     bool use_lr_observer;
-    uint8_t mtpa_mode;
+    bool use_phase_sensors;
     bool use_phase_balancing;
+    bool use_deadtime_compensation;
+    bool use_salient_observer;
     bool has_motor_temp_sensor;
+    bool interpolate_v7_angle;
+    bool use_deadshort;
+    float deadshort_current;
+    float lr_observer_current;
+    uint8_t mtpa_mode;
     uint8_t field_weakening;
+    float field_weakening_threshold;
     uint8_t sqrt_circle_lim;
     uint8_t observer_type;
+    MESC_ObserverCentering_t observer_centering;
     uint8_t pwm_type;
+    // FIXME: remove when refactoring MESCfoc_slowLoop
     uint8_t MESC_APP_type;
 } MESC_OptionFlags_s;
 
@@ -764,6 +768,9 @@ typedef struct {
     MOTORProfile m;
     MESCmeas_s meas;
     MESChall_s hall;
+    // Pointer to the mesc::Motor Rust struct
+    void* rs_motor;
+    // TODO: remove both safe_start and key_bits, useless for my usecase
     int32_t safe_start[2];
     uint32_t key_bits;  // When any of these are low, we keep the motor disabled
     MESClogging_s logging;
@@ -771,14 +778,9 @@ typedef struct {
     input_vars_t input_vars;
     MESClrobs_s lrobs;
     MESC_OptionFlags_s options;
+    MESC_limits_t limits;
     bool conf_is_valid;
 } MESC_motor_typedef;
-
-enum MESCADC {
-    ADCIU,
-    ADCIV,
-    ADCIW,
-};
 
 #define SVPWM_MULTIPLIER \
     1.1547f  // 1/cos30 which comes from the maximum between two 120 degree apart
@@ -808,7 +810,7 @@ void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor);
 // Alternatively, the PWM and ADC IRQ handlers can be
 // stacked in a single interrupt occurring once per period
 // but HFI will be lost
-void fastLoop(MESC_motor_typedef* _motor);
+void MESCfoc_fastLoop(MESC_motor_typedef* _motor);
 void VICheck(MESC_motor_typedef* _motor);
 void ADCConversion(MESC_motor_typedef* _motor);  // Roll this into the V_I_Check? less
                                                  // branching, can probably reduce no.ops
@@ -847,7 +849,7 @@ void MESC_Slow_IRQ_handler(
                   // RCPWM is not present will run at 20Hz If entered from update (reset,
                   // CC1) no data available for the PWM in. If entered from CC2, new PWM
                   // data available
-void slowLoop(MESC_motor_typedef* _motor);
+void MESCfoc_slowLoop(MESC_motor_typedef* _motor);
 void MESCTrack(MESC_motor_typedef* _motor);
 void deadshort(MESC_motor_typedef* _motor);
 void tle5012(MESC_motor_typedef* _motor);
@@ -873,15 +875,6 @@ void MESC_IC_IRQ_Handler(MESC_motor_typedef* _motor, uint32_t SR, uint32_t CCR1,
  * They're here instead of a separate header file because they use types from this header
  */
 
-// #ifdef STM32L4  // For some reason, ST have decided to have a different name for the L4
-//                 // timer DBG freeze...
-//     DBGMCU->APB2FZ |= DBGMCU_APB2FZ_DBG_TIM1_STOP;
-// #else
-//     DBGMCU->APB2FZ |= DBGMCU_APB2_FZ_DBG_TIM1_STOP;
-// #endif
-// enable cycle counter
-// DEMCR |= DEMCR_TRCENA;
-// DWT_CTRL |= CYCCNTENA;
 void MESChal_delayMs(uint32_t ms);
 void MESChal_setDeadtimeNs(MESC_motor_typedef* motor, uint16_t ns);
 
@@ -891,108 +884,24 @@ void MESChal_phC_break(MESC_motor_typedef* motor);
 void MESChal_phA_enable(MESC_motor_typedef* motor);
 void MESChal_phB_enable(MESC_motor_typedef* motor);
 void MESChal_phC_enable(MESC_motor_typedef* motor);
-// _motor->mtimer->Instance->BDTR |= TIM_BDTR_MOE;
 void MESChal_enableOutput(MESC_motor_typedef* motor);
-
-// TIMx->CCRx
 void MESChal_phA_setDuty(MESC_motor_typedef* motor, uint16_t duty);
 void MESChal_phB_setDuty(MESC_motor_typedef* motor, uint16_t duty);
 void MESChal_phC_setDuty(MESC_motor_typedef* motor, uint16_t duty);
 // the fuck?
 // jokes aside it's only done so calculateGains in MESCfoc.c will work
 void MESChal_phD_setDuty(MESC_motor_typedef* motor, uint16_t duty);
-void MESChal_phA_getDuty(MESC_motor_typedef* motor);
-void MESChal_phB_getDuty(MESC_motor_typedef* motor);
-void MESChal_phC_getDuty(MESC_motor_typedef* motor);
-// TIMx->ARR
+uint16_t MESChal_phA_getDuty(MESC_motor_typedef* motor);
+uint16_t MESChal_phB_getDuty(MESC_motor_typedef* motor);
+uint16_t MESChal_phC_getDuty(MESC_motor_typedef* motor);
 uint16_t MESChal_getMaxDuty(MESC_motor_typedef* motor);
 void MESChal_setMaxDuty(MESC_motor_typedef* motor, uint16_t duty);
 void MESChal_setPWMFrequency(MESC_motor_typedef* motor, uint32_t freq);
-// __HAL_TIM_DISABLE_IT(_motor->mtimer,
-//                      TIM_IT_UPDATE);  // DISABLE INTERRUPT, DANGEROUS
 
-void MESChal_setIRQ(MESC_motor_typedef* motor, bool state);
+void MESChal_setIRQ(void* motor, bool state);
 uint32_t MESChal_getTimerHz(MESC_motor_typedef* motor);
 uint32_t MESChal_getCPUCycles();
 bool MESChal_isTimerCountingDown(MESC_motor_typedef* motor);
 
-// #ifdef INV_ENABLE_M1
-//     INV_ENABLE_M1->BSRR = INV_ENABLE_M1_IO << 16U;  // Write the inverter enable pin
-//     low
-// #endif
-// #ifdef INV_ENABLE_M2
-//     INV_ENABLE_M2->BSRR = INV_ENABLE_M2_IO << 16U;  // Write the inverter enable pin
-//     low
-// #endif
-// #ifdef INV_ENABLE_M1
-//     INV_ENABLE_M1->BSRR = INV_ENABLE_M1_IO;  // Write the inverter enable pin high
-// #endif
-// #ifdef INV_ENABLE_M2
-//     INV_ENABLE_M2->BSRR = INV_ENABLE_M2_IO;  // Write the inverter enable pin high
-// #endif
-void MESChal_setInverterEnablePin(MESC_motor_typedef* motor, bool state);
-// uint32_t tmpccmrx;  // Temporary buffer which is used to turn on/off phase PWMs
-// // Turn all phase U FETs off, Tristate the HBridge output - For BLDC mode
-// // mainly, but also used for measuring, software fault detection and recovery
-// void MESChal_phA_break(MESC_motor_typedef* _motor) {
-//     tmpccmrx = _motor->mtimer->Instance->CCMR1;
-//     tmpccmrx &= ~TIM_CCMR1_OC1M;
-//     tmpccmrx &= ~TIM_CCMR1_CC1S;
-//     tmpccmrx |= TIM_OCMODE_FORCED_INACTIVE;
-//     _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-//     _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC1E;   // disable
-//     _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC1NE;  // disable
-// }
-// // Basically un-break phase U, opposite of above...
-// void MESChal_phA_enable(MESC_motor_typedef* _motor) {
-//     tmpccmrx = _motor->mtimer->Instance->CCMR1;
-//     tmpccmrx &= ~TIM_CCMR1_OC1M;
-//     tmpccmrx &= ~TIM_CCMR1_CC1S;
-//     tmpccmrx |= TIM_OCMODE_PWM1;
-//     _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-//     _motor->mtimer->Instance->CCER |= TIM_CCER_CC1E;   // enable
-//     _motor->mtimer->Instance->CCER |= TIM_CCER_CC1NE;  // enable
-// }
-//
-// void MESChal_phB_break(MESC_motor_typedef* _motor) {
-//     tmpccmrx = _motor->mtimer->Instance->CCMR1;
-//     tmpccmrx &= ~TIM_CCMR1_OC2M;
-//     tmpccmrx &= ~TIM_CCMR1_CC2S;
-//     tmpccmrx |= TIM_OCMODE_FORCED_INACTIVE << 8;
-//     _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-//     _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC2E;   // disable
-//     _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC2NE;  // disable
-// }
-//
-// void MESCpwm_phB_Enable(MESC_motor_typedef* _motor) {
-//     tmpccmrx = _motor->mtimer->Instance->CCMR1;
-//     tmpccmrx &= ~TIM_CCMR1_OC2M;
-//     tmpccmrx &= ~TIM_CCMR1_CC2S;
-//     tmpccmrx |= TIM_OCMODE_PWM1 << 8;
-//     _motor->mtimer->Instance->CCMR1 = tmpccmrx;
-//     _motor->mtimer->Instance->CCER |= TIM_CCER_CC2E;   // enable
-//     _motor->mtimer->Instance->CCER |= TIM_CCER_CC2NE;  // enable
-// }
-//
-// void MESCpwm_phC_Break(MESC_motor_typedef* _motor) {
-//     tmpccmrx = _motor->mtimer->Instance->CCMR2;
-//     tmpccmrx &= ~TIM_CCMR2_OC3M;
-//     tmpccmrx &= ~TIM_CCMR2_CC3S;
-//     tmpccmrx |= TIM_OCMODE_FORCED_INACTIVE;
-//     _motor->mtimer->Instance->CCMR2 = tmpccmrx;
-//     _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC3E;   // disable
-//     _motor->mtimer->Instance->CCER &= ~TIM_CCER_CC3NE;  // disable
-// }
-//
-// void MESCpwm_phC_Enable(MESC_motor_typedef* _motor) {
-//     tmpccmrx = _motor->mtimer->Instance->CCMR2;
-//     tmpccmrx &= ~TIM_CCMR2_OC3M;
-//     tmpccmrx &= ~TIM_CCMR2_CC3S;
-//     tmpccmrx |= TIM_OCMODE_PWM1;
-//     _motor->mtimer->Instance->CCMR2 = tmpccmrx;
-//     _motor->mtimer->Instance->CCER |= TIM_CCER_CC3E;   // enable
-//     _motor->mtimer->Instance->CCER |= TIM_CCER_CC3NE;  // enable
-// }
-//
-#endif  // MESC_FOR_H
+#endif  // MESC_FOC_H
 // #endif

@@ -24,7 +24,7 @@ embassy-executor = { version = "0.9.1", features = [
     "rtos-trace",
     "defmt"
 ]}
-rtos-trace = "0.2"
+rtos-trace = "0.2.1"
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
 embassy-time = { version = "0.5.0", features = [
     "defmt",

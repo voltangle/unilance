@@ -1,6 +1,6 @@
 use super::PlatformConfig;
 use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
-use crate::roles;
+use crate::roles::control;
 use core::mem::MaybeUninit;
 use core_control::balance::{BalanceConfig, RideAssistConfig};
 use embassy_executor::Spawner;
@@ -21,7 +21,6 @@ use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwm
 use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
-use mesc::MESC_PWM_IRQ_handler;
 use proto::corelink::control::ControlValueKey;
 
 /*
@@ -190,7 +189,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         None,
         None,
         Hertz::khz(10),
-        CountingMode::EdgeAlignedDown, // TODO: I will need to check what's up with this
+        CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
 
@@ -246,37 +245,7 @@ pub mod foc {
     use embassy_stm32::pac::{GPIOB, TIM8};
     use embassy_stm32::time::Hertz;
     use embassy_stm32::timer::Channel;
-    use mesc::{MESC_motor_typedef, hw_setup_s};
-
-    // NOTE: ideally this default init should be in the mesc crate
-    #[unsafe(export_name = "g_hw_setup")]
-    pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
-        Imax: 0.0,
-        Vmax: 0.0,
-        Vmin: 0.0,
-        Rshunt: 0.0,
-        RVBT: 0.0,
-        RVBB: 0.0,
-        VBGain: 0.0,
-        RIphPU: 0.0,
-        RIphSR: 0.0,
-        OpGain: 0.0,
-        Igain: 0.0,
-        RawCurrLim: 0,
-        RawVoltLim: 0,
-    };
-
-    pub fn init_1(_motor: &mut MESC_motor_typedef) {}
-
-    pub fn init_2(_motor: &mut MESC_motor_typedef) {}
-
-    pub fn init_3(_motor: &mut MESC_motor_typedef) {
-        unimplemented!()
-    }
-
-    pub fn hw_init(_motor: &mut MESC_motor_typedef) {
-        unimplemented!()
-    }
+    use mesc::Motor;
 
     // PB6, 7, 8
     pub fn get_hall_state() -> u8 {
@@ -294,92 +263,92 @@ pub mod foc {
     }
 
     #[inline(always)]
-    pub fn set_irq(_motor: &mut MESC_motor_typedef, state: bool) {
+    pub fn set_irq(_motor: &mut Motor, state: bool) {
         TIM8.dier().read().set_uie(state);
     }
 
     #[inline(always)]
-    pub fn is_tim_counting_down(_motor: &mut MESC_motor_typedef) -> bool {
+    pub fn is_tim_counting_down(_motor: &mut Motor) -> bool {
         // The Dir enum is always going to be just two values, 0 and 1. It is guaranteed
         // that it not cause any UB.
         unsafe { mem::transmute(TIM8.cr1().read().dir()) }
     }
 
     #[inline(always)]
-    pub fn set_pwm_frequency(_motor: &mut MESC_motor_typedef, freq: u32) {
+    pub fn set_pwm_frequency(_motor: &mut Motor, freq: u32) {
         bsp_periph().motor_tim.set_frequency(Hertz::hz(freq));
     }
 
     #[inline(always)]
-    pub fn get_max_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+    pub fn get_max_duty(_motor: &mut Motor) -> u16 {
         bsp_periph().motor_tim.get_max_duty() as u16
     }
 
     #[inline(always)]
-    pub fn phase_a_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+    pub fn phase_a_get_duty(_motor: &mut Motor) -> u16 {
         bsp_periph().motor_tim.get_duty(Channel::Ch1)
     }
 
     #[inline(always)]
-    pub fn phase_b_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+    pub fn phase_b_get_duty(_motor: &mut Motor) -> u16 {
         bsp_periph().motor_tim.get_duty(Channel::Ch2)
     }
 
     #[inline(always)]
-    pub fn phase_c_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
+    pub fn phase_c_get_duty(_motor: &mut Motor) -> u16 {
         bsp_periph().motor_tim.get_duty(Channel::Ch3)
     }
 
     #[inline(always)]
-    pub fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+    pub fn phase_a_set_duty(_motor: &mut Motor, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch1, duty.into());
     }
 
     #[inline(always)]
-    pub fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+    pub fn phase_b_set_duty(_motor: &mut Motor, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch2, duty.into());
     }
 
     #[inline(always)]
-    pub fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+    pub fn phase_c_set_duty(_motor: &mut Motor, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch3, duty.into());
     }
 
     #[inline(always)]
-    pub fn phase_d_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+    pub fn phase_d_set_duty(_motor: &mut Motor, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch4, duty.into());
     }
 
     #[inline(always)]
-    pub fn enable_output(_motor: &mut MESC_motor_typedef) {
+    pub fn enable_output(_motor: &mut Motor) {
         bsp_periph().motor_tim.set_master_output_enable(true);
     }
 
-    pub fn phase_a_enable(_motor: &mut MESC_motor_typedef) {
+    pub fn phase_a_enable(_motor: &mut Motor) {
         bsp_periph().motor_tim.enable(Channel::Ch1);
     }
 
-    pub fn phase_b_enable(_motor: &mut MESC_motor_typedef) {
+    pub fn phase_b_enable(_motor: &mut Motor) {
         bsp_periph().motor_tim.enable(Channel::Ch2);
     }
 
-    pub fn phase_c_enable(_motor: &mut MESC_motor_typedef) {
+    pub fn phase_c_enable(_motor: &mut Motor) {
         bsp_periph().motor_tim.enable(Channel::Ch3);
     }
 
-    pub fn phase_a_break(_motor: &mut MESC_motor_typedef) {
+    pub fn phase_a_break(_motor: &mut Motor) {
         bsp_periph().motor_tim.disable(Channel::Ch1);
     }
 
-    pub fn phase_b_break(_motor: &mut MESC_motor_typedef) {
+    pub fn phase_b_break(_motor: &mut Motor) {
         bsp_periph().motor_tim.disable(Channel::Ch2);
     }
 
-    pub fn phase_c_break(_motor: &mut MESC_motor_typedef) {
+    pub fn phase_c_break(_motor: &mut Motor) {
         bsp_periph().motor_tim.disable(Channel::Ch3);
     }
 
-    pub fn set_deadtime(_motor: &mut MESC_motor_typedef, ns: u16) {
+    pub fn set_deadtime(_motor: &mut Motor, ns: u16) {
         // FIXME: doesn't take into account the timer prescaler
         let tim_clk = HCLK_HZ.load(Ordering::Relaxed) as f32;
         // how many nanoseconds there are in a second
@@ -442,16 +411,9 @@ impl PlatformConfig for Config {
 #[interrupt]
 fn TIM8_UP_TIM13() {
     rtos_trace::trace::isr_enter();
-    // TODO: refactor out to core-control
-    // Ideally, the port should have no knowledge of the FOC backend, but that's for the
-    // future stuffs, when I will need it
 
-    let motor = crate::get_motor();
     adc_dma_read();
-    unsafe {
-        mesc::fastLoop(motor);
-        MESC_PWM_IRQ_handler(motor);
-    }
+    control::motor_loop();
 
     // Clear update flag
     pac::TIM8.sr().modify(|w| w.set_uif(false));
@@ -463,7 +425,7 @@ fn TIM8_UP_TIM13() {
 #[interrupt]
 fn TIM2() {
     rtos_trace::trace::isr_enter();
-    roles::control::balance_loop();
+    control::balance_loop();
     rtos_trace::trace::isr_exit();
 }
 
@@ -495,16 +457,15 @@ fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
 #[allow(static_mut_refs)]
 fn adc_dma_read() {
     unsafe {
-        let motor = crate::get_motor();
-        motor.Raw.Iv = 2048;
-
         let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
-        motor.Raw.Iu = adc1_buf[0]; // I_phaseA
-
         let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
-        motor.Raw.Vbus = adc2_buf[1]; // V_battery
-
         let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
-        motor.Raw.Iw = adc3_buf[0];
+
+        control::get_state().motor.set_raw_adc(
+            adc1_buf[0], // I_phaseA
+            2048,        // Phase B doesn't have a sensor attached
+            adc2_buf[1], // I_phaseC
+            adc3_buf[0], // V_battery
+        );
     }
 }

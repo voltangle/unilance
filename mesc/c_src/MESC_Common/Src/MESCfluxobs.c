@@ -123,69 +123,75 @@ void MESCfluxobs_run(MESC_motor_typedef* _motor) {
             // This is the actual observer function.
             // We are going to integrate Va-Ri and clamp it positively and negatively
             // the angle is then the arctangent of the integrals shifted 180 degrees
-#ifdef USE_SALIENT_OBSERVER
-            float La, Lb;
-            getLabFast(_motor->FOC.FOCAngle, _motor->m.L_D, _motor->m.L_QD, &La, &Lb);
+            if (_motor->options.use_salient_observer) {
+                float La, Lb;
+                getLabFast(_motor->FOC.FOCAngle, _motor->m.L_D, _motor->m.L_QD, &La, &Lb);
 
-            _motor->FOC.flux_a =
-                _motor->FOC.flux_a +
-                (_motor->FOC.Vab.a - _motor->m.R * _motor->FOC.Iab.a) *
-                    _motor->FOC.pwm_period -
-                La *
-                    (_motor->FOC.Iab.a - _motor->FOC.Ia_last) -  // Salient inductance NOW
-                _motor->FOC.Iab.a *
-                    (La - La_last);  // Differential of phi = Li -> Ldi/dt+idL/dt
-            _motor->FOC.flux_b = _motor->FOC.flux_b +
-                                 (_motor->FOC.Vab.b - _motor->m.R * _motor->FOC.Iab.b) *
-                                     _motor->FOC.pwm_period -
-                                 Lb * (_motor->FOC.Iab.b - _motor->FOC.Ib_last) -
-                                 _motor->FOC.Iab.b * (Lb - Lb_last);
-            // Store the inductances
-            La_last = La;
-            Lb_last = Lb;
-#else
-            _motor->FOC.flux_a =
-                _motor->FOC.flux_a +
-                (_motor->FOC.Vab.a - _motor->m.R * _motor->FOC.Iab.a) *
-                    _motor->FOC.pwm_period -
-                _motor->m.L_D * (_motor->FOC.Iab.a - _motor->FOC.Ia_last);
-            _motor->FOC.flux_b =
-                _motor->FOC.flux_b +
-                (_motor->FOC.Vab.b - _motor->m.R * _motor->FOC.Iab.b) *
-                    _motor->FOC.pwm_period -
-                _motor->m.L_D * (_motor->FOC.Iab.b - _motor->FOC.Ib_last);
-#endif
+                _motor->FOC.flux_a =
+                    _motor->FOC.flux_a +
+                    (_motor->FOC.Vab.a - _motor->m.R * _motor->FOC.Iab.a) *
+                        _motor->FOC.pwm_period -
+                    La * (_motor->FOC.Iab.a -
+                          _motor->FOC.Ia_last) -  // Salient inductance NOW
+                    _motor->FOC.Iab.a *
+                        (La - _motor->FOC
+                                  .La_last);  // Differential of phi = Li -> Ldi/dt+idL/dt
+                _motor->FOC.flux_b =
+                    _motor->FOC.flux_b +
+                    (_motor->FOC.Vab.b - _motor->m.R * _motor->FOC.Iab.b) *
+                        _motor->FOC.pwm_period -
+                    Lb * (_motor->FOC.Iab.b - _motor->FOC.Ib_last) -
+                    _motor->FOC.Iab.b * (Lb - _motor->FOC.Lb_last);
+                // Store the inductances
+                _motor->FOC.La_last = La;
+                _motor->FOC.Lb_last = Lb;
+            } else {
+                _motor->FOC.flux_a =
+                    _motor->FOC.flux_a +
+                    (_motor->FOC.Vab.a - _motor->m.R * _motor->FOC.Iab.a) *
+                        _motor->FOC.pwm_period -
+                    _motor->m.L_D * (_motor->FOC.Iab.a - _motor->FOC.Ia_last);
+                _motor->FOC.flux_b =
+                    _motor->FOC.flux_b +
+                    (_motor->FOC.Vab.b - _motor->m.R * _motor->FOC.Iab.b) *
+                        _motor->FOC.pwm_period -
+                    _motor->m.L_D * (_motor->FOC.Iab.b - _motor->FOC.Ib_last);
+            }
             // Store the currents
             _motor->FOC.Ia_last = _motor->FOC.Iab.a;
             _motor->FOC.Ib_last = _motor->FOC.Iab.b;
 
-#ifdef USE_NONLINEAR_OBSERVER_CENTERING
-            /// Try directly applying the centering using the same method as the flux
-            /// linkage observer
-            float err = _motor->FOC.flux_observed * _motor->FOC.flux_observed -
-                        _motor->FOC.flux_a * _motor->FOC.flux_a -
-                        _motor->FOC.flux_b * _motor->FOC.flux_b;
-            _motor->FOC.flux_b =
-                _motor->FOC.flux_b +
-                err * _motor->FOC.flux_b * _motor->m.non_linear_centering_gain;
-            _motor->FOC.flux_a =
-                _motor->FOC.flux_a +
-                err * _motor->FOC.flux_a * _motor->m.non_linear_centering_gain;
-#endif
-#ifdef USE_CLAMPED_OBSERVER_CENTERING
-            if (_motor->FOC.flux_a > _motor->FOC.flux_observed) {
-                _motor->FOC.flux_a = _motor->FOC.flux_observed;
+            switch (_motor->options.observer_centering) {
+                case MESC_ObserverCentering_NonLinear:
+                    /// Try directly applying the centering using the same method as the
+                    /// flux linkage observer
+                    float err = _motor->FOC.flux_observed * _motor->FOC.flux_observed -
+                                _motor->FOC.flux_a * _motor->FOC.flux_a -
+                                _motor->FOC.flux_b * _motor->FOC.flux_b;
+                    _motor->FOC.flux_b =
+                        _motor->FOC.flux_b +
+                        err * _motor->FOC.flux_b * _motor->m.non_linear_centering_gain;
+                    _motor->FOC.flux_a =
+                        _motor->FOC.flux_a +
+                        err * _motor->FOC.flux_a * _motor->m.non_linear_centering_gain;
+                    break;
+                case MESC_ObserverCentering_Clamped:
+                    if (_motor->FOC.flux_a > _motor->FOC.flux_observed) {
+                        _motor->FOC.flux_a = _motor->FOC.flux_observed;
+                    }
+                    if (_motor->FOC.flux_a < -_motor->FOC.flux_observed) {
+                        _motor->FOC.flux_a = -_motor->FOC.flux_observed;
+                    }
+                    if (_motor->FOC.flux_b > _motor->FOC.flux_observed) {
+                        _motor->FOC.flux_b = _motor->FOC.flux_observed;
+                    }
+                    if (_motor->FOC.flux_b < -_motor->FOC.flux_observed) {
+                        _motor->FOC.flux_b = -_motor->FOC.flux_observed;
+                    }
+                    break;
+                default:
+                    break;
             }
-            if (_motor->FOC.flux_a < -_motor->FOC.flux_observed) {
-                _motor->FOC.flux_a = -_motor->FOC.flux_observed;
-            }
-            if (_motor->FOC.flux_b > _motor->FOC.flux_observed) {
-                _motor->FOC.flux_b = _motor->FOC.flux_observed;
-            }
-            if (_motor->FOC.flux_b < -_motor->FOC.flux_observed) {
-                _motor->FOC.flux_b = -_motor->FOC.flux_observed;
-            }
-#endif
             // Calculate the angle
             if (_motor->HFI.inject == 0) {
                 _motor->FOC.FOCAngle =

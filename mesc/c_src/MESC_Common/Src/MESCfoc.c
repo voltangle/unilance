@@ -49,10 +49,8 @@
 #include "MESCfluxobs.h"
 #include "MESChfi.h"
 #include "MESChw_setup.h"
-#include "MESCinput.h"
 #include "MESClrobs.h"
 #include "MESCmeasure.h"
-#include "MESCmotor.h"
 #include "MESCmotor_state.h"
 #include "MESCposition.h"
 #include "MESCpwm.h"
@@ -87,15 +85,11 @@ static void ThrottleTemperature(MESC_motor_typedef* _motor);
 static void FWRampDown(MESC_motor_typedef* _motor);
 
 void MESCfoc_Init(MESC_motor_typedef* _motor) {
-    _motor->safe_start[0] = SAFE_START_DEFAULT;
-
-    _motor->MotorState = MOTOR_STATE_IDLE;
-
     _motor->offset.Iu = ADC_OFFSET_DEFAULT;
-    _motor->offset.Iv = ADC_OFFSET_DEFAULT;
-    _motor->offset.Iw = ADC_OFFSET_DEFAULT;
+	_motor->offset.Iv = ADC_OFFSET_DEFAULT;
+	_motor->offset.Iw = ADC_OFFSET_DEFAULT;
 
-    _motor->FOC.deadtime_comp = DEADTIME_COMP_V;
+	_motor->FOC.deadtime_comp = 0;
 
     _motor->MotorState = MOTOR_STATE_INITIALISING;
 
@@ -103,7 +97,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->MotorControlType = MOTOR_CONTROL_TYPE_FOC;
     _motor->ControlMode = DEFAULT_CONTROL_MODE;
 
-    _motor->MotorSensorMode = DEFAULT_SENSOR_MODE;
+    _motor->MotorSensorMode = MOTOR_SENSOR_MODE_HALL;
     _motor->SLStartupSensor = DEFAULT_STARTUP_SENSOR;
     _motor->HFI.Type = DEFAULT_HFI_TYPE;
     if (_motor->SLStartupSensor != STARTUP_SENSOR_HFI) {
@@ -134,49 +128,20 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.hall_IIR = HALL_IIR;   // decay constant for the hall start preload
     _motor->FOC.hall_IIR = HALL_IIRN;  // decay constant for the hall start preload
     _motor->FOC.hall_transition_V =
-        HALL_VOLTAGE_THRESHOLD;  // transition voltage above which the hall sensors are
+        1.5f;  // transition voltage above which the hall sensors are
                                  // not doing any preloading
 
-#ifdef USE_LR_OBSERVER
-    _motor->options.use_lr_observer = true;
-#else
     _motor->options.use_lr_observer = false;
-#endif
 
-#ifdef USE_MTPA
-    _motor->options.mtpa_mode = MESC_MTPA_MAG;
-#else
     _motor->options.mtpa_mode = MESC_MTPA_NONE;
-#endif
 
-#ifdef USE_HIGHHOPES_PHASE_BALANCING
-    _motor->options.use_phase_balancing = true;
-#else
     _motor->options.use_phase_balancing = false;
-#endif
 
     _motor->options.field_weakening = FIELD_WEAKENING_OFF;
-#ifdef USE_FIELD_WEAKENING
-    _motor->options.field_weakening = FIELD_WEAKENING_V1;
-#endif
-
-#ifdef USE_FIELD_WEAKENINGV2
-    _motor->options.field_weakening = FIELD_WEAKENING_V2;
-#endif
 
     _motor->options.observer_type = MXLEMMING_LAMBDA;
-#ifdef USE_ORTEGA_ORIGINAL
-    _motor->options.field_weakening = ORTEGA_ORIGINAL;
-#endif
 
-    _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_OFF;
-#ifdef USE_SQRT_CIRCLE_LIM
-    _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_ON;
-#endif
-
-#ifdef USE_SQRT_CIRCLE_LIM_VD
     _motor->options.sqrt_circle_lim = SQRT_CIRCLE_LIM_VD;
-#endif
 
     _motor->options.pwm_type =
         MESC_PWM_SVPWM;  // Default to combined bottom clamp sinusoidal combinationPWM
@@ -196,8 +161,8 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.enc_period_count = 1;  // Avoid /0s
 
     // ABI Incremental encoder
-    _motor->m.enc_counts = 4096;  // Default to this, common for many motors. Avoid div0.
-    _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
+    _motor->m.enc_counts = 4096;  // Default to this, common for many motors. Avoid division by zero
+   _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
 
     _motor->hall.hall_error = 0;
     // Init the BLDC
@@ -225,29 +190,28 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.BEMF_kp = -0.25;
     _motor->FOC.BEMF_ki = 0.001;
 
-    //
     _motor->Raw.MOS_temp.V = 3.3f;
-    _motor->Raw.MOS_temp.R_F = MESC_TEMP_MOS_R_F;
+    _motor->Raw.MOS_temp.R_F = 4700.0f;
     _motor->Raw.MOS_temp.adc_range = 4096;
-    _motor->Raw.MOS_temp.method = MESC_TEMP_MOS_METHOD;
-    _motor->Raw.MOS_temp.schema = MESC_TEMP_MOS_SCHEMA;
-    _motor->Raw.MOS_temp.parameters.SH.Beta = MESC_TEMP_MOS_SH_BETA;
-    _motor->Raw.MOS_temp.parameters.SH.r = MESC_TEMP_MOS_SH_R;
+    _motor->Raw.MOS_temp.method = TEMP_METHOD_STEINHART_HART_BETA_R;
+    _motor->Raw.MOS_temp.schema = TEMP_SCHEMA_R_F_ON_R_T;
+    _motor->Raw.MOS_temp.parameters.SH.Beta = 3437.864258f;
+    _motor->Raw.MOS_temp.parameters.SH.r = 0.098243f;
     _motor->Raw.MOS_temp.parameters.SH.T0 = CVT_CELSIUS_TO_KELVIN_F(25.0f);
-    _motor->Raw.MOS_temp.parameters.SH.R0 = MESC_TEMP_MOS_SH_R0;
+    _motor->Raw.MOS_temp.parameters.SH.R0 = 10000.0f;
     _motor->Raw.MOS_temp.limit.Tmin = CVT_CELSIUS_TO_KELVIN_F(-15.0f);
     _motor->Raw.MOS_temp.limit.Thot = CVT_CELSIUS_TO_KELVIN_F(80.0f);
     _motor->Raw.MOS_temp.limit.Tmax = CVT_CELSIUS_TO_KELVIN_F(100.0f);
 
     _motor->Raw.Motor_temp.V = 3.3f;
-    _motor->Raw.Motor_temp.R_F = MESC_TEMP_MOTOR_R_F;
+    _motor->Raw.Motor_temp.R_F = 4700.0f;
     _motor->Raw.Motor_temp.adc_range = 4096;
-    _motor->Raw.Motor_temp.method = MESC_TEMP_MOTOR_METHOD;
-    _motor->Raw.Motor_temp.schema = MESC_TEMP_MOTOR_SCHEMA;
-    _motor->Raw.Motor_temp.parameters.SH.Beta = MESC_TEMP_MOTOR_SH_BETA;
-    _motor->Raw.Motor_temp.parameters.SH.r = MESC_TEMP_MOTOR_SH_R;
+    _motor->Raw.Motor_temp.method = TEMP_METHOD_STEINHART_HART_BETA_R;
+    _motor->Raw.Motor_temp.schema = TEMP_SCHEMA_R_F_ON_R_T;
+    _motor->Raw.Motor_temp.parameters.SH.Beta = 3437.864258f;
+    _motor->Raw.Motor_temp.parameters.SH.r = 0.098243f;
     _motor->Raw.Motor_temp.parameters.SH.T0 = CVT_CELSIUS_TO_KELVIN_F(25.0f);
-    _motor->Raw.Motor_temp.parameters.SH.R0 = MESC_TEMP_MOTOR_SH_R0;
+    _motor->Raw.Motor_temp.parameters.SH.R0 = 10000.0f;
     _motor->Raw.Motor_temp.limit.Tmin = CVT_CELSIUS_TO_KELVIN_F(-15.0f);
     _motor->Raw.Motor_temp.limit.Thot = CVT_CELSIUS_TO_KELVIN_F(80.0f);
     _motor->Raw.Motor_temp.limit.Tmax = CVT_CELSIUS_TO_KELVIN_F(100.0f);
@@ -255,7 +219,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     // Initialise the FOC parameters
     // Init the FW
     _motor->FOC.FW_curr_max =
-        FIELD_WEAKENING_CURRENT;  // test number, to be stored in user settings
+        0.0f;  // test number, to be stored in user settings
 
     // Init the current controller
     _motor->FOC.Current_bandwidth = CURRENT_BANDWIDTH;
@@ -263,15 +227,6 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.ortega_gain = 1000000.0f;
 
     MESClrobs_Init(_motor);
-
-    mesc_init_1(_motor);
-
-#ifdef USE_INIT_DELAY
-    MESChal_delayMs(1000);  // Give the everything else time to start up (e.g. throttle,
-                            // controller, PWM source...)
-#endif
-
-    mesc_init_2(_motor);
 
     hw_init(_motor);  // Populate the resistances, gains etc of the PCB - edit within
                       // this function if compiling for other PCBs
@@ -281,10 +236,6 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     MESChal_setDeadtimeNs(_motor, CUSTOM_DEADTIME);
 #endif
 
-    // Start the PWM channels, reset the counter to zero each time to avoid
-    // triggering the ADC, which in turn triggers the ISR routine and wrecks the
-    // startup
-    mesc_init_3(_motor);
     // Set the keybits
     _motor->key_bits = UNINITIALISED_KEY + KILLSWITCH_KEY + SAFESTART_KEY;
 
@@ -304,13 +255,11 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.enc_offset = ENCODER_E_OFFSET;
 #endif
 
-    MESCinput_Init(_motor);
-
     //_motor->mtimer.Instance->BDTR |=TIM_BDTR_MOE;
     // initialising the comparators triggers the break state,
     // so turn it back on
     // At this point we just let the whole thing run off into interrupt land, and
-    // the fastLoop() starts to be triggered by the ADC conversion complete
+    // the MESCfoc_fastLoop() starts to be triggered by the ADC conversion complete
     // interrupt
 
     _motor->conf_is_valid = true;
@@ -360,7 +309,7 @@ void initialiseInverter(MESC_motor_typedef* _motor) {
     }
 }
 
-void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor) { fastLoop(_motor); }
+void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor) { MESCfoc_fastLoop(_motor); }
 
 // The fastloop runs at PWM timer counter top, which is when the new ADC current
 // readings arrive.
@@ -368,7 +317,7 @@ void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor) { fastLoop(_motor); }
 // since the currents require approximately 1us = 144 clock cycles (f405) and 72
 // clock cycles (f303) to convert.
 int16_t diff;
-void fastLoop(MESC_motor_typedef* _motor) {
+void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     uint32_t cycles = CPU_CYCLES;
     // Call this directly from the TIM top IRQ
     _motor->hall.current_hall_state =
@@ -453,34 +402,34 @@ void fastLoop(MESC_motor_typedef* _motor) {
             break;
 
         case MOTOR_STATE_TRACKING:
-#ifdef HAS_PHASE_SENSORS
-            // Track using BEMF from phase sensors
-            MESCpwm_generateBreak(_motor);
-            getRawADCVph(_motor);
-            ADCPhaseConversion(_motor);
-            MESCTrack(_motor);
-            switch (_motor->MotorSensorMode) {
-                case MOTOR_SENSOR_MODE_HALL:
-                    hallAngleEstimator(_motor);
-                    angleObserver(_motor);
-                    break;
-                case MOTOR_SENSOR_MODE_SENSORLESS:
-                    MESCfluxobs_run(_motor);
-                    if (_motor->options.use_hall_start) {
-                        HallFluxMonitor(_motor);
-                    }
-                    break;
-                case MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER:
-                    _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
-                    break;
-                case MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER:
-                    getIncEncAngle(_motor);
-                    _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
-                    break;
-                default:
-                    break;
+            if (_motor->options.use_phase_sensors) {
+                // Track using BEMF from phase sensors
+                MESCpwm_generateBreak(_motor);
+                getRawADCVph(_motor);
+                ADCPhaseConversion(_motor);
+                MESCTrack(_motor);
+                switch (_motor->MotorSensorMode) {
+                    case MOTOR_SENSOR_MODE_HALL:
+                        hallAngleEstimator(_motor);
+                        angleObserver(_motor);
+                        break;
+                    case MOTOR_SENSOR_MODE_SENSORLESS:
+                        MESCfluxobs_run(_motor);
+                        if (_motor->options.use_hall_start) {
+                            HallFluxMonitor(_motor);
+                        }
+                        break;
+                    case MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER:
+                        _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
+                        break;
+                    case MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER:
+                        getIncEncAngle(_motor);
+                        _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
+                        break;
+                    default:
+                        break;
+                }
             }
-#endif
 
             break;
 
@@ -577,10 +526,10 @@ void fastLoop(MESC_motor_typedef* _motor) {
             break;
 
         case MOTOR_STATE_RECOVERING:
-#ifdef USE_DEADSHORT
-            deadshort(
-                _motor);  // Function to startup motor from running without phase sensors
-#endif
+            if (_motor->options.use_deadshort) {
+                deadshort(_motor);  // Function to startup motor from running without
+                                    // phase sensors
+            }
             break;
 
         case MOTOR_STATE_SLAMBRAKE:
@@ -1221,7 +1170,6 @@ void calculateFlux(MESC_motor_typedef* _motor) {
     _motor->m.flux_linkage_max = 1.7f * _motor->m.flux_linkage;
     _motor->m.flux_linkage_min = 0.5f * _motor->m.flux_linkage;
     _motor->m.flux_linkage_gain = 10.0f * sqrtf(_motor->m.flux_linkage);
-    _motor->m.non_linear_centering_gain = NON_LINEAR_CENTERING_GAIN;
 }
 
 void calculateGains(MESC_motor_typedef* _motor) {
@@ -1284,9 +1232,11 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
         0.9f;  // Logic in this is to always ensure headroom for the P term
     _motor->FOC.Vqint_max = _motor->FOC.Vq_max * 0.9f;
 
-    _motor->FOC.FW_threshold = _motor->FOC.Vmag_max * FIELD_WEAKENING_THRESHOLD;
+    _motor->FOC.FW_threshold =
+        _motor->FOC.Vmag_max * _motor->options.field_weakening_threshold;
     _motor->FOC.FW_multiplier =
-        1.0f / (_motor->FOC.Vmag_max * (1.0f - FIELD_WEAKENING_THRESHOLD));
+        1.0f /
+        (_motor->FOC.Vmag_max * (1.0f - _motor->options.field_weakening_threshold));
 
     // When running HFI we want the bandwidth low, so we calculate it
     // with each slow loop depending on whether we are HFIing or not
@@ -1323,23 +1273,25 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
     // This is important since using the board ABS_MAX may mean the motor DC resistance is
     // high enough that a fault never trips it.
     g_hw_setup.Imax = _motor->input_vars.max_request_Idq.q * 1.5f;
-    if ((g_hw_setup.Imax * 0.5f) < (0.1f * ABS_MAX_PHASE_CURRENT)) {
-        g_hw_setup.Imax =
-            _motor->input_vars.max_request_Idq.q + 0.1f * ABS_MAX_PHASE_CURRENT;
+    if ((g_hw_setup.Imax * 0.5f) < (0.1f * _motor->limits.abs_max_phase_current)) {
+        g_hw_setup.Imax = _motor->input_vars.max_request_Idq.q +
+                          0.1f * _motor->limits.abs_max_phase_current;
     }
     if (g_hw_setup.Imax >
-        ABS_MAX_PHASE_CURRENT) {  // Clamp the current limit to the board max
-        g_hw_setup.Imax = ABS_MAX_PHASE_CURRENT;
+        _motor->limits
+            .abs_max_phase_current) {  // Clamp the current limit to the board max
+        g_hw_setup.Imax = _motor->limits.abs_max_phase_current;
     }
     // Set the over voltage limit dynamically, so that rapid spikes above the bus voltage
     // are trapped. This should be more convenient for working with PSUs and batteries
     // interchangeably
     if (fabsf(_motor->FOC.Idq_req.q) < 1.0f) {
-        g_hw_setup.Vmax = 0.995f * g_hw_setup.Vmax +
-                          0.005f * (_motor->Conv.Vbus + 0.15f * ABS_MAX_BUS_VOLTAGE);
+        g_hw_setup.Vmax =
+            0.995f * g_hw_setup.Vmax +
+            0.005f * (_motor->Conv.Vbus + 0.15f * _motor->limits.abs_max_bus_voltage);
     }
-    if (g_hw_setup.Vmax > ABS_MAX_BUS_VOLTAGE) {
-        g_hw_setup.Vmax = ABS_MAX_BUS_VOLTAGE;
+    if (g_hw_setup.Vmax > _motor->limits.abs_max_bus_voltage) {
+        g_hw_setup.Vmax = _motor->limits.abs_max_bus_voltage;
     }
 }
 
@@ -1347,7 +1299,7 @@ void MESC_Slow_IRQ_handler(MESC_motor_typedef* _motor) {
     // #ifdef SLOWLED
     //	  SLOWLED->BSRR = SLOWLEDIO;
     // #endif
-    slowLoop(_motor);
+    MESCfoc_slowLoop(_motor);
     // #ifdef SLOWLED
     //		SLOWLED->BSRR = SLOWLEDIO<<16U;
     // #endif
@@ -1356,7 +1308,8 @@ extern uint32_t ADC_buffer[6];
 
 float Square(float x) { return ((x) * (x)); }
 
-void slowLoop(MESC_motor_typedef* _motor) {
+// FIXME: revisit
+void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
     // In this loop, we will fetch the throttle values, and run functions that
     // are critical, but do not need to be executed very often e.g. adjustment
     // for battery voltage change
@@ -1364,7 +1317,7 @@ void slowLoop(MESC_motor_typedef* _motor) {
 
     houseKeeping(_motor);  // General dross that keeps things ticking over, like nudging
                            // the observer
-    MESCinput_Collect(_motor);  // Get all the throttle inputs
+    // MESCinput_Collect(_motor);  // Get all the throttle inputs
     switch (_motor->options.MESC_APP_type) {
         case MESC_APP_NONE:
             _motor->key_bits &= ~MESC_APP_KEY;
@@ -1478,21 +1431,24 @@ void slowLoop(MESC_motor_typedef* _motor) {
             // Seperate based on control mode. We NEED to have a fallthrough here in
             // transition state! Does not seem possible to use nested switches due to
             // fallthrough requirement :(
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
             if (_motor->ControlMode == MOTOR_CONTROL_MODE_TORQUE) {
-                if (MESCinput_isHandbrake()) {
-                    _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
-                }
+#pragma GCC diagnostic pop
+                // if (MESCinput_isHandbrake()) {
+                //     _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
+                // }
                 if (fabsf(_motor->FOC.Idq_prereq.q) > 0.2f) {
-#ifdef HAS_PHASE_SENSORS
-                    if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_FOC) {
-                        _motor->MotorState = MOTOR_STATE_RUN;
-                    } else if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_BLDC) {
-                        _motor->MotorState = MOTOR_STATE_RUN_BLDC;
+                    if (_motor->options.use_phase_sensors) {
+                        if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_FOC) {
+                            _motor->MotorState = MOTOR_STATE_RUN;
+                        } else if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_BLDC) {
+                            _motor->MotorState = MOTOR_STATE_RUN_BLDC;
+                        }
+                    } else {
+                        _motor->MotorState = MOTOR_STATE_RECOVERING;
+                        break;
                     }
-#else
-                    _motor->MotorState = MOTOR_STATE_RECOVERING;
-                    break;
-#endif
                     // fallthrough to RUN, no break!
                 } else {
                     // Remain in tracking
@@ -1556,9 +1512,9 @@ void slowLoop(MESC_motor_typedef* _motor) {
                             FWRampDown(_motor);
                         }
                     }
-                    if (MESCinput_isHandbrake()) {
-                        _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
-                    }
+                    // if (MESCinput_isHandbrake()) {
+                    //     _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
+                    // }
                     break;
 
                 case MOTOR_CONTROL_MODE_SPEED:
@@ -1663,7 +1619,6 @@ float IacalcDS, IbcalcDS, VacalcDS, VbcalcDS, VdcalcDS, VqcalcDS, FLaDS, FLbDS, 
 uint16_t angleDS, angleErrorDSENC, angleErrorPhaseSENC, angleErrorPhaseDS,
     countdown_cycles;
 
-#ifdef USE_DEADSHORT
 void deadshort(MESC_motor_typedef* _motor) {
     // LICENCE NOTE:
     // This function deviates slightly from the BSD 3 clause licence.
@@ -1687,10 +1642,11 @@ void deadshort(MESC_motor_typedef* _motor) {
 
     static uint16_t countdown = 10;
 
-    if (countdown == 1 || (((_motor->FOC.Iab.a * _motor->FOC.Iab.a +
-                             _motor->FOC.Iab.b * _motor->FOC.Iab.b) >
-                            DEADSHORT_CURRENT * DEADSHORT_CURRENT) &&
-                           countdown < 9)) {
+    if (countdown == 1 ||
+        (((_motor->FOC.Iab.a * _motor->FOC.Iab.a +
+           _motor->FOC.Iab.b * _motor->FOC.Iab.b) >
+          _motor->options.deadshort_current * _motor->options.deadshort_current) &&
+         countdown < 9)) {
         // Need to collect the ADC currents here
         MESCpwm_generateBreak(_motor);
         // Calculate the voltages in the alpha beta phase...
@@ -1756,7 +1712,6 @@ void deadshort(MESC_motor_typedef* _motor) {
     }
     countdown--;
 }
-#endif
 
 uint8_t pkt_crc8(uint8_t crc /*CRC_SEED=0xFF*/, uint8_t* data, uint8_t length) {
     int16_t i, bit;

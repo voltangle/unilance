@@ -1,5 +1,6 @@
 version: '3'
 
+# TODO: Rewrite all of this with either a custom build tool or with a Justfile.
 tasks:
   clean:
     cmds:
@@ -9,7 +10,6 @@ tasks:
     cmds:
       - cargo fmt
       - find mesc/c_src/MESC_Common/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
-      - find mesc/c_src/hardware_conf/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
 
   all_targets:list: task --list-all | grep --color=never build
   all_targets:build:
@@ -22,7 +22,6 @@ tasks:
       CARGO_METHOD: '{{.CARGO_METHOD}}'
     cmds:
       - |
-        TARGET_PORT=stm32 TARGET_NAME=begode_etmax \
         cargo {{.CARGO_METHOD}} -p port-stm32 \
           --no-default-features --features board_begode_etmax \
           --target thumbv7em-none-eabihf {{.CLI_ARGS}}
@@ -54,8 +53,8 @@ tasks:
           CARGO_METHOD: bloat
   control:doc:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo doc -p core-control {{.CLI_ARGS}}
+      - cargo doc -p core-control {{.CLI_ARGS}}
 
   supervisor:doc:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo doc -p core-supervisor {{.CLI_ARGS}}
+      - cargo doc -p core-supervisor {{.CLI_ARGS}}

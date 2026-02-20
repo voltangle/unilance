@@ -4,7 +4,7 @@ use core::mem::MaybeUninit;
 use core_control::State;
 use core_control::balance::BalanceState;
 use embassy_executor::Spawner;
-use mesc::MESC_motor_typedef;
+use mesc::{hw_setup_s, Motor};
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -19,45 +19,42 @@ static mut CONTROL_STATE: MaybeUninit<State> = MaybeUninit::uninit();
 type PlatformCoreLink<'a> = MemChannelCoreLink<'a>;
 static CONTROL_CORELINK: StaticCell<PlatformCoreLink> = StaticCell::new();
 
+/// Returns a mutable reference to the static State instance.
 #[allow(static_mut_refs, unused)]
-fn state() -> &'static mut State {
+pub fn get_state() -> &'static mut State {
     unsafe { (&mut *CONTROL_STATE.as_mut_ptr()) }
 }
 
 #[allow(static_mut_refs)]
 pub fn init() {
-    // FIXME: redo as new() call
     unsafe {
-        CONTROL_STATE.write(State::new());
+        CONTROL_STATE.write(State::new(Motor::new()));
     }
-    // TODO: Try to figure out how to do the hardware config in Rust instead of a C header
-
-    // TODO: This has to be refactored so it uses motor config in BSP
-    let motor = MESC_motor_typedef {
-        id: 0,
-        ..Default::default()
-    };
-
-    crate::set_motor(motor);
 }
 
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
 pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     let corelink = CONTROL_CORELINK.init(link);
-    spawner
-        .spawn(main_task(state(), corelink).expect("failed to start control main task"));
+    spawner.spawn(
+        main_task(get_state(), corelink).expect("failed to start control main task"),
+    );
 }
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn balance_loop() {
-    // TODO: MESC doesn't expose this, make it work later
+    // FIXME: MESC doesn't expose this, make it work later
     // mesc::houseKeeping(mesc::get_motor());
 
-    let motor = crate::get_motor();
-    motor.FOC.Idq_req.q = state()
-        .balance
-        .iterate(core_control::imu::IMUData::default());
+    get_state().motor.request_q(
+        get_state()
+            .balance
+            .update(core_control::ahrs::SpacialState::default()),
+    );
+}
+
+pub fn motor_loop() {
+    core_control::pwm_isr(get_state());
 }
 
 #[embassy_executor::task]
@@ -67,3 +64,21 @@ async fn main_task(
 ) {
     core_control::main_task(state, link).await;
 }
+
+// NOTE: ideally this default init should be in the mesc crate
+#[unsafe(export_name = "g_hw_setup")]
+pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
+    Imax: 0.0,
+    Vmax: 0.0,
+    Vmin: 0.0,
+    Rshunt: 0.0,
+    RVBT: 0.0,
+    RVBB: 0.0,
+    VBGain: 0.0,
+    RIphPU: 0.0,
+    RIphSR: 0.0,
+    OpGain: 0.0,
+    Igain: 0.0,
+    RawCurrLim: 0,
+    RawVoltLim: 0,
+};
