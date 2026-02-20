@@ -106,9 +106,6 @@
 #define DEFAULT_BATTERY_CURRENT 10.0f
 #endif
 
-#ifndef DEADSHORT_CURRENT
-#define DEADSHORT_CURRENT 30.0f
-#endif
 // HFI related
 #ifndef HFI_VOLTAGE
 #define HFI_VOLTAGE 2.0f
@@ -730,6 +727,9 @@ typedef struct {
     bool use_salient_observer;
     bool has_motor_temp_sensor;
     bool interpolate_v7_angle;
+    bool use_deadshort;
+    float deadshort_current;
+    float lr_observer_current;
     uint8_t mtpa_mode;
     uint8_t field_weakening;
     float field_weakening_threshold;

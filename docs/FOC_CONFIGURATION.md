@@ -54,7 +54,7 @@ Current which throws an overcurrent error (`ERROR_OVERCURRENT_PH(A|B|C)`).
 
 Input voltage that throws an overvoltage error (`ERROR_OVERVOLTAGE`).
 
-## LR observer current (not yet made)
+## LR observer current (`motor->options.lr_observer_current`)
 
 Inject this much current into the d-axis at the slowloop frequency and observe the change
 in Vd and Vq Needs to be a small current that does not have much effect on the running
@@ -74,3 +74,24 @@ Vd favouring option (unlikely). Use LIM_VD with field weakening.
 > Values: `MESC_MTPA_NONE`, `MESC_MTPA_REQ`, `MESC_MTPA_MAG`, `MESC_MTPA_Q`
 
 Maximum Torque Per Amp (MTPA). Check out `MESCfoc.c` for more details on how this works.
+
+## Observer centering (`motor->options.observer_centering`)
+
+> Values: `MESC_ObserverCentering_NonLinear`, `MESC_ObserverCentering_Clamped`
+
+TODO: document
+
+## Deadshort (`motor->options.use_deadshort`, `motor->options.deadshort_current`)
+
+> Types: bool, f32
+
+When recovering from tracking phase without phase sensors, the deadshort function will
+short the phases until the current exceeds this value. At this point, it calculates the
+Vd Vq and phase angle Don't set too high, after 9PWM periods, it will run the calc and
+start the motor regardless. This seems to work best with a higher current bandwidth
+(~10krads-1) and using the non-linear observer centering. Broadly incompatible with the
+flux observer
+
+Only works for forward direction presently
+
+WIP, not completely stable yet

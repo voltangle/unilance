@@ -570,10 +570,10 @@ void fastLoop(MESC_motor_typedef* _motor) {
             break;
 
         case MOTOR_STATE_RECOVERING:
-#ifdef USE_DEADSHORT
+            if (_motor->options.use_deadshort) {
             deadshort(
                 _motor);  // Function to startup motor from running without phase sensors
-#endif
+            }
             break;
 
         case MOTOR_STATE_SLAMBRAKE:
@@ -1659,7 +1659,6 @@ float IacalcDS, IbcalcDS, VacalcDS, VbcalcDS, VdcalcDS, VqcalcDS, FLaDS, FLbDS, 
 uint16_t angleDS, angleErrorDSENC, angleErrorPhaseSENC, angleErrorPhaseDS,
     countdown_cycles;
 
-#ifdef USE_DEADSHORT
 void deadshort(MESC_motor_typedef* _motor) {
     // LICENCE NOTE:
     // This function deviates slightly from the BSD 3 clause licence.
@@ -1685,7 +1684,7 @@ void deadshort(MESC_motor_typedef* _motor) {
 
     if (countdown == 1 || (((_motor->FOC.Iab.a * _motor->FOC.Iab.a +
                              _motor->FOC.Iab.b * _motor->FOC.Iab.b) >
-                            DEADSHORT_CURRENT * DEADSHORT_CURRENT) &&
+                            _motor->options.deadshort_current * _motor->options.deadshort_current) &&
                            countdown < 9)) {
         // Need to collect the ADC currents here
         MESCpwm_generateBreak(_motor);
@@ -1752,7 +1751,6 @@ void deadshort(MESC_motor_typedef* _motor) {
     }
     countdown--;
 }
-#endif
 
 uint8_t pkt_crc8(uint8_t crc /*CRC_SEED=0xFF*/, uint8_t* data, uint8_t length) {
     int16_t i, bit;

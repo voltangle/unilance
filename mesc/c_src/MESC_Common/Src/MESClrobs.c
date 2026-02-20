@@ -21,12 +21,12 @@ void MESClrobs_Run(MESC_motor_typedef* _motor) {
         (_motor->HFI.inject == 0)) {
         _motor->lrobs.R_observer =
             (_motor->lrobs.Vd_obs_high_filt - _motor->lrobs.Vd_obs_low_filt) /
-            (2.0f * LR_OBS_CURRENT);
+            (2.0f * _motor->options.lr_observer_current);
         _motor->lrobs.L_observer =
             (_motor->lrobs.Vq_obs_high_filt - _motor->lrobs.Vq_obs_low_filt -
              6.28f * (_motor->FOC.eHz - _motor->lrobs.Last_eHz) *
                  _motor->FOC.flux_observed) /
-            (2.0f * LR_OBS_CURRENT * 6.28f * _motor->FOC.eHz);
+            (2.0f * _motor->options.lr_observer_current * 6.28f * _motor->FOC.eHz);
 
         if (_motor->lrobs.plusminus == 1) {
             _motor->lrobs.plusminus = -1;
@@ -34,7 +34,7 @@ void MESClrobs_Run(MESC_motor_typedef* _motor) {
                 _motor->lrobs.Vd_obs_low / _motor->lrobs.LR_collect_count;
             _motor->lrobs.Vq_obs_low_filt =
                 _motor->lrobs.Vq_obs_low / _motor->lrobs.LR_collect_count;
-            _motor->FOC.Idq_req.d = _motor->FOC.Idq_req.d + 1.0f * LR_OBS_CURRENT;
+            _motor->FOC.Idq_req.d = _motor->FOC.Idq_req.d + 1.0f * _motor->options.lr_observer_current;
             _motor->lrobs.Vd_obs_low = 0;
             _motor->lrobs.Vq_obs_low = 0;
         } else if (_motor->lrobs.plusminus == -1) {
@@ -43,7 +43,7 @@ void MESClrobs_Run(MESC_motor_typedef* _motor) {
                 _motor->lrobs.Vd_obs_high / _motor->lrobs.LR_collect_count;
             _motor->lrobs.Vq_obs_high_filt =
                 _motor->lrobs.Vq_obs_high / _motor->lrobs.LR_collect_count;
-            _motor->FOC.Idq_req.d = _motor->FOC.Idq_req.d - 1.0f * LR_OBS_CURRENT;
+            _motor->FOC.Idq_req.d = _motor->FOC.Idq_req.d - 1.0f * _motor->options.lr_observer_current;
             _motor->lrobs.Vd_obs_high = 0;
             _motor->lrobs.Vq_obs_high = 0;
         }

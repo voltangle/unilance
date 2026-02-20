@@ -58,7 +58,6 @@ fn main() {
         .file("c_src/MESC_Common/Src/MESChfi.c")
         .file("c_src/MESC_Common/Src/MESClrobs.c")
         .file("c_src/MESC_Common/Src/MESCmeasure.c")
-        .file("c_src/MESC_Common/Src/MESCmotor.c")
         .file("c_src/MESC_Common/Src/MESCmotor_state.c")
         .file("c_src/MESC_Common/Src/MESCposition.c")
         .file("c_src/MESC_Common/Src/MESCpwm.c")
