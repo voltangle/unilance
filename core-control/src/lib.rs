@@ -43,11 +43,11 @@ pub struct State {
 }
 
 impl State {
-    pub fn new() -> Self {
+    pub fn new(motor: mesc::Motor) -> Self {
         Self {
             state: SystemState::Booting,
             balance: BalanceState::new(),
-            motor: Motor::new(),
+            motor,
         }
     }
 }

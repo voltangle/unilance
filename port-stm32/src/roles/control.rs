@@ -4,7 +4,7 @@ use core::mem::MaybeUninit;
 use core_control::State;
 use core_control::balance::BalanceState;
 use embassy_executor::Spawner;
-use mesc::hw_setup_s;
+use mesc::{hw_setup_s, Motor};
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -28,7 +28,7 @@ pub fn get_state() -> &'static mut State {
 #[allow(static_mut_refs)]
 pub fn init() {
     unsafe {
-        CONTROL_STATE.write(State::new());
+        CONTROL_STATE.write(State::new(Motor::new()));
     }
 }
 
