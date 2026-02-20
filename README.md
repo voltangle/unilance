@@ -12,7 +12,7 @@ and motor control stuff. All credit for that goes to the creator, David Molony.
 
 ## Building
 
-To check out all available targets, run `task all_targets`. To build for a target, run
+To check out all available targets, run `task all_targets:list`. To build for a target, run
 `task <target-name>:build`, for example `task begode_etmax:build`.
 
 The naming convention for target names is `<manufacturer>_<model>`. If there is no

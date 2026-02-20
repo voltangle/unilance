@@ -11,7 +11,10 @@ tasks:
       - find mesc/c_src/MESC_Common/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
       - find mesc/c_src/hardware_conf/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i
 
-  all_targets: task --list-all | grep --color=never build
+  all_targets:list: task --list-all | grep --color=never build
+  all_targets:build:
+    cmds:
+      - task: begode_etmax:build
 
   begode_etmax:
     internal: true
