@@ -6,7 +6,6 @@ use embassy_sync::mutex::Mutex;
 use embassy_time::{Duration, Ticker, Timer};
 use littlefs2::driver::Storage;
 use littlefs2::fs::Filesystem;
-use littlefs2::path;
 use proto::corelink::{CoreLink, Message};
 
 use crate::info::FW_VERSION;
@@ -47,7 +46,7 @@ pub async fn corelink_heartbeat<T: RawMutex>(
 
 pub async fn main_task(
     state: &'static Mutex<impl RawMutex, State>,
-    fs: &'static Mutex<impl RawMutex, Filesystem<'static, impl Storage>>,
+    _fs: &'static Mutex<impl RawMutex, Filesystem<'static, impl Storage>>,
     link: &'static impl CoreLink,
 ) {
     let mut ticker = Ticker::every(Duration::from_hz(100));

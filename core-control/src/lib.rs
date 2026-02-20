@@ -1,17 +1,10 @@
 #![no_std]
 
 use embassy_time::{Duration, Ticker};
-use heapless::{Vec, VecView};
-use mesc::Motor;
-use proto::corelink::control::ControlValueKey;
-use proto::corelink::{
-    CoreLink, FileTransmissionDeniedReason, FileTransmissionNackReason, Message,
-    ValueNackReason,
-};
+use proto::corelink::CoreLink;
 
-use crate::balance::{BalanceConfig, BalanceState};
+use crate::balance::BalanceState;
 use crate::corelink::handle_corelink;
-use crate::info::FW_VERSION;
 
 pub mod ahrs;
 pub mod balance;

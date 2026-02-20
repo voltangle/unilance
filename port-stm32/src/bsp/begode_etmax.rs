@@ -2,7 +2,6 @@ use super::PlatformConfig;
 use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::roles::control;
 use core::mem::MaybeUninit;
-use core_control::balance::{BalanceConfig, RideAssistConfig};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -21,7 +20,6 @@ use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwm
 use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
-use proto::corelink::control::ControlValueKey;
 
 /*
  * BSP for the Begode ET Max electric unicycle motherboard.
@@ -85,6 +83,7 @@ static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
 // just enough space for smooth operation
 static mut WS281X_BUF: [u16; 500] = [0; 500];
 
+#[allow(unused)]
 pub struct BspPeripherals<'a> {
     poweron: gpio::Output<'a>,
     power_button: gpio::Input<'a>,

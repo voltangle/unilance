@@ -7,9 +7,9 @@ pub(crate) async fn handle_corelink(state: &mut State, link: &mut impl CoreLink)
     match link.core_recv().await {
         Message::Hello {
             firmware_version,
-            serial_number,
-            system_time,
-            stored_total_mileage,
+            serial_number: _,
+            system_time: _,
+            stored_total_mileage: _,
         } => {
             if firmware_version != info::FW_VERSION {
                 // TODO: Make it do an error response or something
@@ -32,7 +32,7 @@ pub(crate) async fn handle_corelink(state: &mut State, link: &mut impl CoreLink)
                     link.core_send(Message::WriteValueAck { key: key.into() })
                         .await
                 }
-                Err(err) => {
+                Err(_) => {
                     link.core_send(Message::WriteValueNack {
                         key: key.into(),
                         reason: ValueNackReason::BadPayload,

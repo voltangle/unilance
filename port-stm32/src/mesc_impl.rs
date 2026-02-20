@@ -6,13 +6,13 @@ use mesc::{MESC_motor_typedef, Motor};
 
 // Intentionally blank, only there to satisfy the linker (MESCfoc_Init is not even called)
 #[unsafe(no_mangle)]
-pub extern "C" fn mesc_init_1(motor: &mut MESC_motor_typedef) {}
+pub extern "C" fn mesc_init_1(_motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-pub extern "C" fn mesc_init_2(motor: &mut MESC_motor_typedef) {}
+pub extern "C" fn mesc_init_2(_motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-pub extern "C" fn mesc_init_3(motor: &mut MESC_motor_typedef) {}
+pub extern "C" fn mesc_init_3(_motor: &mut MESC_motor_typedef) {}
 #[unsafe(no_mangle)]
-pub extern "C" fn hw_init(motor: &mut MESC_motor_typedef) {}
+pub extern "C" fn hw_init(_motor: &mut MESC_motor_typedef) {}
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]

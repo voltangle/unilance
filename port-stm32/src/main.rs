@@ -11,7 +11,6 @@ mod roles;
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use core::mem::MaybeUninit;
 use core::sync::atomic::Ordering;
 use embassy_executor::Spawner;
 use embassy_stm32::Config;

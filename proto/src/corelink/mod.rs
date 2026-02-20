@@ -201,6 +201,7 @@ pub enum ValueNackReason {
 }
 
 impl Message {
+    #[allow(unused)]
     fn discriminant(&self) -> u16 {
         // SAFETY: Because `Self` is marked `repr(u16)`, its layout is a `repr(C)` `union`
         // between `repr(C)` structs, each of which has the `u16` discriminant as its first
