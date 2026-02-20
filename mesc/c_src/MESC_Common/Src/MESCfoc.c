@@ -52,7 +52,6 @@
 #include "MESCinput.h"
 #include "MESClrobs.h"
 #include "MESCmeasure.h"
-#include "MESCmotor.h"
 #include "MESCmotor_state.h"
 #include "MESCposition.h"
 #include "MESCpwm.h"
@@ -571,8 +570,8 @@ void fastLoop(MESC_motor_typedef* _motor) {
 
         case MOTOR_STATE_RECOVERING:
             if (_motor->options.use_deadshort) {
-            deadshort(
-                _motor);  // Function to startup motor from running without phase sensors
+                deadshort(_motor);  // Function to startup motor from running without
+                                    // phase sensors
             }
             break;
 
@@ -1682,10 +1681,11 @@ void deadshort(MESC_motor_typedef* _motor) {
 
     static uint16_t countdown = 10;
 
-    if (countdown == 1 || (((_motor->FOC.Iab.a * _motor->FOC.Iab.a +
-                             _motor->FOC.Iab.b * _motor->FOC.Iab.b) >
-                            _motor->options.deadshort_current * _motor->options.deadshort_current) &&
-                           countdown < 9)) {
+    if (countdown == 1 ||
+        (((_motor->FOC.Iab.a * _motor->FOC.Iab.a +
+           _motor->FOC.Iab.b * _motor->FOC.Iab.b) >
+          _motor->options.deadshort_current * _motor->options.deadshort_current) &&
+         countdown < 9)) {
         // Need to collect the ADC currents here
         MESCpwm_generateBreak(_motor);
         // Calculate the voltages in the alpha beta phase...

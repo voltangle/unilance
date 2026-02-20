@@ -6,7 +6,8 @@ pub use bindings::{MESC_motor_typedef, hw_setup_s};
 
 use crate::bindings::{
     MESC_PWM_IRQ_handler, MESClrobs_Init, fastLoop,
-    motor_state_e_MOTOR_STATE_INITIALIZING,
+    motor_state_e_MOTOR_STATE_INITIALISING,
+    motor_control_type_e_MOTOR_CONTROL_TYPE_FOC
 };
 use core::ffi::c_void;
 use core::ptr;
@@ -32,7 +33,7 @@ impl Motor {
             },
         };
         m.motor.rs_motor = ptr::from_mut(&mut m) as *mut c_void;
-        m.motor.MotorState = motor_state_e_MOTOR_STATE_INITIALIZING;
+        m.motor.MotorState = motor_state_e_MOTOR_STATE_INITIALISING;
         m.motor.MotorControlType = motor_control_type_e_MOTOR_CONTROL_TYPE_FOC;
         // TODO: make the check automatic
         // So, my idea is to have a list of parameters that have to be explicitly set,

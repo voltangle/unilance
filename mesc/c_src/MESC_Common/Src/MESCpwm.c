@@ -35,6 +35,8 @@
 
 #include "MESCpwm.h"
 
+#include <math.h>
+
 #include "MESChfi.h"
 #include "MESCsin_lut.h"
 

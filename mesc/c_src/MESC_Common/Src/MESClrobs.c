@@ -34,7 +34,8 @@ void MESClrobs_Run(MESC_motor_typedef* _motor) {
                 _motor->lrobs.Vd_obs_low / _motor->lrobs.LR_collect_count;
             _motor->lrobs.Vq_obs_low_filt =
                 _motor->lrobs.Vq_obs_low / _motor->lrobs.LR_collect_count;
-            _motor->FOC.Idq_req.d = _motor->FOC.Idq_req.d + 1.0f * _motor->options.lr_observer_current;
+            _motor->FOC.Idq_req.d =
+                _motor->FOC.Idq_req.d + 1.0f * _motor->options.lr_observer_current;
             _motor->lrobs.Vd_obs_low = 0;
             _motor->lrobs.Vq_obs_low = 0;
         } else if (_motor->lrobs.plusminus == -1) {
@@ -43,7 +44,8 @@ void MESClrobs_Run(MESC_motor_typedef* _motor) {
                 _motor->lrobs.Vd_obs_high / _motor->lrobs.LR_collect_count;
             _motor->lrobs.Vq_obs_high_filt =
                 _motor->lrobs.Vq_obs_high / _motor->lrobs.LR_collect_count;
-            _motor->FOC.Idq_req.d = _motor->FOC.Idq_req.d - 1.0f * _motor->options.lr_observer_current;
+            _motor->FOC.Idq_req.d =
+                _motor->FOC.Idq_req.d - 1.0f * _motor->options.lr_observer_current;
             _motor->lrobs.Vd_obs_high = 0;
             _motor->lrobs.Vq_obs_high = 0;
         }

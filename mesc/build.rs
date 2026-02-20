@@ -48,7 +48,6 @@ fn main() {
 
     build
         .include("c_src/")
-        .include("c_src/hardware_conf")
         .define("LOGLENGTH", Some("10"))
         // MESC sources
         .include("c_src/MESC_Common/Inc")
@@ -75,7 +74,6 @@ fn main() {
     let bindings = bindgen
         .clang_arg("-I./c_src/")
         .clang_arg("-I./c_src/MESC_Common/Inc")
-        .clang_arg("-I./c_src/hardware_conf")
         .header("c_src/mesc_wrap.h")
         .use_core()
         .derive_default(true)
