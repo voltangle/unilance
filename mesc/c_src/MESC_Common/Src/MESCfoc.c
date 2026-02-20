@@ -427,7 +427,7 @@ void fastLoop(MESC_motor_typedef* _motor) {
                     break;
                 case MOTOR_SENSOR_MODE_HALL:
                     _motor->HFI.inject = 0;
-                    hallAngleEstimator();
+                    hallAngleEstimator(_motor);
                     angleObserver(_motor);
                     MESCFOC(_motor);
                     break;

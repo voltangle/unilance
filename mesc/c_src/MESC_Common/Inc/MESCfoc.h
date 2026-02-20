@@ -817,10 +817,11 @@ void ADCConversion(MESC_motor_typedef* _motor);  // Roll this into the V_I_Check
 // into float volts Since the observer needs the Clark transformed current, do
 // the Clark and Park transform now
 void ADCPhaseConversion(MESC_motor_typedef* _motor);
-void hallAngleEstimator();  // Going to attempt to make a similar hall angle
-                            // estimator that rolls the hall state into the main
-                            // function, and calls a vector table to find the
-                            // angle from hall offsets.
+void hallAngleEstimator(
+    MESC_motor_typedef* motor);  // Going to attempt to make a similar hall angle
+                                 // estimator that rolls the hall state into the main
+                                 // function, and calls a vector table to find the
+                                 // angle from hall offsets.
 float fast_atan2(float y, float x);
 void angleObserver(MESC_motor_typedef* _motor);
 void OLGenerateAngle(
