@@ -14,10 +14,13 @@ fn main() {
             .arg("-c")
             .arg("arm-none-eabi-gcc -Wp,-v -E - < /dev/null 2>&1 | sed -n 's/^ //p'")
             .output()
-            .expect("failed to run bash command");
+            .expect("failed to run arm-none-eabi-gcc");
 
         if !output.status.success() {
-            panic!("arm-none-eabi-gcc failed");
+            panic!(
+                "arm-none-eabi-gcc failed: {:?}",
+                String::from_utf8(output.stderr)
+            );
         }
 
         let stdout = String::from_utf8(output.stdout)
@@ -47,8 +50,8 @@ fn main() {
     }
 
     build
-        .include("c_src/")
         .define("LOGLENGTH", Some("10"))
+        .include("c_src/")
         // MESC sources
         .include("c_src/MESC_Common/Inc")
         .file("c_src/MESC_Common/Src/MESCerror.c")
