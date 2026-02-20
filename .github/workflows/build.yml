@@ -31,6 +31,8 @@ jobs:
         run: rustup default nightly && rustup target add thumbv7em-none-eabihf
 
       - name: Build
-        run: task all_targets:build
+        run: task all_targets:build -- --release
         # TODO: when there will be any tests, make sure that they are executed here
-
+        # TODO: make it also upload all built binaries
+        # For that I will most likely need a modification to the task runner commands so
+        # it automatically extracts any build artifacts and stores them
