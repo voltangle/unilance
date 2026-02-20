@@ -1,4 +1,3 @@
-use core::default;
 
 use crate::bindings::{
     motor_control_mode_e, motor_control_mode_e_MOTOR_CONTROL_MODE_DUTY,
@@ -6,7 +5,7 @@ use crate::bindings::{
     motor_control_mode_e_MOTOR_CONTROL_MODE_MEASURING,
     motor_control_mode_e_MOTOR_CONTROL_MODE_POSITION,
     motor_control_mode_e_MOTOR_CONTROL_MODE_SPEED,
-    motor_control_mode_e_MOTOR_CONTROL_MODE_TORQUE, motor_startup_sensor_e,
+    motor_control_mode_e_MOTOR_CONTROL_MODE_TORQUE,
     motor_state_e, motor_state_e_MOTOR_STATE_ALIGN, motor_state_e_MOTOR_STATE_DETECTING,
     motor_state_e_MOTOR_STATE_ERROR, motor_state_e_MOTOR_STATE_GET_KV,
     motor_state_e_MOTOR_STATE_IDLE, motor_state_e_MOTOR_STATE_INITIALISING,

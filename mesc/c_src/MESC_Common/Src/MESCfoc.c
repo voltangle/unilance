@@ -49,7 +49,6 @@
 #include "MESCfluxobs.h"
 #include "MESChfi.h"
 #include "MESChw_setup.h"
-#include "MESCinput.h"
 #include "MESClrobs.h"
 #include "MESCmeasure.h"
 #include "MESCmotor_state.h"
@@ -1309,6 +1308,7 @@ extern uint32_t ADC_buffer[6];
 
 float Square(float x) { return ((x) * (x)); }
 
+// FIXME: revisit
 void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
     // In this loop, we will fetch the throttle values, and run functions that
     // are critical, but do not need to be executed very often e.g. adjustment
@@ -1317,7 +1317,7 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
 
     houseKeeping(_motor);  // General dross that keeps things ticking over, like nudging
                            // the observer
-    MESCinput_Collect(_motor);  // Get all the throttle inputs
+    // MESCinput_Collect(_motor);  // Get all the throttle inputs
     switch (_motor->options.MESC_APP_type) {
         case MESC_APP_NONE:
             _motor->key_bits &= ~MESC_APP_KEY;
@@ -1431,10 +1431,13 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
             // Seperate based on control mode. We NEED to have a fallthrough here in
             // transition state! Does not seem possible to use nested switches due to
             // fallthrough requirement :(
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
             if (_motor->ControlMode == MOTOR_CONTROL_MODE_TORQUE) {
-                if (MESCinput_isHandbrake()) {
-                    _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
-                }
+#pragma GCC diagnostic pop
+                // if (MESCinput_isHandbrake()) {
+                //     _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
+                // }
                 if (fabsf(_motor->FOC.Idq_prereq.q) > 0.2f) {
                     if (_motor->options.use_phase_sensors) {
                         if (_motor->MotorControlType == MOTOR_CONTROL_TYPE_FOC) {
@@ -1509,9 +1512,9 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
                             FWRampDown(_motor);
                         }
                     }
-                    if (MESCinput_isHandbrake()) {
-                        _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
-                    }
+                    // if (MESCinput_isHandbrake()) {
+                    //     _motor->ControlMode = MOTOR_CONTROL_MODE_HANDBRAKE;
+                    // }
                     break;
 
                 case MOTOR_CONTROL_MODE_SPEED:

@@ -7,9 +7,7 @@ pub use bindings::{MESC_motor_typedef, hw_setup_s};
 pub use types::*;
 
 use crate::bindings::{
-    MESC_PWM_IRQ_handler, MESCfoc_fastLoop, MESCfoc_slowLoop, MESClrobs_Init,
-    motor_control_mode_e, motor_control_type_e_MOTOR_CONTROL_TYPE_FOC,
-    motor_state_e_MOTOR_STATE_INITIALISING,
+    MESC_PWM_IRQ_handler, MESCfoc_fastLoop, MESCfoc_slowLoop,
     MESCfoc_Init
 };
 use core::ffi::c_void;
@@ -86,6 +84,8 @@ impl Motor {
         self.motor.FOC.Idq_req.q = i_q;
     }
 
+    // NOTE: this one I will most likely be scrapping, as Id should be controlled by the FOC loop
+    // itself, and not the balance loop/anything else
     pub fn request_d(&mut self, i_d: f32) {
         self.motor.FOC.Idq_req.d = i_d;
     }
