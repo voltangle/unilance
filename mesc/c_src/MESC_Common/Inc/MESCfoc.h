@@ -737,7 +737,7 @@ typedef struct {
     uint8_t observer_type;
     MESC_ObserverCentering_t observer_centering;
     uint8_t pwm_type;
-    // FIXME: remove together with slowLoop
+    // FIXME: remove when refactoring MESCfoc_slowLoop
     uint8_t MESC_APP_type;
 } MESC_OptionFlags_s;
 
@@ -810,7 +810,7 @@ void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor);
 // Alternatively, the PWM and ADC IRQ handlers can be
 // stacked in a single interrupt occurring once per period
 // but HFI will be lost
-void fastLoop(MESC_motor_typedef* _motor);
+void MESCfoc_fastLoop(MESC_motor_typedef* _motor);
 void VICheck(MESC_motor_typedef* _motor);
 void ADCConversion(MESC_motor_typedef* _motor);  // Roll this into the V_I_Check? less
                                                  // branching, can probably reduce no.ops
@@ -848,7 +848,7 @@ void MESC_Slow_IRQ_handler(
                   // RCPWM is not present will run at 20Hz If entered from update (reset,
                   // CC1) no data available for the PWM in. If entered from CC2, new PWM
                   // data available
-void slowLoop(MESC_motor_typedef* _motor);
+void MESCfoc_slowLoop(MESC_motor_typedef* _motor);
 void MESCTrack(MESC_motor_typedef* _motor);
 void deadshort(MESC_motor_typedef* _motor);
 void tle5012(MESC_motor_typedef* _motor);

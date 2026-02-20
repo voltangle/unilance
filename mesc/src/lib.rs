@@ -7,8 +7,7 @@ pub use bindings::{MESC_motor_typedef, hw_setup_s};
 pub use types::*;
 
 use crate::bindings::{
-    MESC_PWM_IRQ_handler, MESClrobs_Init, fastLoop, motor_control_mode_e,
-    motor_control_type_e_MOTOR_CONTROL_TYPE_FOC, motor_state_e_MOTOR_STATE_INITIALISING,
+    motor_control_mode_e, motor_control_type_e_MOTOR_CONTROL_TYPE_FOC, motor_state_e_MOTOR_STATE_INITIALISING, MESC_PWM_IRQ_handler, MESCfoc_fastLoop, MESCfoc_slowLoop, MESClrobs_Init
 };
 use core::ffi::c_void;
 use core::ptr;
@@ -34,7 +33,8 @@ impl Motor {
             },
         };
         m.motor.rs_motor = ptr::from_mut(&mut m) as *mut c_void;
-        m.motor.MotorState = motor_state_e_MOTOR_STATE_INITIALISING;
+        m.motor.MotorState = MotorState::Initializing.into();
+        // TODO: remove once BLDC control is removed
         m.motor.MotorControlType = motor_control_type_e_MOTOR_CONTROL_TYPE_FOC;
         // TODO: make the check automatic
         // So, my idea is to have a list of parameters that have to be explicitly set,
@@ -53,11 +53,25 @@ impl Motor {
         return m;
     }
 
+    // TODO: do proper documentation
+    /// Runs MESCfoc_fastLoop and MESC_PWM_IRQ_handler.
     pub fn foc_update(&mut self) {
         unsafe {
-            fastLoop(&mut self.motor);
+            MESCfoc_fastLoop(&mut self.motor);
             MESC_PWM_IRQ_handler(&mut self.motor);
         }
+    }
+
+    // TODO: do proper documentation
+    /// Runs MESCfoc_slowLoop.
+    pub fn foc_aux_update(&mut self) {
+        unsafe {
+            MESCfoc_slowLoop(&mut self.motor);
+        }
+    }
+
+    pub fn get_state(&self) -> MotorState {
+        MotorState::from(self.motor.MotorState)
     }
 
     pub fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16) {

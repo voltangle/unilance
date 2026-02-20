@@ -302,7 +302,7 @@ static void FWRampDown(MESC_motor_typedef* _motor);
 //     // initialising the comparators triggers the break state,
 //     // so turn it back on
 //     // At this point we just let the whole thing run off into interrupt land, and
-//     // the fastLoop() starts to be triggered by the ADC conversion complete
+//     // the MESCfoc_fastLoop() starts to be triggered by the ADC conversion complete
 //     // interrupt
 //
 //     _motor->conf_is_valid = true;
@@ -352,7 +352,7 @@ void initialiseInverter(MESC_motor_typedef* _motor) {
     }
 }
 
-void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor) { fastLoop(_motor); }
+void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor) { MESCfoc_fastLoop(_motor); }
 
 // The fastloop runs at PWM timer counter top, which is when the new ADC current
 // readings arrive.
@@ -360,7 +360,7 @@ void MESC_ADC_IRQ_handler(MESC_motor_typedef* _motor) { fastLoop(_motor); }
 // since the currents require approximately 1us = 144 clock cycles (f405) and 72
 // clock cycles (f303) to convert.
 int16_t diff;
-void fastLoop(MESC_motor_typedef* _motor) {
+void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     uint32_t cycles = CPU_CYCLES;
     // Call this directly from the TIM top IRQ
     _motor->hall.current_hall_state =
@@ -1342,7 +1342,7 @@ void MESC_Slow_IRQ_handler(MESC_motor_typedef* _motor) {
     // #ifdef SLOWLED
     //	  SLOWLED->BSRR = SLOWLEDIO;
     // #endif
-    slowLoop(_motor);
+    MESCfoc_slowLoop(_motor);
     // #ifdef SLOWLED
     //		SLOWLED->BSRR = SLOWLEDIO<<16U;
     // #endif
@@ -1351,7 +1351,7 @@ extern uint32_t ADC_buffer[6];
 
 float Square(float x) { return ((x) * (x)); }
 
-void slowLoop(MESC_motor_typedef* _motor) {
+void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
     // In this loop, we will fetch the throttle values, and run functions that
     // are critical, but do not need to be executed very often e.g. adjustment
     // for battery voltage change

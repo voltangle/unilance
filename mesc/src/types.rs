@@ -1,10 +1,19 @@
+use core::default;
+
 use crate::bindings::{
     motor_control_mode_e, motor_control_mode_e_MOTOR_CONTROL_MODE_DUTY,
     motor_control_mode_e_MOTOR_CONTROL_MODE_HANDBRAKE,
     motor_control_mode_e_MOTOR_CONTROL_MODE_MEASURING,
     motor_control_mode_e_MOTOR_CONTROL_MODE_POSITION,
     motor_control_mode_e_MOTOR_CONTROL_MODE_SPEED,
-    motor_control_mode_e_MOTOR_CONTROL_MODE_TORQUE,
+    motor_control_mode_e_MOTOR_CONTROL_MODE_TORQUE, motor_startup_sensor_e,
+    motor_state_e, motor_state_e_MOTOR_STATE_ALIGN, motor_state_e_MOTOR_STATE_DETECTING,
+    motor_state_e_MOTOR_STATE_ERROR, motor_state_e_MOTOR_STATE_GET_KV,
+    motor_state_e_MOTOR_STATE_IDLE, motor_state_e_MOTOR_STATE_INITIALISING,
+    motor_state_e_MOTOR_STATE_MEASURING, motor_state_e_MOTOR_STATE_OPEN_LOOP_STARTUP,
+    motor_state_e_MOTOR_STATE_OPEN_LOOP_TRANSITION, motor_state_e_MOTOR_STATE_RECOVERING,
+    motor_state_e_MOTOR_STATE_RUN, motor_state_e_MOTOR_STATE_SLAMBRAKE,
+    motor_state_e_MOTOR_STATE_TEST, motor_state_e_MOTOR_STATE_TRACKING,
 };
 
 pub enum ControlMode {
@@ -84,4 +93,55 @@ pub enum MotorState {
 
     /// All PWM should be off state, nothing happening. Motor may be spinning freely
     Idle,
+    Undefined,
+}
+
+impl Into<motor_state_e> for MotorState {
+    fn into(self) -> motor_state_e {
+        match self {
+            MotorState::Initializing => motor_state_e_MOTOR_STATE_INITIALISING,
+            MotorState::Detecting => motor_state_e_MOTOR_STATE_DETECTING,
+            MotorState::Align => motor_state_e_MOTOR_STATE_ALIGN,
+            MotorState::Measuring => motor_state_e_MOTOR_STATE_MEASURING,
+            MotorState::OpenLoopStartup => motor_state_e_MOTOR_STATE_OPEN_LOOP_STARTUP,
+            MotorState::OpenLoopTransition => {
+                motor_state_e_MOTOR_STATE_OPEN_LOOP_TRANSITION
+            }
+            MotorState::Tracking => motor_state_e_MOTOR_STATE_TRACKING,
+            MotorState::Run => motor_state_e_MOTOR_STATE_RUN,
+            MotorState::GetKV => motor_state_e_MOTOR_STATE_GET_KV,
+            MotorState::Test => motor_state_e_MOTOR_STATE_TEST,
+            MotorState::Error => motor_state_e_MOTOR_STATE_ERROR,
+            MotorState::Recovering => motor_state_e_MOTOR_STATE_RECOVERING,
+            MotorState::SlamBrake => motor_state_e_MOTOR_STATE_SLAMBRAKE,
+            MotorState::Idle => motor_state_e_MOTOR_STATE_IDLE,
+            // TODO: honestly no idea what to do about this guy
+            MotorState::Undefined => motor_state_e_MOTOR_STATE_IDLE,
+        }
+    }
+}
+
+impl From<motor_state_e> for MotorState {
+    #[allow(non_upper_case_globals)]
+    fn from(value: motor_state_e) -> Self {
+        match value {
+            motor_state_e_MOTOR_STATE_INITIALISING => MotorState::Initializing,
+            motor_state_e_MOTOR_STATE_DETECTING => MotorState::Detecting,
+            motor_state_e_MOTOR_STATE_ALIGN => MotorState::Align,
+            motor_state_e_MOTOR_STATE_MEASURING => MotorState::Measuring,
+            motor_state_e_MOTOR_STATE_OPEN_LOOP_STARTUP => MotorState::OpenLoopStartup,
+            motor_state_e_MOTOR_STATE_OPEN_LOOP_TRANSITION => {
+                MotorState::OpenLoopTransition
+            }
+            motor_state_e_MOTOR_STATE_TRACKING => MotorState::Tracking,
+            motor_state_e_MOTOR_STATE_RUN => MotorState::Run,
+            motor_state_e_MOTOR_STATE_GET_KV => MotorState::GetKV,
+            motor_state_e_MOTOR_STATE_TEST => MotorState::Test,
+            motor_state_e_MOTOR_STATE_ERROR => MotorState::Error,
+            motor_state_e_MOTOR_STATE_RECOVERING => MotorState::Recovering,
+            motor_state_e_MOTOR_STATE_SLAMBRAKE => MotorState::SlamBrake,
+            motor_state_e_MOTOR_STATE_IDLE => MotorState::Idle,
+            _ => MotorState::Undefined
+        }
+    }
 }

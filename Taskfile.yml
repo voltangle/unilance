@@ -50,8 +50,8 @@ tasks:
           CARGO_METHOD: bloat
   control:doc:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo doc -p core-control {{.CLI_ARGS}}
+      - cargo doc -p core-control {{.CLI_ARGS}}
 
   supervisor:doc:
     cmds:
-      - TARGET_PORT=stm32 TARGET_NAME=begode_etmax cargo doc -p core-supervisor {{.CLI_ARGS}}
+      - cargo doc -p core-supervisor {{.CLI_ARGS}}
