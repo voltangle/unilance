@@ -141,7 +141,7 @@ impl From<motor_state_e> for MotorState {
             motor_state_e_MOTOR_STATE_RECOVERING => MotorState::Recovering,
             motor_state_e_MOTOR_STATE_SLAMBRAKE => MotorState::SlamBrake,
             motor_state_e_MOTOR_STATE_IDLE => MotorState::Idle,
-            _ => MotorState::Undefined
+            _ => MotorState::Undefined,
         }
     }
 }

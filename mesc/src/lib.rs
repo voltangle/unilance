@@ -7,7 +7,10 @@ pub use bindings::{MESC_motor_typedef, hw_setup_s};
 pub use types::*;
 
 use crate::bindings::{
-    motor_control_mode_e, motor_control_type_e_MOTOR_CONTROL_TYPE_FOC, motor_state_e_MOTOR_STATE_INITIALISING, MESC_PWM_IRQ_handler, MESCfoc_fastLoop, MESCfoc_slowLoop, MESClrobs_Init
+    MESC_PWM_IRQ_handler, MESCfoc_fastLoop, MESCfoc_slowLoop, MESClrobs_Init,
+    motor_control_mode_e, motor_control_type_e_MOTOR_CONTROL_TYPE_FOC,
+    motor_state_e_MOTOR_STATE_INITIALISING,
+    MESCfoc_Init
 };
 use core::ffi::c_void;
 use core::ptr;
@@ -33,9 +36,7 @@ impl Motor {
             },
         };
         m.motor.rs_motor = ptr::from_mut(&mut m) as *mut c_void;
-        m.motor.MotorState = MotorState::Initializing.into();
-        // TODO: remove once BLDC control is removed
-        m.motor.MotorControlType = motor_control_type_e_MOTOR_CONTROL_TYPE_FOC;
+
         // TODO: make the check automatic
         // So, my idea is to have a list of parameters that have to be explicitly set,
         // and after the Supervisor finishes sending all configuration options it will
@@ -44,10 +45,10 @@ impl Motor {
         // not set yet. If it's all good though, Control will set conf_is_valid and
         // allow the Supervisor to start sending commands, like starting balance or
         // something.
-        m.motor.conf_is_valid = false;
+        // m.motor.conf_is_valid = false;
 
         unsafe {
-            MESClrobs_Init(&mut m.motor);
+            MESCfoc_Init(&mut m.motor);
         }
 
         return m;
