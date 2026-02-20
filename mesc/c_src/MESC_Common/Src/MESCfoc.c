@@ -186,7 +186,7 @@ static void FWRampDown(MESC_motor_typedef* _motor);
 //
 //     // ABI Incremental encoder
 //     _motor->m.enc_counts = 4096;  // Default to this, common for many motors. Avoid
-//     div0. _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
+//     div0._motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
 //
 //     _motor->hall.hall_error = 0;
 //     // Init the BLDC
@@ -197,12 +197,12 @@ static void FWRampDown(MESC_motor_typedef* _motor);
 //     _motor->FOC.speed_kp = DEFAULT_SPEED_KP;  // 0.01 = 10A/1000eHz
 //     _motor->FOC.speed_ki =
 //         DEFAULT_SPEED_KI;  // Trickier to set since we want this to be proportional to
-//         the
-//                            // ramp speed? Not intuitive? Try 0.1; ramp in 1/10 of a
-//                            second
-//                            // @100Hz.
-//     // Init the Duty controller
-//     _motor->FOC.Duty_scaler =
+//     the
+//         // ramp speed? Not intuitive? Try 0.1; ramp in 1/10 of a
+//         second
+//             // @100Hz.
+//             // Init the Duty controller
+//             _motor->FOC.Duty_scaler =
 //         1.0f;  // We want this to be 1.0f for everything except duty control mode.
 //     // Init the PLL values
 //     _motor->FOC.PLL_kp = PLL_KP;
@@ -260,10 +260,10 @@ static void FWRampDown(MESC_motor_typedef* _motor);
 // #ifdef USE_INIT_DELAY
 //     MESChal_delayMs(1000);  // Give the everything else time to start up (e.g.
 //     throttle,
-//                             // controller, PWM source...)
+//     // controller, PWM source...)
 // #endif
 //
-//     mesc_init_2(_motor);
+//         mesc_init_2(_motor);
 //
 //     hw_init(_motor);  // Populate the resistances, gains etc of the PCB - edit within
 //                       // this function if compiling for other PCBs

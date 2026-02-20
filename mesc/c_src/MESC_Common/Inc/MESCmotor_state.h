@@ -109,7 +109,6 @@ typedef enum {
     MOTOR_CONTROL_MODE_POSITION,
     MOTOR_CONTROL_MODE_MEASURING,
     MOTOR_CONTROL_MODE_HANDBRAKE,
-    MOTOR_CONTROL_MODE_SOMETHING,
 } motor_control_mode_e;
 
 typedef enum {
@@ -118,6 +117,7 @@ typedef enum {
     HFI_TYPE_D,
     HFI_TYPE_SPECIAL,
 } HFI_type_e;
+
 typedef enum {
     U,
     V,

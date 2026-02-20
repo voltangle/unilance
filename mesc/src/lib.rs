@@ -1,13 +1,14 @@
 #![no_std]
 
 mod bindings;
+mod types;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
+pub use types::*;
 
 use crate::bindings::{
-    MESC_PWM_IRQ_handler, MESClrobs_Init, fastLoop,
-    motor_state_e_MOTOR_STATE_INITIALISING,
-    motor_control_type_e_MOTOR_CONTROL_TYPE_FOC
+    MESC_PWM_IRQ_handler, MESClrobs_Init, fastLoop, motor_control_mode_e,
+    motor_control_type_e_MOTOR_CONTROL_TYPE_FOC, motor_state_e_MOTOR_STATE_INITIALISING,
 };
 use core::ffi::c_void;
 use core::ptr;
