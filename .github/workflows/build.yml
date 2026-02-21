@@ -27,9 +27,6 @@ jobs:
           && arm-none-eabi-gdb --version \
           && arm-none-eabi-size --version \
 
-      - name: Configure Rust
-        run: rustup default nightly && rustup target add thumbv7em-none-eabihf
-
       - name: Build
         run: task all_targets:build -- --release
         # TODO: when there will be any tests, make sure that they are executed here
