@@ -33,3 +33,8 @@ jobs:
         # TODO: make it also upload all built binaries
         # For that I will most likely need a modification to the task runner commands so
         # it automatically extracts any build artifacts and stores them
+
+        # The ET Max target was chosen because it was the only one existing at the time of
+        # writing allat.
+      - name: Analyze bloat (begode_etmax)
+        run: task begode_etmax:build -- --release -n 50
