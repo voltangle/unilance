@@ -37,4 +37,4 @@ jobs:
         # The ET Max target was chosen because it was the only one existing at the time of
         # writing allat.
       - name: Analyze bloat (begode_etmax)
-        run: task begode_etmax:build -- --release -n 50
+        run: cargo install cargo-bloat && task begode_etmax:bloat -- --release -n 50
