@@ -8,10 +8,14 @@ mod driver;
 mod mesc_impl;
 mod roles;
 
-use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
+use crate::{
+    bsp::PlatformConfig,
+    cpu_usage::{init, now_cycles, Snapshot},
+};
 use core::sync::atomic::Ordering;
+use cortex_m::Peripherals;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_stm32::{Config, bind_interrupts};
@@ -71,9 +75,25 @@ async fn main(spawner: Spawner) -> ! {
     bsp::startup_successful();
     info!("Hello from UniLANCE!");
 
+    unsafe {
+        let mut p = Peripherals::steal();
+        p.DCB.enable_trace();
+        p.DWT.enable_cycle_counter();
+        cpu_usage::init();
+    }
+
+    let mut prev = cpu_usage::snapshot();
+    loop {
+        Timer::after_secs(1).await;
+        let now = cpu_usage::snapshot();
+        let usage = cpu_usage::usage_percent(prev, now);
+        info!("CPU usage: {}%", usage);
+        prev = now;
+    }
+
     // Park indefinitely, so all other tasks can just, uhh, run
-    core::future::pending::<()>().await;
-    unreachable!();
+    // core::future::pending::<()>().await;
+    // unreachable!();
 }
 
 #[for_role("combined")]

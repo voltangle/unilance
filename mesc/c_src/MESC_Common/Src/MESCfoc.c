@@ -294,11 +294,11 @@ void initialiseInverter(MESC_motor_typedef* _motor) {
         if ((_motor->offset.Iu > 1500) && (_motor->offset.Iu < 2600) &&
             (_motor->offset.Iv > 1500) && (_motor->offset.Iv < 2600) &&
             (_motor->offset.Iw > 1500) && (_motor->offset.Iw < 2600)) {
-        // BUG: do we want some safety checks here like offsets being roughly
-        // correct?
-        _motor->MotorState = MOTOR_STATE_TRACKING;
-        _motor->key_bits &= ~UNINITIALISED_KEY;
-        MESChal_enableOutput(_motor);
+            // BUG: do we want some safety checks here like offsets being roughly
+            // correct?
+            _motor->MotorState = MOTOR_STATE_TRACKING;
+            _motor->key_bits &= ~UNINITIALISED_KEY;
+            MESChal_enableOutput(_motor);
         } else {
             handleError(_motor, ERROR_STARTUP);
             // Should just loop until this succeeds
