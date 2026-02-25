@@ -1,6 +1,8 @@
 #![no_std]
 
+use defmt::info;
 use embassy_time::{Duration, Ticker};
+use mesc::{MESC_motor_typedef, MescMotorExt};
 use proto::corelink::CoreLink;
 
 use crate::balance::BalanceState;
@@ -31,16 +33,16 @@ pub enum FaultType {
 
 pub struct State {
     pub state: SystemState,
-    pub motor: mesc::Motor,
+    pub motor: MESC_motor_typedef,
     pub balance: BalanceState,
 }
 
 impl State {
-    pub fn new(motor: mesc::Motor) -> Self {
+    pub fn new() -> Self {
         Self {
             state: SystemState::Booting,
             balance: BalanceState::new(),
-            motor,
+            motor: MESC_motor_typedef::default(),
         }
     }
 }

@@ -551,9 +551,6 @@ typedef struct {
 } MESCPos_s;
 
 // Logging
-#ifndef LOGLENGTH
-#define LOGLENGTH 300
-#endif
 // We want to log primarily Ia Ib Ic, Vd,Vq, phase angle, which gives us a complete
 // picture of the machine state 4 bytes per variable*6 variables*1000 = 24000bytes. Lowest
 // spec target is F303CB with 48kB SRAM, so this is OK
@@ -745,7 +742,6 @@ typedef struct {
 ////////////////////////Main typedef for starting a motor instance////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////
 typedef struct {
-    uint8_t id;
     // FIXME: I'm disabling enctimer altogether, because it's not used for my usecase
     // Instead, I should make it also support the MESChal thing
     //
@@ -768,8 +764,6 @@ typedef struct {
     MOTORProfile m;
     MESCmeas_s meas;
     MESChall_s hall;
-    // Pointer to the mesc::Motor Rust struct
-    void* rs_motor;
     // TODO: remove both safe_start and key_bits, useless for my usecase
     int32_t safe_start[2];
     uint32_t key_bits;  // When any of these are low, we keep the motor disabled
@@ -902,6 +896,14 @@ void MESChal_setIRQ(void* motor, bool state);
 uint32_t MESChal_getTimerHz(MESC_motor_typedef* motor);
 uint32_t MESChal_getCPUCycles();
 bool MESChal_isTimerCountingDown(MESC_motor_typedef* motor);
+
+void MESChal_logTrace(char* string);
+void MESChal_logTraceDouble(double num);
+void MESChal_logTraceInt(uint32_t num);
+void MESChal_logDebug(char* string);
+void MESChal_logInfo(char* string);
+void MESChal_logWarn(char* string);
+void MESChal_logError(char* string);
 
 #endif  // MESC_FOC_H
 // #endif

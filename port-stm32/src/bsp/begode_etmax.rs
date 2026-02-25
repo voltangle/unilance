@@ -1,13 +1,19 @@
 use super::PlatformConfig;
+use crate::Irqs;
 use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::roles::control;
 use core::mem::MaybeUninit;
+use core::ptr::read_volatile;
+use cortex_m_rt::{ExceptionFrame, exception};
+use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
     SampleTime,
 };
 use embassy_stm32::gpio::OutputType;
+use embassy_stm32::interrupt::typelevel::{self, Interrupt};
+use embassy_stm32::mode::Async;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
@@ -19,7 +25,10 @@ use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
+use embassy_stm32::usart::{self, Uart};
 use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
+use mesc::MescMotorExt;
+use static_cell::StaticCell;
 
 /*
  * BSP for the Begode ET Max electric unicycle motherboard.
@@ -98,6 +107,8 @@ pub struct BspPeripherals<'a> {
 
 static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
 
+static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Async>> = StaticCell::new();
+
 #[allow(static_mut_refs)]
 fn bsp_periph() -> &'static mut BspPeripherals<'static> {
     unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
@@ -109,6 +120,22 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 /// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
 pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
+    let mut serial_config = usart::Config::default();
+    serial_config.baudrate = 115200;
+    let serial = Uart::new(
+        p.USART1,
+        p.PA10,
+        p.PA9,
+        Irqs,
+        p.DMA2_CH7,
+        p.DMA2_CH5,
+        serial_config,
+    )
+    .unwrap();
+
+    defmt_serial::defmt_serial(DEFMT_SERIAL.init(serial));
+    info!("defmt-serial started");
+
     let i_battery = p.PC0.degrade_adc();
     let t_driver = p.PC1.degrade_adc();
     let v_battery = p.PA0.degrade_adc();
@@ -187,10 +214,16 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         Some(ComplementaryPwmPin::new(p.PB1, OutputType::PushPull)),
         None,
         None,
-        Hertz::khz(10),
+        Hertz::hz(10_000),
         CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
+    // Enable the TIM8 update interrupt
+    pac::TIM8.dier().modify(|w| w.set_uie(true));
+    typelevel::TIM8_UP_TIM13::unpend();
+    unsafe {
+        typelevel::TIM8_UP_TIM13::enable();
+    }
 
     let ws281x_tim = SimplePwm::new(
         p.TIM3,
@@ -207,12 +240,12 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     imu_spi_conf.frequency = Hertz::mhz(1);
 
     let _imu_spi = Spi::new(
-        p.SPI1,
+        p.SPI3,
         p.PB3,
         p.PB5,
         p.PB4,
-        p.DMA2_CH5,
-        p.DMA2_CH2,
+        p.DMA1_CH5,
+        p.DMA1_CH2,
         imu_spi_conf,
     );
 
@@ -229,6 +262,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             ws281x_tim,
         });
     }
+    info!("BSP peripherals initialized");
 }
 
 /*
@@ -244,7 +278,7 @@ pub mod foc {
     use embassy_stm32::pac::{GPIOB, TIM8};
     use embassy_stm32::time::Hertz;
     use embassy_stm32::timer::Channel;
-    use mesc::Motor;
+    use mesc::MESC_motor_typedef;
 
     // PB6, 7, 8
     pub fn get_hall_state() -> u8 {
@@ -262,92 +296,92 @@ pub mod foc {
     }
 
     #[inline(always)]
-    pub fn set_irq(_motor: &mut Motor, state: bool) {
+    pub fn set_irq(_motor: &mut MESC_motor_typedef, state: bool) {
         TIM8.dier().read().set_uie(state);
     }
 
     #[inline(always)]
-    pub fn is_tim_counting_down(_motor: &mut Motor) -> bool {
+    pub fn is_tim_counting_down(_motor: &mut MESC_motor_typedef) -> bool {
         // The Dir enum is always going to be just two values, 0 and 1. It is guaranteed
         // that it not cause any UB.
         unsafe { mem::transmute(TIM8.cr1().read().dir()) }
     }
 
     #[inline(always)]
-    pub fn set_pwm_frequency(_motor: &mut Motor, freq: u32) {
+    pub fn set_pwm_frequency(_motor: &mut MESC_motor_typedef, freq: u32) {
         bsp_periph().motor_tim.set_frequency(Hertz::hz(freq));
     }
 
     #[inline(always)]
-    pub fn get_max_duty(_motor: &mut Motor) -> u16 {
+    pub fn get_max_duty(_motor: &mut MESC_motor_typedef) -> u16 {
         bsp_periph().motor_tim.get_max_duty() as u16
     }
 
     #[inline(always)]
-    pub fn phase_a_get_duty(_motor: &mut Motor) -> u16 {
+    pub fn phase_a_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
         bsp_periph().motor_tim.get_duty(Channel::Ch1)
     }
 
     #[inline(always)]
-    pub fn phase_b_get_duty(_motor: &mut Motor) -> u16 {
+    pub fn phase_b_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
         bsp_periph().motor_tim.get_duty(Channel::Ch2)
     }
 
     #[inline(always)]
-    pub fn phase_c_get_duty(_motor: &mut Motor) -> u16 {
+    pub fn phase_c_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
         bsp_periph().motor_tim.get_duty(Channel::Ch3)
     }
 
     #[inline(always)]
-    pub fn phase_a_set_duty(_motor: &mut Motor, duty: u16) {
+    pub fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch1, duty.into());
     }
 
     #[inline(always)]
-    pub fn phase_b_set_duty(_motor: &mut Motor, duty: u16) {
+    pub fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch2, duty.into());
     }
 
     #[inline(always)]
-    pub fn phase_c_set_duty(_motor: &mut Motor, duty: u16) {
+    pub fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch3, duty.into());
     }
 
     #[inline(always)]
-    pub fn phase_d_set_duty(_motor: &mut Motor, duty: u16) {
+    pub fn phase_d_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
         bsp_periph().motor_tim.set_duty(Channel::Ch4, duty.into());
     }
 
     #[inline(always)]
-    pub fn enable_output(_motor: &mut Motor) {
+    pub fn enable_output(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.set_master_output_enable(true);
     }
 
-    pub fn phase_a_enable(_motor: &mut Motor) {
+    pub fn phase_a_enable(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.enable(Channel::Ch1);
     }
 
-    pub fn phase_b_enable(_motor: &mut Motor) {
+    pub fn phase_b_enable(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.enable(Channel::Ch2);
     }
 
-    pub fn phase_c_enable(_motor: &mut Motor) {
+    pub fn phase_c_enable(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.enable(Channel::Ch3);
     }
 
-    pub fn phase_a_break(_motor: &mut Motor) {
+    pub fn phase_a_break(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.disable(Channel::Ch1);
     }
 
-    pub fn phase_b_break(_motor: &mut Motor) {
+    pub fn phase_b_break(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.disable(Channel::Ch2);
     }
 
-    pub fn phase_c_break(_motor: &mut Motor) {
+    pub fn phase_c_break(_motor: &mut MESC_motor_typedef) {
         bsp_periph().motor_tim.disable(Channel::Ch3);
     }
 
-    pub fn set_deadtime(_motor: &mut Motor, ns: u16) {
+    pub fn set_deadtime(_motor: &mut MESC_motor_typedef, ns: u16) {
         // FIXME: doesn't take into account the timer prescaler
         let tim_clk = HCLK_HZ.load(Ordering::Relaxed) as f32;
         // how many nanoseconds there are in a second
@@ -381,7 +415,7 @@ impl PlatformConfig for Config {
 
         conf.rcc.hse = Some(Hse {
             freq: Hertz::mhz(8),
-            mode: HseMode::Bypass,
+            mode: HseMode::Oscillator,
         });
 
         conf.rcc.sys = Sysclk::PLL1_P;
@@ -406,6 +440,19 @@ impl PlatformConfig for Config {
 /*
  * Interrupts
  */
+
+#[exception]
+unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
+    unsafe {
+        const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
+        error!(
+            "HardFault triggered! xpsr: {}, cfsr: {:#010x}",
+            frame.xpsr(),
+            read_volatile(CFSR)
+        );
+        loop {}
+    }
+}
 
 #[interrupt]
 fn TIM8_UP_TIM13() {
@@ -435,6 +482,7 @@ fn TIM2() {
 pub fn startup_successful() {
     bsp_periph().poweron.set_high();
     bsp_periph().motor_tim.set_master_output_enable(true);
+    info!("Startup successful");
 }
 
 /*

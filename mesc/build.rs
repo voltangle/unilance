@@ -1,13 +1,15 @@
-#![feature(string_remove_matches)]
-
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
 
 fn main() {
     println!("cargo:rerun-if-changed=c_src");
+    let target = std::env::var("TARGET").unwrap();
 
     let mut build = cc::Build::new();
+
+    // Bindings to MESC
+    let mut bindgen = bindgen::Builder::default().clang_arg("-I./c_src");
 
     let arm_gcc_toolchain_includes: Vec<String> = {
         let output = Command::new("bash")
@@ -36,6 +38,7 @@ fn main() {
 
     for include in &arm_gcc_toolchain_includes {
         build.include(include);
+        bindgen = bindgen.clang_arg(format!("-I{}", include));
     }
 
     for var in std::env::vars() {
@@ -43,14 +46,16 @@ fn main() {
         // of Cargo.toml are MESC defines in disguise
         if var.0.starts_with("CARGO_FEATURE_") {
             let mut name = var.0.clone();
-            name.remove_matches("CARGO_FEATURE_");
+            name.replace_range(0.."CARGO_FEATURE_".len(), "");
 
             build.define(&name, None);
+            bindgen = bindgen.clang_arg(format!("-D{}", &name));
         }
     }
 
     build
         .define("LOGLENGTH", Some("10"))
+        .compiler("arm-none-eabi-gcc")
         .include("c_src/")
         // MESC sources
         .include("c_src/MESC_Common/Inc")
@@ -66,20 +71,24 @@ fn main() {
         .file("c_src/MESC_Common/Src/MESCsin_lut.c")
         .file("c_src/MESC_Common/Src/MESCtemp.c")
         .flag("-Wno-unused-parameter")
-        .compile("MESC");
+        .compile("libmesc");
 
-    // Bindings to MESC
-    let mut bindgen = bindgen::Builder::default().clang_arg("-I./c_src");
-
-    for include in &arm_gcc_toolchain_includes {
-        bindgen = bindgen.clang_arg(format!("-I{}", include));
-    }
+    // FIXME: make this adapt itself to the selected architecture, only applicable
+    // to thumbv7em-none-eabihf
     let bindings = bindgen
+        .header("c_src/mesc_wrap.h")
         .clang_arg("-I./c_src/")
         .clang_arg("-I./c_src/MESC_Common/Inc")
-        .header("c_src/mesc_wrap.h")
-        .use_core()
+        .clang_arg("-DLOGLENGTH=10")
+        .clang_arg(format!("--target={}", target))
+        .clang_arg("-mthumb")
+        .clang_arg("-mcpu=cortex-m4")
+        .clang_arg("-mfpu=fpv4-sp-d16")
+        .clang_arg("-mfloat-abi=hard")
+        .clang_arg("-fshort-enums")
+        .clang_arg("--gcc-toolchain=/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin/../arm-none-eabi")
         .derive_default(true)
+        .use_core()
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         // Finish the builder and generate the bindings.
         .generate()

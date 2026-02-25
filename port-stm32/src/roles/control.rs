@@ -2,7 +2,7 @@ use crate::roles::MemChannelCoreLink;
 use core::mem::MaybeUninit;
 use core_control::State;
 use embassy_executor::Spawner;
-use mesc::{hw_setup_s, Motor};
+use mesc::{MescMotorExt, hw_setup_s};
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -26,7 +26,8 @@ pub fn get_state() -> &'static mut State {
 #[allow(static_mut_refs)]
 pub fn init() {
     unsafe {
-        CONTROL_STATE.write(State::new(Motor::new()));
+        CONTROL_STATE.write(State::new());
+        get_state().motor.init();
     }
 }
 
@@ -34,16 +35,19 @@ pub fn init() {
 /// tasks.
 pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     let corelink = CONTROL_CORELINK.init(link);
-    spawner.spawn(
-        main_task(get_state(), corelink).expect("failed to start control main task"),
-    );
+    spawner.spawn({
+        match main_task(get_state(), corelink) {
+            Ok(result) => result,
+            Err(_) => {
+                panic!("Failed to initialize control main task");
+            }
+        }
+    });
 }
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn balance_loop() {
-    // FIXME: MESC doesn't expose this, make it work later
-    // mesc::houseKeeping(mesc::get_motor());
-
+    get_state().motor.foc_aux_update();
     get_state().motor.request_q(
         get_state()
             .balance

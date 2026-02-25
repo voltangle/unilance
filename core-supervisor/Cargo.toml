@@ -11,6 +11,7 @@ embassy-futures = "0.1.2"
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
 heapless = "0.9.2"
 littlefs2 = "0.6.1"
+defmt = "1.0.1"
 
 [features]
 control_scheme_power_park = []

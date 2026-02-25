@@ -23,7 +23,7 @@ static LITTLEFS: StaticCell<Mutex<NoopRawMutex, Filesystem<'static, RamStorage>>
     StaticCell::new();
 
 const BLOCK_SIZE: usize = 4096;
-const BLOCK_COUNT: usize = 8; // small for example
+const BLOCK_COUNT: usize = 2; // small for example
 
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.

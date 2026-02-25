@@ -42,6 +42,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "MESCApp.h"
 #include "MESCBLDC.h"
@@ -86,10 +87,10 @@ static void FWRampDown(MESC_motor_typedef* _motor);
 
 void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->offset.Iu = ADC_OFFSET_DEFAULT;
-	_motor->offset.Iv = ADC_OFFSET_DEFAULT;
-	_motor->offset.Iw = ADC_OFFSET_DEFAULT;
+    _motor->offset.Iv = ADC_OFFSET_DEFAULT;
+    _motor->offset.Iw = ADC_OFFSET_DEFAULT;
 
-	_motor->FOC.deadtime_comp = 0;
+    _motor->FOC.deadtime_comp = 0;
 
     _motor->MotorState = MOTOR_STATE_INITIALISING;
 
@@ -125,11 +126,10 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 #else
     _motor->options.use_hall_start = false;
 #endif
-    _motor->FOC.hall_IIR = HALL_IIR;   // decay constant for the hall start preload
-    _motor->FOC.hall_IIR = HALL_IIRN;  // decay constant for the hall start preload
-    _motor->FOC.hall_transition_V =
-        1.5f;  // transition voltage above which the hall sensors are
-                                 // not doing any preloading
+    _motor->FOC.hall_IIR = HALL_IIR;       // decay constant for the hall start preload
+    _motor->FOC.hall_IIR = HALL_IIRN;      // decay constant for the hall start preload
+    _motor->FOC.hall_transition_V = 1.5f;  // transition voltage above which the hall
+                                           // sensors are not doing any preloading
 
     _motor->options.use_lr_observer = false;
 
@@ -161,8 +161,9 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.enc_period_count = 1;  // Avoid /0s
 
     // ABI Incremental encoder
-    _motor->m.enc_counts = 4096;  // Default to this, common for many motors. Avoid division by zero
-   _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
+    _motor->m.enc_counts =
+        4096;  // Default to this, common for many motors. Avoid division by zero
+    _motor->FOC.enc_ratio = 65536 / _motor->m.enc_counts;
 
     _motor->hall.hall_error = 0;
     // Init the BLDC
@@ -218,8 +219,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
     // Initialise the FOC parameters
     // Init the FW
-    _motor->FOC.FW_curr_max =
-        0.0f;  // test number, to be stored in user settings
+    _motor->FOC.FW_curr_max = 0.0f;  // test number, to be stored in user settings
 
     // Init the current controller
     _motor->FOC.Current_bandwidth = CURRENT_BANDWIDTH;
@@ -227,9 +227,6 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.ortega_gain = 1000000.0f;
 
     MESClrobs_Init(_motor);
-
-    hw_init(_motor);  // Populate the resistances, gains etc of the PCB - edit within
-                      // this function if compiling for other PCBs
 // Reconfigure dead times
 // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
 #ifdef CUSTOM_DEADTIME
@@ -297,11 +294,11 @@ void initialiseInverter(MESC_motor_typedef* _motor) {
         if ((_motor->offset.Iu > 1500) && (_motor->offset.Iu < 2600) &&
             (_motor->offset.Iv > 1500) && (_motor->offset.Iv < 2600) &&
             (_motor->offset.Iw > 1500) && (_motor->offset.Iw < 2600)) {
-            // BUG: do we want some safety checks here like offsets being roughly
-            // correct?
-            _motor->MotorState = MOTOR_STATE_TRACKING;
-            _motor->key_bits &= ~UNINITIALISED_KEY;
-            MESChal_enableOutput(_motor);
+        // BUG: do we want some safety checks here like offsets being roughly
+        // correct?
+        _motor->MotorState = MOTOR_STATE_TRACKING;
+        _motor->key_bits &= ~UNINITIALISED_KEY;
+        MESChal_enableOutput(_motor);
         } else {
             handleError(_motor, ERROR_STARTUP);
             // Should just loop until this succeeds
@@ -321,7 +318,8 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     uint32_t cycles = CPU_CYCLES;
     // Call this directly from the TIM top IRQ
     _motor->hall.current_hall_state =
-        MESC_getHallState();  // ToDo, this macro is not applicable to dual motors
+        MESC_getHallState();  // TODO: this macro is not applicable to dual motors
+
     // First thing we ever want to do is convert the ADC values
     // to real, useable numbers.
     ADCConversion(_motor);
@@ -1317,20 +1315,6 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
 
     houseKeeping(_motor);  // General dross that keeps things ticking over, like nudging
                            // the observer
-    // MESCinput_Collect(_motor);  // Get all the throttle inputs
-    switch (_motor->options.MESC_APP_type) {
-        case MESC_APP_NONE:
-            _motor->key_bits &= ~MESC_APP_KEY;
-            No_app(_motor);  // No_app just sums the inputs
-            break;
-        case MESC_APP_VEHICLE:
-            Vehicle_app(_motor);
-            break;
-        case MESC_APP_2:
-            break;
-        case MESC_APP_3:
-            break;
-    }
 
     switch (_motor->ControlMode) {
         case MOTOR_CONTROL_MODE_TORQUE:
