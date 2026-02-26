@@ -1,4 +1,4 @@
-use defmt::{info, trace, Format};
+use defmt::{Format, info, trace};
 use embedded_hal::{digital::OutputPin, spi::SpiBus};
 use int_enum::IntEnum;
 
@@ -58,31 +58,28 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 
     /// Resets the internal registers and restores the default settings.
     pub fn reset(&mut self) -> Result<(), MpuError> {
-        self.write_register(Register::PWR_MGMT_1, 0x80)?;
-        Ok(())
+        self.set_register(Register::PWR_MGMT_1, 0b10000000, 0x80)
     }
 
     /// Resets the gyro, accel, and temp digital signal paths.
     pub fn reset_signal_path_all(&mut self) -> Result<(), MpuError> {
-        self.write_register(Register::SIGNAL_PATH_RESET, 0x7)?;
-        Ok(())
+        self.write_register(Register::SIGNAL_PATH_RESET, 0x7)
     }
 
     /// Sets the clock source. If [src] is set to None, will stop the clock and keep the
     /// timing generator in reset.
     pub fn set_clock_source(&mut self, src: Option<ClockSource>) -> Result<(), MpuError> {
         match src {
-            Some(src) => self.write_register(Register::PWR_MGMT_1, src as u8)?,
+            Some(src) => self.set_register(Register::PWR_MGMT_1, 0b111, src as u8)?,
             // Stops the clock and keeps timing generator in reset
-            None => self.write_register(Register::PWR_MGMT_1, 0x7)?,
+            None => self.set_register(Register::PWR_MGMT_1, 0b111, 0x7)?,
         }
         Ok(())
     }
 
     /// If yes, reset I2C Slave module and put the serial interface in SPI mode only.
     pub fn set_spi_mode_only(&mut self, yes: bool) -> Result<(), MpuError> {
-        self.write_register(Register::USER_CTRL, if yes { 0x10 } else { 0x0 })?;
-        Ok(())
+        self.set_register(Register::USER_CTRL, 0b10000, (yes as u8) << 4)
     }
 
     /// Divides the internal sample rate (see register CONFIG) to generate the sample
@@ -101,27 +98,27 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         if div == 0 {
             return Err(MpuError::ZeroDividerNumber);
         }
-        self.write_register(Register::SMPLRT_DIV, div - 1)?;
-        Ok(())
+        self.write_register(Register::SMPLRT_DIV, div - 1)
     }
 
     pub fn set_gyro_scale(&mut self, scale: GyroScale) -> Result<(), MpuError> {
-        self.write_register(Register::GYRO_CONFIG, (scale as u8) << 3)?;
-        Ok(())
+        self.set_register(Register::GYRO_CONFIG, 0b11000, (scale as u8) << 3)
     }
 
     pub fn set_accel_scale(&mut self, scale: AccelScale) -> Result<(), MpuError> {
-        self.write_register(Register::ACCEL_CONFIG, (scale as u8) << 3)?;
-        Ok(())
+        self.set_register(Register::ACCEL_CONFIG, 0b11000, (scale as u8) << 3)
     }
 
-    pub fn get_measurements(&mut self) -> Result<Measurements, MpuError> {
+    pub fn enable_fifo(&mut self, yes: bool) -> Result<(), MpuError> {
+        self.set_register(Register::USER_CTRL, 0x40, (yes as u8) << 6)
+    }
+
+    pub fn get_raw_measurements(&mut self) -> Result<RawMeasurements, MpuError> {
         let mut buf: [u8; 14] = [0; 14];
 
         self.read_burst(Register::ACCEL_XOUT_H, &mut buf)?;
-        trace!("Buffer: {}", buf);
 
-        Ok(Measurements {
+        Ok(RawMeasurements {
             accel_x: make_val!(buf, 0),
             accel_y: make_val!(buf, 2),
             accel_z: make_val!(buf, 4),
@@ -135,6 +132,16 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 
 // Lower level register access
 impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
+    pub fn set_register(
+        &mut self,
+        reg: Register,
+        mask: u8,
+        value: u8,
+    ) -> Result<(), MpuError> {
+        let current = self.read_register(reg)?;
+        self.write_register(reg, (current & !mask) | value & mask)
+    }
+
     pub fn read_burst<T: AsMut<[u8]>>(
         &mut self,
         reg: Register,
@@ -152,7 +159,7 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn read_register(&mut self, reg: Register) -> Result<u8, MpuError> {
         self.start_operation()?;
         let _ = self.write(reg as u8 + 0x80)?; // 0x80 sets the RW bit, indicating that
-                                               // this is a read operation
+        // this is a read operation
         let res = self.write(0xFF)?;
         self.end_operation()?;
         trace!("reg: {}, res: {}", reg, res);
@@ -170,7 +177,9 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 
     fn write(&mut self, data: u8) -> Result<u8, MpuError> {
         let mut buf = [data];
-        self.spi.transfer_in_place(&mut buf).map_err(|_| MpuError::SpiWriteFailed)?;
+        self.spi
+            .transfer_in_place(&mut buf)
+            .map_err(|_| MpuError::SpiWriteFailed)?;
         self.wait_for_idle()?;
         Ok(buf[0])
     }
@@ -197,7 +206,7 @@ pub enum GyroScale {
     Dps250 = 0b00,
     Dps500 = 0b01,
     Dps1000 = 0b10,
-    Dps2000 = 0b11
+    Dps2000 = 0b11,
 }
 
 #[repr(u8)]
@@ -206,11 +215,11 @@ pub enum AccelScale {
     Range2G,
     Range4G,
     Range8G,
-    Range16G
+    Range16G,
 }
 
 #[derive(Debug, Clone, Copy, Format)]
-pub struct Measurements {
+pub struct RawMeasurements {
     pub accel_x: i16,
     pub accel_y: i16,
     pub accel_z: i16,

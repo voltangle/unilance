@@ -289,8 +289,14 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
 async fn test_imu_fetcher() {
     loop {
         // TODO: read IMU state
-        info!("IMU state: {}", bsp_periph().imu.get_measurements().expect("Failed to get measurements"));
-        Timer::after_secs(1).await;
+        info!(
+            "IMU state: {}",
+            bsp_periph()
+                .imu
+                .get_raw_measurements()
+                .expect("Failed to get measurements")
+        );
+        Timer::after_millis(100).await;
     }
 }
 
