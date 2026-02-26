@@ -446,7 +446,7 @@ unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
     unsafe {
         const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
         error!(
-            "HardFault triggered! xpsr: {}, cfsr: {:#010x}",
+            "HardFault triggered! xpsr: {:#010x}, cfsr: {:#010x}",
             frame.xpsr(),
             read_volatile(CFSR)
         );
@@ -471,7 +471,7 @@ fn TIM8_UP_TIM13() {
 #[interrupt]
 fn TIM2() {
     rtos_trace::trace::isr_enter();
-    control::balance_loop();
+    control::aux_loop();
     rtos_trace::trace::isr_exit();
 }
 
@@ -482,7 +482,6 @@ fn TIM2() {
 pub fn startup_successful() {
     bsp_periph().poweron.set_high();
     bsp_periph().motor_tim.set_master_output_enable(true);
-    info!("Startup successful");
 }
 
 /*

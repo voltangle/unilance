@@ -46,7 +46,7 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
 }
 
 /// BALANCE_STATE MUST be initialized when this function runs.
-pub fn balance_loop() {
+pub fn aux_loop() {
     get_state().motor.foc_aux_update();
     get_state().motor.request_q(
         get_state()

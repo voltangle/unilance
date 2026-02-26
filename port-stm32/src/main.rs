@@ -46,27 +46,15 @@ async fn main(spawner: Spawner) -> ! {
     bsp::init(p, &spawner);
     info!("BSP init finished");
     #[cfg(feature = "role_supervisor")]
-    {
-        roles::supervisor::init();
-        info!("Supervisor init finished");
-    }
+    roles::supervisor::init();
     #[cfg(feature = "role_control")]
-    {
-        roles::control::init();
-        info!("Control init finished");
-    }
+    roles::control::init();
     info!("Roles initialized");
 
     #[cfg(feature = "role_supervisor")]
-    {
-        roles::supervisor::start(&spawner, make_core_link(true));
-        info!("Supervisor started");
-    }
+    roles::supervisor::start(&spawner, make_core_link(true));
     #[cfg(feature = "role_control")]
-    {
-        roles::control::start(&spawner, make_core_link(false));
-        info!("Control started");
-    }
+    roles::control::start(&spawner, make_core_link(false));
     info!("Roles started");
 
     // the timer starts "counting" right after it was created (it just saves a timestamp of
