@@ -6,7 +6,7 @@ use core::mem::MaybeUninit;
 use core::ptr::read_volatile;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
-use drivers::mpu6500::MPU6500Driver;
+use drivers::mpu6500::{AccelScale, GyroScale, MPU6500Driver};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -29,6 +29,7 @@ use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::usart::{self, Uart};
 use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
+use embassy_time::Timer;
 use mesc::MescMotorExt;
 use static_cell::StaticCell;
 
@@ -42,7 +43,8 @@ use static_cell::StaticCell;
  * - TIM3 on PA6: Tail light WS281x
  * - TIM4 on PB9: Passive buzzer
  * - TIM5: Embassy time source
- * - SPI1 on PB3,4,5 + SPI1 SS PA15: MPU6500 IMU
+ * - TIM2: Auxiliary loop
+ * - SPI3 on PB3,4,5 + SPI3 SS PA15: MPU6500 IMU
  * - USART1 on PA9,10: BLE module
  * - USART3 on PB10,11: BMS
  * - PB6, PB7, PB8: hall sensors
@@ -56,7 +58,7 @@ use static_cell::StaticCell;
  *
  * Clock sources:
  * - HSI: unused
- * - HSE: 8 MHz bypass
+ * - HSE: 8 MHz oscillator
  * - LSI: unused
  *
  * ADC pins:
@@ -122,7 +124,7 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 /// Peripherals initialized here have to be ONLY initialized. They have to be either off
 /// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
-pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
+pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
     let mut serial_config = usart::Config::default();
     serial_config.baudrate = 115200;
     let serial = Uart::new(
@@ -244,7 +246,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     // TODO: verify that this IMU SPI conf is enough
 
-    let imu = MPU6500Driver::new(
+    let mut imu = MPU6500Driver::new(
         Spi::new(
             p.SPI3,
             p.PB3,
@@ -256,6 +258,14 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         ),
         gpio::Output::new(p.PA15, gpio::Level::High, gpio::Speed::VeryHigh),
     );
+    // FIXME: not great to have a hardfault here. Should instead raise a global error
+    // and let it run
+    imu.init().expect("IMU init failed");
+    imu.set_sample_rate_divider(2);
+    imu.set_gyro_scale(GyroScale::Dps500);
+    imu.set_accel_scale(AccelScale::Range4G);
+
+    info!("IMU whoami response: {}", imu.whoami().unwrap());
 
     unsafe {
         BSP_PERIPH.write(BspPeripherals {
@@ -271,7 +281,17 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             imu,
         });
     }
+    spawner.spawn(test_imu_fetcher().expect("Failed to start IMU fetcher"));
     info!("BSP peripherals initialized");
+}
+
+#[embassy_executor::task]
+async fn test_imu_fetcher() {
+    loop {
+        // TODO: read IMU state
+        info!("IMU state: {}", bsp_periph().imu.get_measurements().expect("Failed to get measurements"));
+        Timer::after_secs(1).await;
+    }
 }
 
 /*

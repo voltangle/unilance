@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 defmt = "1.0.1"
 embedded-hal = { version = "1.0.0", features = ["defmt-03"] }
+int-enum = "1.2.0"
 nalgebra = { version = "0.34.1", default-features = false }

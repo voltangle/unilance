@@ -1,0 +1,342 @@
+use defmt::{info, trace, Format};
+use embedded_hal::{digital::OutputPin, spi::SpiBus};
+use int_enum::IntEnum;
+
+/// Swaps bytes and sets as a signed integer. For reading i16 IMU values from a buffer
+macro_rules! make_val {
+    ($buf:ident, $i:literal) => {
+        (($buf[$i + 1] as u16) << 8 | $buf[$i] as u16) as i16
+    };
+}
+
+#[derive(Debug, Format)]
+pub enum MpuError {
+    /// For some reason, changing chip select pin state resulted in an error. How did we
+    /// get here?
+    ChipSelectFailed,
+    SpiWriteFailed,
+    SpiReadFailed,
+    SpiFlushFailed,
+    /// If the device responded to a whoami request with an ID that is unknown to the
+    /// driver
+    UnknownDeviceIdentifier,
+    /// If the divider value in [MPU6500Driver::set_sample_rate_divider] is set as 0
+    ZeroDividerNumber,
+}
+
+/// The MPU6500 SPI driver. Because of the shared protocol, also implicitly supports
+/// the MPU925x series.
+pub struct MPU6500Driver<S: SpiBus, O: OutputPin> {
+    spi: S,
+    cs: O,
+}
+
+impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
+    pub fn new(spi: S, cs: O) -> Self {
+        Self { spi, cs }
+    }
+
+    /// Do initialisation of the IMU. Ideally, you should run it right after creating the
+    /// driver instance.
+    pub fn init(&mut self) -> Result<(), MpuError> {
+        self.reset()?;
+        self.reset_signal_path_all()?;
+        self.set_clock_source(Some(ClockSource::Autoselect))?;
+        self.set_spi_mode_only(true)?;
+        // FSYNC to GYRO_OUT_L[0]
+        self.write_register(Register::CONFIG, 4 << 3)?;
+        Ok(())
+    }
+}
+
+// Safe API over raw register reads
+impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
+    pub fn whoami(&mut self) -> Result<DeviceModel, MpuError> {
+        let val = self.read_register(Register::WHO_AM_I)?;
+        Ok(DeviceModel::try_from(val).map_err(|_| MpuError::UnknownDeviceIdentifier)?)
+    }
+
+    /// Resets the internal registers and restores the default settings.
+    pub fn reset(&mut self) -> Result<(), MpuError> {
+        self.write_register(Register::PWR_MGMT_1, 0x80)?;
+        Ok(())
+    }
+
+    /// Resets the gyro, accel, and temp digital signal paths.
+    pub fn reset_signal_path_all(&mut self) -> Result<(), MpuError> {
+        self.write_register(Register::SIGNAL_PATH_RESET, 0x7)?;
+        Ok(())
+    }
+
+    /// Sets the clock source. If [src] is set to None, will stop the clock and keep the
+    /// timing generator in reset.
+    pub fn set_clock_source(&mut self, src: Option<ClockSource>) -> Result<(), MpuError> {
+        match src {
+            Some(src) => self.write_register(Register::PWR_MGMT_1, src as u8)?,
+            // Stops the clock and keeps timing generator in reset
+            None => self.write_register(Register::PWR_MGMT_1, 0x7)?,
+        }
+        Ok(())
+    }
+
+    /// If yes, reset I2C Slave module and put the serial interface in SPI mode only.
+    pub fn set_spi_mode_only(&mut self, yes: bool) -> Result<(), MpuError> {
+        self.write_register(Register::USER_CTRL, if yes { 0x10 } else { 0x0 })?;
+        Ok(())
+    }
+
+    /// Divides the internal sample rate (see register CONFIG) to generate the sample
+    /// rate that controls sensor data output rate, FIFO sample rate.
+    /// This register is only effective when FCHOICE = 2’b11 (FCHOICE_B register bits are
+    /// 2’b00), and (0 < DLPF_CFG < 7)
+    ///
+    /// This is the update rate of sensor register.
+    /// Sample rate = INTERNAL_SAMPLE_RATE / ([div])
+    /// where INTERNAL_SAMPLE_RATE = 1kHz.
+    ///
+    /// The divider number cannot be zero.
+    // TODO: maybe rewrite this guy as a "set sample rate" function with predefined rates
+    // in an enum, make it more portable?
+    pub fn set_sample_rate_divider(&mut self, div: u8) -> Result<(), MpuError> {
+        if div == 0 {
+            return Err(MpuError::ZeroDividerNumber);
+        }
+        self.write_register(Register::SMPLRT_DIV, div - 1)?;
+        Ok(())
+    }
+
+    pub fn set_gyro_scale(&mut self, scale: GyroScale) -> Result<(), MpuError> {
+        self.write_register(Register::GYRO_CONFIG, (scale as u8) << 3)?;
+        Ok(())
+    }
+
+    pub fn set_accel_scale(&mut self, scale: AccelScale) -> Result<(), MpuError> {
+        self.write_register(Register::ACCEL_CONFIG, (scale as u8) << 3)?;
+        Ok(())
+    }
+
+    pub fn get_measurements(&mut self) -> Result<Measurements, MpuError> {
+        let mut buf: [u8; 14] = [0; 14];
+
+        self.read_burst(Register::ACCEL_XOUT_H, &mut buf)?;
+        trace!("Buffer: {}", buf);
+
+        Ok(Measurements {
+            accel_x: make_val!(buf, 0),
+            accel_y: make_val!(buf, 2),
+            accel_z: make_val!(buf, 4),
+            gyro_x: make_val!(buf, 8),
+            gyro_y: make_val!(buf, 10),
+            gyro_z: make_val!(buf, 12),
+            temp: make_val!(buf, 6) as u16,
+        })
+    }
+}
+
+// Lower level register access
+impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
+    pub fn read_burst<T: AsMut<[u8]>>(
+        &mut self,
+        reg: Register,
+        buf: &mut T,
+    ) -> Result<(), MpuError> {
+        self.start_operation()?;
+        buf.as_mut()[0] = self.write(reg as u8 + 0x80)?;
+        for i in 1..buf.as_mut().len() {
+            buf.as_mut()[i] = self.write(0xFF)?;
+        }
+        self.end_operation()?;
+        Ok(())
+    }
+
+    pub fn read_register(&mut self, reg: Register) -> Result<u8, MpuError> {
+        self.start_operation()?;
+        let _ = self.write(reg as u8 + 0x80)?; // 0x80 sets the RW bit, indicating that
+                                               // this is a read operation
+        let res = self.write(0xFF)?;
+        self.end_operation()?;
+        trace!("reg: {}, res: {}", reg, res);
+        Ok(res)
+    }
+
+    pub fn write_register(&mut self, reg: Register, data: u8) -> Result<(), MpuError> {
+        self.start_operation()?;
+        self.write(reg as u8)?;
+        self.write(data)?;
+        self.end_operation()?;
+        trace!("reg: {}, data: {}", reg, data);
+        Ok(())
+    }
+
+    fn write(&mut self, data: u8) -> Result<u8, MpuError> {
+        let mut buf = [data];
+        self.spi.transfer_in_place(&mut buf).map_err(|_| MpuError::SpiWriteFailed)?;
+        self.wait_for_idle()?;
+        Ok(buf[0])
+    }
+
+    fn start_operation(&mut self) -> Result<(), MpuError> {
+        self.cs.set_low().map_err(|_| MpuError::ChipSelectFailed)?;
+        Ok(())
+    }
+
+    fn end_operation(&mut self) -> Result<(), MpuError> {
+        self.cs.set_high().map_err(|_| MpuError::ChipSelectFailed)?;
+        Ok(())
+    }
+
+    fn wait_for_idle(&mut self) -> Result<(), MpuError> {
+        self.spi.flush().map_err(|_| MpuError::SpiFlushFailed)?;
+        Ok(())
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Format, IntEnum)]
+pub enum GyroScale {
+    Dps250 = 0b00,
+    Dps500 = 0b01,
+    Dps1000 = 0b10,
+    Dps2000 = 0b11
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Format, IntEnum)]
+pub enum AccelScale {
+    Range2G,
+    Range4G,
+    Range8G,
+    Range16G
+}
+
+#[derive(Debug, Clone, Copy, Format)]
+pub struct Measurements {
+    pub accel_x: i16,
+    pub accel_y: i16,
+    pub accel_z: i16,
+    pub gyro_x: i16,
+    pub gyro_y: i16,
+    pub gyro_z: i16,
+    pub temp: u16,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Format, IntEnum)]
+pub enum ClockSource {
+    /// Internal 20MHz oscillator
+    Internal = 0x1,
+    /// Auto selects the best available clock source – PLL if ready, else use the
+    /// Internal oscillator.
+    Autoselect = 0x3,
+}
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Format, IntEnum)]
+pub enum DeviceModel {
+    MPU6500 = 0x70,
+}
+
+#[allow(dead_code, non_camel_case_types)]
+#[derive(Debug, Clone, Copy, Format)]
+pub enum Register {
+    SELF_TEST_X_GYRO = 0x00,
+    SELF_TEST_Y_GYRO = 0x01,
+    SELF_TEST_Z_GYRO = 0x02,
+    SELF_TEST_X_ACCEL = 0x0D,
+    SELF_TEST_Y_ACCEL = 0x0E,
+    SELF_TEST_Z_ACCEL = 0x0F,
+    XG_OFFSET_H = 0x13,
+    XG_OFFSET_L = 0x14,
+    YG_OFFSET_H = 0x15,
+    YG_OFFSET_L = 0x16,
+    ZG_OFFSET_H = 0x17,
+    ZG_OFFSET_L = 0x18,
+    SMPLRT_DIV = 0x19,
+    CONFIG = 0x1A,
+    GYRO_CONFIG = 0x1B,
+    ACCEL_CONFIG = 0x1C,
+    ACCEL_CONFIG_2 = 0x1D,
+    LP_ACCEL_ODR = 0x1E,
+    WOM_THR = 0x1F,
+    FIFO_EN = 0x23,
+    I2C_MST_CTRL = 0x24,
+    I2C_SLV0_ADDR = 0x25,
+    I2C_SLV0_REG = 0x26,
+    I2C_SLV0_CTRL = 0x27,
+    I2C_SLV1_ADDR = 0x28,
+    I2C_SLV1_REG = 0x29,
+    I2C_SLV1_CTRL = 0x2A,
+    I2C_SLV2_ADDR = 0x2B,
+    I2C_SLV2_REG = 0x2C,
+    I2C_SLV2_CTRL = 0x2D,
+    I2C_SLV3_ADDR = 0x2E,
+    I2C_SLV3_REG = 0x2F,
+    I2C_SLV3_CTRL = 0x30,
+    I2C_SLV4_ADDR = 0x31,
+    I2C_SLV4_REG = 0x32,
+    I2C_SLV4_DO = 0x33,
+    I2C_SLV4_CTRL = 0x34,
+    I2C_SLV4_DI = 0x35,
+    I2C_MST_STATUS = 0x36,
+    INT_PIN_CFG = 0x37,
+    INT_ENABLE = 0x38,
+    INT_STATUS = 0x3A,
+    ACCEL_XOUT_H = 0x3B,
+    ACCEL_XOUT_L = 0x3C,
+    ACCEL_YOUT_H = 0x3D,
+    ACCEL_YOUT_L = 0x3E,
+    ACCEL_ZOUT_H = 0x3F,
+    ACCEL_ZOUT_L = 0x40,
+    TEMP_OUT_H = 0x41,
+    TEMP_OUT_L = 0x42,
+    GYRO_XOUT_H = 0x43,
+    GYRO_XOUT_L = 0x44,
+    GYRO_YOUT_H = 0x45,
+    GYRO_YOUT_L = 0x46,
+    GYRO_ZOUT_H = 0x47,
+    GYRO_ZOUT_L = 0x48,
+    EXT_SENS_DATA_00 = 0x49,
+    EXT_SENS_DATA_01 = 0x4A,
+    EXT_SENS_DATA_02 = 0x4B,
+    EXT_SENS_DATA_03 = 0x4C,
+    EXT_SENS_DATA_04 = 0x4D,
+    EXT_SENS_DATA_05 = 0x4E,
+    EXT_SENS_DATA_06 = 0x4F,
+    EXT_SENS_DATA_07 = 0x50,
+    EXT_SENS_DATA_08 = 0x51,
+    EXT_SENS_DATA_09 = 0x52,
+    EXT_SENS_DATA_10 = 0x53,
+    EXT_SENS_DATA_11 = 0x54,
+    EXT_SENS_DATA_12 = 0x55,
+    EXT_SENS_DATA_13 = 0x56,
+    EXT_SENS_DATA_14 = 0x57,
+    EXT_SENS_DATA_15 = 0x58,
+    EXT_SENS_DATA_16 = 0x59,
+    EXT_SENS_DATA_17 = 0x5A,
+    EXT_SENS_DATA_18 = 0x5B,
+    EXT_SENS_DATA_19 = 0x5C,
+    EXT_SENS_DATA_20 = 0x5D,
+    EXT_SENS_DATA_21 = 0x5E,
+    EXT_SENS_DATA_22 = 0x5F,
+    EXT_SENS_DATA_23 = 0x60,
+    I2C_SLV0_DO = 0x63,
+    I2C_SLV1_DO = 0x64,
+    I2C_SLV2_DO = 0x65,
+    I2C_SLV3_DO = 0x66,
+    I2C_MST_DELAY_CTRL = 0x67,
+    SIGNAL_PATH_RESET = 0x68,
+    MOT_DETECT_CTRL = 0x69,
+    USER_CTRL = 0x6A,
+    PWR_MGMT_1 = 0x6B,
+    PWR_MGMT_2 = 0x6C,
+    FIFO_COUNTH = 0x72,
+    FIFO_COUNTL = 0x73,
+    FIFO_R_W = 0x74,
+    WHO_AM_I = 0x75,
+    XA_OFFSET_H = 0x77,
+    XA_OFFSET_L = 0x78,
+    YA_OFFSET_H = 0x7A,
+    YA_OFFSET_L = 0x7B,
+    ZA_OFFSET_H = 0x7D,
+    ZA_OFFSET_L = 0x7E,
+}
