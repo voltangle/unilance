@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 mesc = { path = "../mesc" }
 proto = { path = "../proto" }
+drivers = { path = "../drivers" }
 proc-macros = { path = "../proc-macros" }
 core-control = { path = "../core-control", optional = true }
 core-supervisor = { path = "../core-supervisor", optional = true }

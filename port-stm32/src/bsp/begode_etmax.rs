@@ -6,6 +6,7 @@ use core::mem::MaybeUninit;
 use core::ptr::read_volatile;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
+use drivers::mpu6500::MPU6500Driver;
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -21,6 +22,7 @@ use embassy_stm32::rcc::{
     RtcClockSource, Sysclk,
 };
 use embassy_stm32::spi::Spi;
+use embassy_stm32::spi::mode::Master;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
 use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
@@ -103,6 +105,7 @@ pub struct BspPeripherals<'a> {
     balance_loop_tim: timer::low_level::Timer<'a, TIM2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
     ws281x_tim: SimplePwm<'a, TIM3>,
+    imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
 }
 
 static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
@@ -239,14 +242,19 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     imu_spi_conf.mode = spi::MODE_0;
     imu_spi_conf.frequency = Hertz::mhz(1);
 
-    let _imu_spi = Spi::new(
-        p.SPI3,
-        p.PB3,
-        p.PB5,
-        p.PB4,
-        p.DMA1_CH5,
-        p.DMA1_CH2,
-        imu_spi_conf,
+    // TODO: verify that this IMU SPI conf is enough
+
+    let imu = MPU6500Driver::new(
+        Spi::new(
+            p.SPI3,
+            p.PB3,
+            p.PB5,
+            p.PB4,
+            p.DMA1_CH5,
+            p.DMA1_CH2,
+            imu_spi_conf,
+        ),
+        gpio::Output::new(p.PA15, gpio::Level::High, gpio::Speed::VeryHigh),
     );
 
     unsafe {
@@ -260,6 +268,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             balance_loop_tim,
             motor_tim,
             ws281x_tim,
+            imu,
         });
     }
     info!("BSP peripherals initialized");

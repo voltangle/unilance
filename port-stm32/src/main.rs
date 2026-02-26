@@ -12,7 +12,7 @@ mod roles;
 use crate::roles::{CoreChannel, MemChannelCoreLink};
 use crate::{
     bsp::PlatformConfig,
-    cpu_usage::{init, now_cycles, Snapshot},
+    cpu_usage::{Snapshot, init, now_cycles},
 };
 use core::sync::atomic::Ordering;
 use cortex_m::Peripherals;
