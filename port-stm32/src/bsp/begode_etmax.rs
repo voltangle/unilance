@@ -6,7 +6,7 @@ use core::mem::MaybeUninit;
 use core::ptr::read_volatile;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
-use drivers::mpu6500::{AccelScale, GyroScale, MPU6500Driver};
+use drivers::mpu6500::{AccelScale, GyroScale, MPU6500Driver, RawMeasurements};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -14,9 +14,11 @@ use embassy_stm32::adc::{
 };
 use embassy_stm32::gpio::OutputType;
 use embassy_stm32::interrupt::typelevel::{self, Interrupt};
+use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::Async;
 use embassy_stm32::pac::DMA2;
-use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
+use embassy_stm32::pac::timer::vals::Urs;
+use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM3, TIM8};
 use embassy_stm32::rcc::{
     AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource,
     RtcClockSource, Sysclk,
@@ -25,10 +27,10 @@ use embassy_stm32::spi::Spi;
 use embassy_stm32::spi::mode::Master;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
-use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
+use embassy_stm32::timer::low_level::CountingMode;
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::usart::{self, Uart};
-use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
+use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi};
 use embassy_time::Timer;
 use mesc::MescMotorExt;
 use static_cell::StaticCell;
@@ -95,6 +97,15 @@ static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
 // just enough space for smooth operation
 static mut WS281X_BUF: [u16; 500] = [0; 500];
+static mut IMU_DATA: RawMeasurements = RawMeasurements {
+    accel_x: 0,
+    accel_y: 0,
+    accel_z: 0,
+    gyro_x: 0,
+    gyro_y: 0,
+    gyro_z: 0,
+    temp: 0,
+};
 
 #[allow(unused)]
 pub struct BspPeripherals<'a> {
@@ -104,7 +115,6 @@ pub struct BspPeripherals<'a> {
     adc1: RingBufferedAdc<'a, ADC1>,
     adc2: RingBufferedAdc<'a, ADC2>,
     adc3: RingBufferedAdc<'a, ADC3>,
-    balance_loop_tim: timer::low_level::Timer<'a, TIM2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
     ws281x_tim: SimplePwm<'a, TIM3>,
     imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
@@ -205,10 +215,6 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         )
     };
 
-    let balance_loop_tim = timer::low_level::Timer::new(p.TIM2);
-    balance_loop_tim.set_frequency(Hertz::khz(1), RoundTo::Slower);
-    balance_loop_tim.enable_update_interrupt(true);
-
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
         Some(PwmPin::new(p.PC6, OutputType::PushPull)),
@@ -219,7 +225,7 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         Some(ComplementaryPwmPin::new(p.PB1, OutputType::PushPull)),
         None,
         None,
-        Hertz::hz(10_000),
+        Hertz::khz(10),
         CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
@@ -267,6 +273,91 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
 
     info!("IMU whoami response: {}", imu.whoami().unwrap());
 
+    // === Configure TIM2 to generate update interrupts ===
+    unsafe {
+        // 1) Enable TIM2 clock on APB1
+        pac::RCC.apb1enr().modify(|w| w.set_tim2en(true));
+        // A dummy readback is sometimes used to ensure the write lands before configuring.
+        let _ = pac::RCC.apb1enr().read().0;
+
+        // Optional: reset TIM2 to a clean state
+        pac::RCC.apb1rstr().modify(|w| w.set_tim2rst(true));
+        pac::RCC.apb1rstr().modify(|w| w.set_tim2rst(false));
+
+        let tim2 = pac::TIM2;
+
+        // 2) Make sure it's stopped while we configure
+        tim2.cr1().modify(|w| w.set_cen(false));
+
+        // 3) Set prescaler and auto-reload
+        let (psc, arr) = {
+            let tim: u64 = 84_000_000;
+            let target_hz = Hertz::khz(1).0 as u64;
+
+            // Total divider needed (rounded to nearest).
+            // Using rounding reduces systematic bias vs floor division.
+            let mut div = (tim + target_hz / 2) / target_hz;
+            if div < 1 {
+                div = 1;
+            }
+
+            // Maximum ARR+1 value based on counter width.
+            let max_arr_p1: u64 = 1u64 << 32; // 4294967296
+
+            // Choose smallest prescaler such that (ARR+1) fits.
+            // We want: ARR+1 = div/(psc+1) <= max_arr_p1
+            // => psc+1 >= div/max_arr_p1
+            let mut psc_p1 = (div + max_arr_p1 - 1) / max_arr_p1; // ceil(div / max_arr_p1)
+            if psc_p1 < 1 {
+                psc_p1 = 1;
+            }
+            if psc_p1 > 65_536 {
+                psc_p1 = 65_536;
+            } // PSC is 16-bit => PSC+1 max is 65536
+
+            // Compute ARR+1 as div/(psc+1), rounded to nearest, and clamp to valid range.
+            let mut arr_p1 = (div + psc_p1 / 2) / psc_p1; // round(div/psc_p1)
+            if arr_p1 < 1 {
+                arr_p1 = 1;
+            }
+            if arr_p1 > max_arr_p1 {
+                arr_p1 = max_arr_p1;
+            }
+
+            let psc = (psc_p1 - 1) as u16;
+            let arr = (arr_p1 - 1) as u32;
+
+            (psc, arr)
+        };
+        tim2.psc().write(|w| *w = psc);
+        tim2.arr().write(|w| *w = arr);
+
+        // 4) Only overflow/underflow generates update (optional but nice)
+        // URS=1: Update request source = counter overflow/underflow only (no UG, no slave events)
+        tim2.cr1().modify(|w| {
+            w.set_urs(Urs::COUNTER_ONLY);
+            w.set_arpe(true)
+        }); // ARPE=1: buffered ARR
+
+        // 5) Generate an update event to latch PSC/ARR into the active shadow regs
+        tim2.egr().write(|w| w.set_ug(true));
+
+        // 6) Clear any pending update flag
+        tim2.sr().modify(|w| w.set_uif(false));
+
+        // 7) Enable update interrupt
+        tim2.dier().modify(|w| w.set_uie(true));
+
+        // 8) Enable NVIC IRQ for TIM2
+        cortex_m::peripheral::NVIC::unmask(pac::Interrupt::TIM2);
+
+        // Optional: set priority (lower number = higher priority on Cortex-M)
+        pac::Interrupt::TIM2.set_priority(Priority::P2);
+
+        // 9) Start the counter
+        tim2.cr1().modify(|w| w.set_cen(true));
+    }
+
     unsafe {
         BSP_PERIPH.write(BspPeripherals {
             poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
@@ -275,7 +366,6 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
             adc1: adc1_rb,
             adc2: adc2_rb,
             adc3: adc3_rb,
-            balance_loop_tim,
             motor_tim,
             ws281x_tim,
             imu,
@@ -289,13 +379,6 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
 async fn test_imu_fetcher() {
     loop {
         // TODO: read IMU state
-        info!(
-            "IMU state: {}",
-            bsp_periph()
-                .imu
-                .get_raw_measurements()
-                .expect("Failed to get measurements")
-        );
         Timer::after_millis(100).await;
     }
 }
@@ -503,10 +586,20 @@ fn TIM8_UP_TIM13() {
 }
 
 /// The balance loop interrupt
+#[allow(static_mut_refs)]
 #[interrupt]
 fn TIM2() {
     rtos_trace::trace::isr_enter();
+
+    unsafe {
+        let meas = bsp_periph().imu.get_raw_measurements().unwrap();
+        IMU_DATA = meas;
+        // info!("IMU state: {}", meas);
+    }
     control::aux_loop();
+    // Clear update flag
+    pac::TIM2.sr().modify(|w| w.set_uif(false));
+
     rtos_trace::trace::isr_exit();
 }
 

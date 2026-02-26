@@ -218,7 +218,7 @@ pub enum AccelScale {
     Range16G,
 }
 
-#[derive(Debug, Clone, Copy, Format)]
+#[derive(Debug, Clone, Copy, Format, Default)]
 pub struct RawMeasurements {
     pub accel_x: i16,
     pub accel_y: i16,

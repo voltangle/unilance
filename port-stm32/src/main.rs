@@ -10,10 +10,7 @@ mod roles;
 
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use crate::{
-    bsp::PlatformConfig,
-    cpu_usage::{Snapshot, init, now_cycles},
-};
+use crate::bsp::PlatformConfig;
 use core::sync::atomic::Ordering;
 use cortex_m::Peripherals;
 use defmt::info;
