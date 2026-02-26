@@ -2,10 +2,10 @@ use defmt::{Format, info, trace};
 use embedded_hal::{digital::OutputPin, spi::SpiBus};
 use int_enum::IntEnum;
 
-/// Swaps bytes and sets as a signed integer. For reading i16 IMU values from a buffer
+/// Swaps bytes. For reading from read_multi.
 macro_rules! make_val {
-    ($buf:ident, $i:literal) => {
-        (($buf[$i + 1] as u16) << 8 | $buf[$i] as u16) as i16
+    ($buf:ident, $i:expr) => {
+        (($buf[$i + 1] as u16) << 8 | $buf[$i] as u16)
     };
 }
 
@@ -41,6 +41,7 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn init(&mut self) -> Result<(), MpuError> {
         self.reset()?;
         self.reset_signal_path_all()?;
+        self.set_register(Register::PWR_MGMT_1, 0b1000000, 0 << 6)?;
         self.set_clock_source(Some(ClockSource::Autoselect))?;
         self.set_spi_mode_only(true)?;
         // FSYNC to GYRO_OUT_L[0]
@@ -110,24 +111,92 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     }
 
     pub fn enable_fifo(&mut self, yes: bool) -> Result<(), MpuError> {
-        self.set_register(Register::USER_CTRL, 0x40, (yes as u8) << 6)
+        self.reset_fifo()?;
+        self.set_register(Register::USER_CTRL, 0x40, (yes as u8) << 6)?;
+        // Enable all channels except for SLV ones
+        self.write_register(Register::FIFO_EN, 0xF8)
+    }
+
+    pub fn reset_fifo(&mut self) -> Result<(), MpuError> {
+        self.set_register(Register::USER_CTRL, 0b100, 1 << 2)
+    }
+    //
+    // pub fn select_fifo_channels(
+    //     &mut self,
+    //     channels: FIFOChannels,
+    // ) -> Result<(), MpuError> {
+    //     self.write_register(Register::FIFO_EN, {
+    //         let mut out: u8 = 0;
+    //         out |= (channels.temp as u8) << 7;
+    //         out |= (channels.gyro_x as u8) << 6;
+    //         out |= (channels.gyro_y as u8) << 5;
+    //         out |= (channels.gyro_z as u8) << 4;
+    //         out |= (channels.accel as u8) << 3;
+    //         out
+    //     })
+    // }
+
+    /// The number of available written bytes in the FIFO.
+    pub fn get_fifo_available(&mut self) -> Result<u16, MpuError> {
+        let mut buf: [u8; 2] = [0; 2];
+        self.read_multi(Register::FIFO_COUNTH, &mut buf)?;
+        Ok(make_val!(buf, 0))
+    }
+
+    /// Read all available data from FIFO into the buffer, either limited by available
+    /// data or buffer size.
+    pub fn read_fifo_all<const SIZE: usize>(
+        &mut self,
+        buf: &mut [u8; SIZE],
+    ) -> Result<usize, MpuError> {
+        let amount = {
+            let available = self.get_fifo_available()? as usize;
+            trace!("Available: {}", available);
+            if available > SIZE {
+                SIZE / 14 // 14 means length of all enabled channels, which are temp, gyro,
+            // and accelerometer
+            } else {
+                available / 14
+            }
+        };
+        trace!("Amount: {}", amount);
+        for i in 0..(amount * 14) {
+            let val = self.read_register(Register::FIFO_R_W)?;
+            buf[i] = val;
+        }
+        Ok(amount)
     }
 
     pub fn get_raw_measurements(&mut self) -> Result<RawMeasurements, MpuError> {
         let mut buf: [u8; 14] = [0; 14];
 
-        self.read_burst(Register::ACCEL_XOUT_H, &mut buf)?;
+        self.read_multi(Register::ACCEL_XOUT_H, &mut buf)?;
 
         Ok(RawMeasurements {
-            accel_x: make_val!(buf, 0),
-            accel_y: make_val!(buf, 2),
-            accel_z: make_val!(buf, 4),
-            gyro_x: make_val!(buf, 8),
-            gyro_y: make_val!(buf, 10),
-            gyro_z: make_val!(buf, 12),
-            temp: make_val!(buf, 6) as u16,
+            accel_x: make_val!(buf, 0) as i16,
+            accel_y: make_val!(buf, 2) as i16,
+            accel_z: make_val!(buf, 4) as i16,
+            gyro_x: make_val!(buf, 8) as i16,
+            gyro_y: make_val!(buf, 10) as i16,
+            gyro_z: make_val!(buf, 12) as i16,
+            temp: make_val!(buf, 6),
         })
     }
+}
+
+pub fn parse_fifo_data<const SIZE: usize>(
+    buf: &mut [u8; SIZE],
+    index: usize,
+) -> Result<RawMeasurements, MpuError> {
+    Ok(RawMeasurements {
+        accel_x: make_val!(buf, index + 8) as i16,
+        accel_y: make_val!(buf, index + 10) as i16,
+        accel_z: make_val!(buf, index + 12) as i16,
+        gyro_x: make_val!(buf, index + 2) as i16,
+        gyro_y: make_val!(buf, index + 4) as i16,
+        gyro_z: make_val!(buf, index + 6) as i16,
+        temp: make_val!(buf, index + 0),
+    })
 }
 
 // Lower level register access
@@ -142,15 +211,15 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.write_register(reg, (current & !mask) | value & mask)
     }
 
-    pub fn read_burst<T: AsMut<[u8]>>(
+    pub fn read_multi<const SIZE: usize>(
         &mut self,
         reg: Register,
-        buf: &mut T,
+        buf: &mut [u8; SIZE],
     ) -> Result<(), MpuError> {
         self.start_operation()?;
-        buf.as_mut()[0] = self.write(reg as u8 + 0x80)?;
-        for i in 1..buf.as_mut().len() {
-            buf.as_mut()[i] = self.write(0xFF)?;
+        _ = self.write(reg as u8 + 0x80)?;
+        for i in 0..SIZE {
+            buf[i] = self.write(0xFF)?;
         }
         self.end_operation()?;
         Ok(())
@@ -159,10 +228,9 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn read_register(&mut self, reg: Register) -> Result<u8, MpuError> {
         self.start_operation()?;
         let _ = self.write(reg as u8 + 0x80)?; // 0x80 sets the RW bit, indicating that
-        // this is a read operation
+                                               // this is a read operation
         let res = self.write(0xFF)?;
         self.end_operation()?;
-        trace!("reg: {}, res: {}", reg, res);
         Ok(res)
     }
 
@@ -171,7 +239,6 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.write(reg as u8)?;
         self.write(data)?;
         self.end_operation()?;
-        trace!("reg: {}, data: {}", reg, data);
         Ok(())
     }
 
@@ -198,6 +265,15 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.spi.flush().map_err(|_| MpuError::SpiFlushFailed)?;
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Copy, Format, Default)]
+pub struct FIFOChannels {
+    pub temp: bool,
+    pub gyro_x: bool,
+    pub gyro_y: bool,
+    pub gyro_z: bool,
+    pub accel: bool,
 }
 
 #[repr(u8)]

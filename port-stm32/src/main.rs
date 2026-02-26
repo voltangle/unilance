@@ -8,9 +8,9 @@ mod driver;
 mod mesc_impl;
 mod roles;
 
+use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use crate::bsp::PlatformConfig;
 use core::sync::atomic::Ordering;
 use cortex_m::Peripherals;
 use defmt::info;
@@ -40,7 +40,7 @@ async fn main(spawner: Spawner) -> ! {
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
     Timer::after_millis(2000).await;
 
-    bsp::init(p, &spawner);
+    bsp::init(p, &spawner).await;
     info!("BSP init finished");
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::init();

@@ -6,7 +6,9 @@ use core::mem::MaybeUninit;
 use core::ptr::read_volatile;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
-use drivers::mpu6500::{AccelScale, GyroScale, MPU6500Driver, RawMeasurements};
+use drivers::mpu6500::{
+    self, AccelScale, FIFOChannels, GyroScale, MPU6500Driver, RawMeasurements,
+};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -134,7 +136,7 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 /// Peripherals initialized here have to be ONLY initialized. They have to be either off
 /// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
-pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
+pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
     let mut serial_config = usart::Config::default();
     serial_config.baudrate = 115200;
     let serial = Uart::new(
@@ -150,6 +152,37 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
 
     defmt_serial::defmt_serial(DEFMT_SERIAL.init(serial));
     info!("defmt-serial started");
+
+    let mut imu_spi_conf = spi::Config::default();
+    imu_spi_conf.mode = spi::MODE_0;
+    imu_spi_conf.frequency = Hertz::mhz(1);
+
+    // TODO: verify that this IMU SPI conf is enough
+
+    let mut imu = MPU6500Driver::new(
+        Spi::new(
+            p.SPI3,
+            p.PB3,
+            p.PB5,
+            p.PB4,
+            p.DMA1_CH5,
+            p.DMA1_CH2,
+            imu_spi_conf,
+        ),
+        gpio::Output::new(p.PA15, gpio::Level::High, gpio::Speed::VeryHigh),
+    );
+    // FIXME: not great to have a hardfault here. Should instead raise a global error
+    // and let it run
+    imu.init().expect("IMU init failed");
+    Timer::after_millis(100).await;
+    imu.set_sample_rate_divider(2).unwrap();
+    imu.set_gyro_scale(GyroScale::Dps500).unwrap();
+    imu.set_accel_scale(AccelScale::Range4G).unwrap();
+    imu.enable_fifo(true).unwrap();
+
+    Timer::after_millis(150).await;
+
+    info!("IMU whoami response: {}", imu.whoami().unwrap());
 
     let i_battery = p.PC0.degrade_adc();
     let t_driver = p.PC1.degrade_adc();
@@ -246,34 +279,14 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         CountingMode::EdgeAlignedUp,
     );
 
-    let mut imu_spi_conf = spi::Config::default();
-    imu_spi_conf.mode = spi::MODE_0;
-    imu_spi_conf.frequency = Hertz::mhz(1);
-
-    // TODO: verify that this IMU SPI conf is enough
-
-    let mut imu = MPU6500Driver::new(
-        Spi::new(
-            p.SPI3,
-            p.PB3,
-            p.PB5,
-            p.PB4,
-            p.DMA1_CH5,
-            p.DMA1_CH2,
-            imu_spi_conf,
-        ),
-        gpio::Output::new(p.PA15, gpio::Level::High, gpio::Speed::VeryHigh),
-    );
-    // FIXME: not great to have a hardfault here. Should instead raise a global error
-    // and let it run
-    imu.init().expect("IMU init failed");
-    imu.set_sample_rate_divider(2);
-    imu.set_gyro_scale(GyroScale::Dps500);
-    imu.set_accel_scale(AccelScale::Range4G);
-
-    info!("IMU whoami response: {}", imu.whoami().unwrap());
-
-    // === Configure TIM2 to generate update interrupts ===
+    // TIM2 configuration
+    // It's done via raw register access because I only need the ISR from this guy
+    // NOTE: 500 Hz was chosen because Begode did the same and it works well enough for
+    // them, so idk
+    // And I also save some processing power (at the time of writing, CPU usage difference
+    // between 1 kHz and 500 Hz is 73% and 65% with rudimentary IMU read logic)
+    // TODO: check if all this manual configuration is actually needed, or can I just
+    // configure the thing with Embassy and then manually enable the required interrupt
     unsafe {
         // 1) Enable TIM2 clock on APB1
         pac::RCC.apb1enr().modify(|w| w.set_tim2en(true));
@@ -292,7 +305,7 @@ pub fn init<'a>(p: Peripherals, spawner: &Spawner) {
         // 3) Set prescaler and auto-reload
         let (psc, arr) = {
             let tim: u64 = 84_000_000;
-            let target_hz = Hertz::khz(1).0 as u64;
+            let target_hz = Hertz::hz(500).0 as u64;
 
             // Total divider needed (rounded to nearest).
             // Using rounding reduces systematic bias vs floor division.
@@ -591,10 +604,15 @@ fn TIM8_UP_TIM13() {
 fn TIM2() {
     rtos_trace::trace::isr_enter();
 
+    let mut buf: [u8; 20] = [0; 20];
+
     unsafe {
-        let meas = bsp_periph().imu.get_raw_measurements().unwrap();
-        IMU_DATA = meas;
-        // info!("IMU state: {}", meas);
+        let amount = bsp_periph().imu.read_fifo_all(&mut buf).unwrap();
+        if amount > 0 {
+            IMU_DATA = mpu6500::parse_fifo_data(&mut buf, (amount - 1) * 14).unwrap();
+        }
+        // IMU_DATA = bsp_periph().imu.get_raw_measurements().unwrap();
+        info!("IMU state: {}, buf: {}", IMU_DATA, buf);
     }
     control::aux_loop();
     // Clear update flag
