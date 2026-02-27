@@ -2,13 +2,14 @@
 //! from https://github.com/justdimaa/embedded-sensors/tree/main/src/mpu6500, which is
 //! licensed as Apache 2.0 and MIT.
 extern crate nalgebra as na;
-use defmt::{Format, info, trace};
+use defmt::Format;
 use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::SpiBus;
 use int_enum::IntEnum;
 pub use na::Vector3;
 
 const DEG_TO_RAD: f32 = 0.01745329252;
+const STD_GRAVITY: f32 = 9.80665;
 
 #[derive(Debug, Format)]
 pub enum MpuError {
@@ -134,19 +135,18 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 
     pub fn get_measurements(&mut self) -> Result<Measurements, MpuError> {
         let raw = self.get_raw_measurements()?;
-        // temp conversion
-        //  / 333.87 + 21.0
         Ok(Measurements {
             accel: Vector3::new(
-                raw.accel_x as f32 * self.accel_scale.resolution(),
-                raw.accel_y as f32 * self.accel_scale.resolution(),
-                raw.accel_z as f32 * self.accel_scale.resolution(),
+                raw.accel_x as f32 * self.accel_scale.resolution() * STD_GRAVITY,
+                raw.accel_y as f32 * self.accel_scale.resolution() * STD_GRAVITY,
+                raw.accel_z as f32 * self.accel_scale.resolution() * STD_GRAVITY,
             ),
             gyro: Vector3::new(
                 raw.gyro_x as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
                 raw.gyro_y as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
                 raw.gyro_z as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
             ),
+            temp: raw.temp as f32 / 333.87 + 21.0,
         })
     }
 }
@@ -221,8 +221,12 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 
 #[derive(Debug, Clone, Copy, Format, Default)]
 pub struct Measurements {
+    // m/s^2
     pub accel: Vector3<f32>,
+    // Rads/s
     pub gyro: Vector3<f32>,
+    // Celcius
+    pub temp: f32,
 }
 
 #[derive(Debug, Clone, Copy, Format, Default)]
