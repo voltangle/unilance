@@ -37,15 +37,13 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     }
 
     /// Do initialisation of the IMU. Ideally, you should run it right after creating the
-    /// driver instance.
+    /// driver instance. You should run [MPU6500Driver::reset] with a delay of ~100 ms
+    /// before running init.
     pub fn init(&mut self) -> Result<(), MpuError> {
-        self.reset()?;
         self.reset_signal_path_all()?;
         self.set_register(Register::PWR_MGMT_1, 0b1000000, 0 << 6)?;
         self.set_clock_source(Some(ClockSource::Autoselect))?;
         self.set_spi_mode_only(true)?;
-        // FSYNC to GYRO_OUT_L[0]
-        self.write_register(Register::CONFIG, 4 << 3)?;
         Ok(())
     }
 }
@@ -110,63 +108,6 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.set_register(Register::ACCEL_CONFIG, 0b11000, (scale as u8) << 3)
     }
 
-    pub fn enable_fifo(&mut self, yes: bool) -> Result<(), MpuError> {
-        self.reset_fifo()?;
-        self.set_register(Register::USER_CTRL, 0x40, (yes as u8) << 6)?;
-        // Enable all channels except for SLV ones
-        self.write_register(Register::FIFO_EN, 0xF8)
-    }
-
-    pub fn reset_fifo(&mut self) -> Result<(), MpuError> {
-        self.set_register(Register::USER_CTRL, 0b100, 1 << 2)
-    }
-    //
-    // pub fn select_fifo_channels(
-    //     &mut self,
-    //     channels: FIFOChannels,
-    // ) -> Result<(), MpuError> {
-    //     self.write_register(Register::FIFO_EN, {
-    //         let mut out: u8 = 0;
-    //         out |= (channels.temp as u8) << 7;
-    //         out |= (channels.gyro_x as u8) << 6;
-    //         out |= (channels.gyro_y as u8) << 5;
-    //         out |= (channels.gyro_z as u8) << 4;
-    //         out |= (channels.accel as u8) << 3;
-    //         out
-    //     })
-    // }
-
-    /// The number of available written bytes in the FIFO.
-    pub fn get_fifo_available(&mut self) -> Result<u16, MpuError> {
-        let mut buf: [u8; 2] = [0; 2];
-        self.read_multi(Register::FIFO_COUNTH, &mut buf)?;
-        Ok(make_val!(buf, 0))
-    }
-
-    /// Read all available data from FIFO into the buffer, either limited by available
-    /// data or buffer size.
-    pub fn read_fifo_all<const SIZE: usize>(
-        &mut self,
-        buf: &mut [u8; SIZE],
-    ) -> Result<usize, MpuError> {
-        let amount = {
-            let available = self.get_fifo_available()? as usize;
-            trace!("Available: {}", available);
-            if available > SIZE {
-                SIZE / 14 // 14 means length of all enabled channels, which are temp, gyro,
-            // and accelerometer
-            } else {
-                available / 14
-            }
-        };
-        trace!("Amount: {}", amount);
-        for i in 0..(amount * 14) {
-            let val = self.read_register(Register::FIFO_R_W)?;
-            buf[i] = val;
-        }
-        Ok(amount)
-    }
-
     pub fn get_raw_measurements(&mut self) -> Result<RawMeasurements, MpuError> {
         let mut buf: [u8; 14] = [0; 14];
 
@@ -182,21 +123,6 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
             temp: make_val!(buf, 6),
         })
     }
-}
-
-pub fn parse_fifo_data<const SIZE: usize>(
-    buf: &mut [u8; SIZE],
-    index: usize,
-) -> Result<RawMeasurements, MpuError> {
-    Ok(RawMeasurements {
-        accel_x: make_val!(buf, index + 8) as i16,
-        accel_y: make_val!(buf, index + 10) as i16,
-        accel_z: make_val!(buf, index + 12) as i16,
-        gyro_x: make_val!(buf, index + 2) as i16,
-        gyro_y: make_val!(buf, index + 4) as i16,
-        gyro_z: make_val!(buf, index + 6) as i16,
-        temp: make_val!(buf, index + 0),
-    })
 }
 
 // Lower level register access

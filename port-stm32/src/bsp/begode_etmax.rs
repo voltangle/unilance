@@ -173,12 +173,12 @@ pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
     );
     // FIXME: not great to have a hardfault here. Should instead raise a global error
     // and let it run
-    imu.init().expect("IMU init failed");
+    imu.reset().unwrap();
     Timer::after_millis(100).await;
+    imu.init().unwrap();
     imu.set_sample_rate_divider(2).unwrap();
     imu.set_gyro_scale(GyroScale::Dps500).unwrap();
     imu.set_accel_scale(AccelScale::Range4G).unwrap();
-    imu.enable_fifo(true).unwrap();
 
     Timer::after_millis(150).await;
 
@@ -397,7 +397,139 @@ async fn test_imu_fetcher() {
 }
 
 /*
- * MESC configuration
+ * Clock configurations
+ */
+
+impl PlatformConfig for Config {
+    /// Clock configurations here result in the following frequencies:
+    ///
+    /// - FCLK Cortex: 168 MHz
+    /// - Cortex System timer: 168 MHz
+    /// - Ethernet PTP: 168 MHz
+    /// - HCLK: 168 MHz
+    /// - APB1 peripherals: 42 MHz
+    /// - APB1 timers: 84 MHz
+    /// - APB2 peripherals: 84 MHz
+    /// - APB2 timers: 168 MHz
+    fn for_platform() -> Self {
+        let mut conf = Config::default();
+
+        conf.rcc.hsi = false;
+
+        conf.rcc.hse = Some(Hse {
+            freq: Hertz::mhz(8),
+            mode: HseMode::Oscillator,
+        });
+
+        conf.rcc.sys = Sysclk::PLL1_P;
+        conf.rcc.pll_src = PllSource::HSE;
+        conf.rcc.pll = Some(Pll {
+            prediv: PllPreDiv::DIV4,
+            mul: PllMul::MUL168,
+            divp: Some(PllPDiv::DIV2),
+            divq: None,
+            divr: None,
+        });
+
+        conf.rcc.ahb_pre = AHBPrescaler::DIV1;
+        conf.rcc.apb1_pre = APBPrescaler::DIV4;
+        conf.rcc.apb2_pre = APBPrescaler::DIV2;
+        conf.rcc.mux.rtcsel = RtcClockSource::HSE;
+
+        conf
+    }
+}
+
+/*
+ * Interrupts
+ */
+
+#[exception]
+unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
+    unsafe {
+        const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
+        error!(
+            "HardFault triggered! xpsr: {:#010x}, cfsr: {:#010x}",
+            frame.xpsr(),
+            read_volatile(CFSR)
+        );
+        loop {}
+    }
+}
+
+#[interrupt]
+fn TIM8_UP_TIM13() {
+    rtos_trace::trace::isr_enter();
+
+    adc_dma_read();
+    control::motor_loop();
+
+    // Clear update flag
+    pac::TIM8.sr().modify(|w| w.set_uif(false));
+
+    rtos_trace::trace::isr_exit();
+}
+
+/// The balance loop interrupt
+#[allow(static_mut_refs)]
+#[interrupt]
+fn TIM2() {
+    rtos_trace::trace::isr_enter();
+
+    unsafe {
+        IMU_DATA = bsp_periph().imu.get_raw_measurements().unwrap();
+        info!("IMU state: {}", IMU_DATA);
+    }
+    control::aux_loop();
+    // Clear update flag
+    pac::TIM2.sr().modify(|w| w.set_uif(false));
+
+    rtos_trace::trace::isr_exit();
+}
+
+/*
+ * Platform functions
+ */
+
+pub fn startup_successful() {
+    bsp_periph().poweron.set_high();
+    bsp_periph().motor_tim.set_master_output_enable(true);
+}
+
+/*
+ * BSP-specific functions
+ */
+
+fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
+    let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
+
+    // if the amount of data to write is smaller than half the buffer, then DMA is
+    // writing to the second half of the buffer
+    if ndtr < (buf.len() - 1) / 2 {
+        &buf[..buf.len() / 2]
+    } else {
+        &buf[(buf.len() / 2) - 1..]
+    }
+}
+
+#[allow(static_mut_refs)]
+fn adc_dma_read() {
+    unsafe {
+        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
+        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
+        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
+
+        control::get_state().motor.set_raw_adc(
+            adc1_buf[0], // I_phaseA
+            2048,        // Phase B doesn't have a sensor attached
+            adc2_buf[1], // I_phaseC
+            adc3_buf[0], // V_battery
+        );
+    }
+}
+
+/*
+ * MESC hooks
  */
 
 pub mod foc {
@@ -524,140 +656,3 @@ pub mod foc {
     }
 }
 
-/*
- * Clock configurations
- */
-
-impl PlatformConfig for Config {
-    /// Clock configurations here result in the following frequencies:
-    ///
-    /// - FCLK Cortex: 168 MHz
-    /// - Cortex System timer: 168 MHz
-    /// - Ethernet PTP: 168 MHz
-    /// - HCLK: 168 MHz
-    /// - APB1 peripherals: 42 MHz
-    /// - APB1 timers: 84 MHz
-    /// - APB2 peripherals: 84 MHz
-    /// - APB2 timers: 168 MHz
-    fn for_platform() -> Self {
-        let mut conf = Config::default();
-
-        conf.rcc.hsi = false;
-
-        conf.rcc.hse = Some(Hse {
-            freq: Hertz::mhz(8),
-            mode: HseMode::Oscillator,
-        });
-
-        conf.rcc.sys = Sysclk::PLL1_P;
-        conf.rcc.pll_src = PllSource::HSE;
-        conf.rcc.pll = Some(Pll {
-            prediv: PllPreDiv::DIV4,
-            mul: PllMul::MUL168,
-            divp: Some(PllPDiv::DIV2),
-            divq: None,
-            divr: None,
-        });
-
-        conf.rcc.ahb_pre = AHBPrescaler::DIV1;
-        conf.rcc.apb1_pre = APBPrescaler::DIV4;
-        conf.rcc.apb2_pre = APBPrescaler::DIV2;
-        conf.rcc.mux.rtcsel = RtcClockSource::HSE;
-
-        conf
-    }
-}
-
-/*
- * Interrupts
- */
-
-#[exception]
-unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
-    unsafe {
-        const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
-        error!(
-            "HardFault triggered! xpsr: {:#010x}, cfsr: {:#010x}",
-            frame.xpsr(),
-            read_volatile(CFSR)
-        );
-        loop {}
-    }
-}
-
-#[interrupt]
-fn TIM8_UP_TIM13() {
-    rtos_trace::trace::isr_enter();
-
-    adc_dma_read();
-    control::motor_loop();
-
-    // Clear update flag
-    pac::TIM8.sr().modify(|w| w.set_uif(false));
-
-    rtos_trace::trace::isr_exit();
-}
-
-/// The balance loop interrupt
-#[allow(static_mut_refs)]
-#[interrupt]
-fn TIM2() {
-    rtos_trace::trace::isr_enter();
-
-    let mut buf: [u8; 20] = [0; 20];
-
-    unsafe {
-        let amount = bsp_periph().imu.read_fifo_all(&mut buf).unwrap();
-        if amount > 0 {
-            IMU_DATA = mpu6500::parse_fifo_data(&mut buf, (amount - 1) * 14).unwrap();
-        }
-        // IMU_DATA = bsp_periph().imu.get_raw_measurements().unwrap();
-        info!("IMU state: {}, buf: {}", IMU_DATA, buf);
-    }
-    control::aux_loop();
-    // Clear update flag
-    pac::TIM2.sr().modify(|w| w.set_uif(false));
-
-    rtos_trace::trace::isr_exit();
-}
-
-/*
- * Platform functions
- */
-
-pub fn startup_successful() {
-    bsp_periph().poweron.set_high();
-    bsp_periph().motor_tim.set_master_output_enable(true);
-}
-
-/*
- * BSP-specific functions
- */
-
-fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
-    let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
-
-    // if the amount of data to write is smaller than half the buffer, then DMA is
-    // writing to the second half of the buffer
-    if ndtr < (buf.len() - 1) / 2 {
-        &buf[..buf.len() / 2]
-    } else {
-        &buf[(buf.len() / 2) - 1..]
-    }
-}
-
-#[allow(static_mut_refs)]
-fn adc_dma_read() {
-    unsafe {
-        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
-        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
-        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
-
-        control::get_state().motor.set_raw_adc(
-            adc1_buf[0], // I_phaseA
-            2048,        // Phase B doesn't have a sensor attached
-            adc2_buf[1], // I_phaseC
-            adc3_buf[0], // V_battery
-        );
-    }
-}
