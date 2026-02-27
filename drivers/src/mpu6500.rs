@@ -110,10 +110,12 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     }
 
     pub fn set_gyro_scale(&mut self, scale: GyroScale) -> Result<(), MpuError> {
+        self.gyro_scale = scale;
         self.set_register(Register::GYRO_CONFIG, 0b11000, (scale as u8) << 3)
     }
 
     pub fn set_accel_scale(&mut self, scale: AccelScale) -> Result<(), MpuError> {
+        self.accel_scale = scale;
         self.set_register(Register::ACCEL_CONFIG, 0b11000, (scale as u8) << 3)
     }
 

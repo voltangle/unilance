@@ -466,7 +466,9 @@ fn TIM2() {
             .update_imu(&IMU_DATA.gyro, &IMU_DATA.accel)
             .unwrap()
             .euler_angles();
-        info!("Roll: {}, pitch: {}, yaw: {}", pos.0, pos.1, pos.2);
+        const RAD_TO_DEG: f32 = 57.2957795129;
+        // info!("Roll: {}, pitch: {}, yaw: {}", pos.0 * RAD_TO_DEG, pos.1 * RAD_TO_DEG, pos.2 * RAD_TO_DEG);
+        // info!("IMU data: {}", IMU_DATA);
     }
     control::aux_loop();
     // Clear update flag
