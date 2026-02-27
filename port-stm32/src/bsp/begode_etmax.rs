@@ -7,7 +7,7 @@ use core::ptr::read_volatile;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
 use drivers::mpu6500::{
-    self, AccelScale, FIFOChannels, GyroScale, MPU6500Driver, RawMeasurements,
+    self, AccelScale, FIFOChannels, GyroScale, MPU6500Driver, Measurements, RawMeasurements, Vector3
 };
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
@@ -99,14 +99,9 @@ static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
 // just enough space for smooth operation
 static mut WS281X_BUF: [u16; 500] = [0; 500];
-static mut IMU_DATA: RawMeasurements = RawMeasurements {
-    accel_x: 0,
-    accel_y: 0,
-    accel_z: 0,
-    gyro_x: 0,
-    gyro_y: 0,
-    gyro_z: 0,
-    temp: 0,
+static mut IMU_DATA: Measurements = Measurements {
+    accel: Vector3::new(0.0, 0.0, 0.0),
+    gyro: Vector3::new(0.0, 0.0, 0.0)
 };
 
 #[allow(unused)]
@@ -477,7 +472,7 @@ fn TIM2() {
     rtos_trace::trace::isr_enter();
 
     unsafe {
-        IMU_DATA = bsp_periph().imu.get_raw_measurements().unwrap();
+        IMU_DATA = bsp_periph().imu.get_measurements().unwrap();
         info!("IMU state: {}", IMU_DATA);
     }
     control::aux_loop();
@@ -655,4 +650,3 @@ pub mod foc {
         bsp_periph().motor_tim.set_dead_time(ns / tick_ns as u16);
     }
 }
-

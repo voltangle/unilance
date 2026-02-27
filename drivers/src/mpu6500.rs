@@ -1,13 +1,14 @@
+//! MPU6500 SPI driver based on embedded-hal. Some code like the register enum was taken
+//! from https://github.com/justdimaa/embedded-sensors/tree/main/src/mpu6500, which is
+//! licensed as Apache 2.0 and MIT.
+extern crate nalgebra as na;
 use defmt::{Format, info, trace};
-use embedded_hal::{digital::OutputPin, spi::SpiBus};
+use embedded_hal::digital::OutputPin;
+use embedded_hal::spi::SpiBus;
 use int_enum::IntEnum;
+pub use na::Vector3;
 
-/// Swaps bytes. For reading from read_multi.
-macro_rules! make_val {
-    ($buf:ident, $i:expr) => {
-        (($buf[$i + 1] as u16) << 8 | $buf[$i] as u16)
-    };
-}
+const DEG_TO_RAD: f32 = 0.01745329252;
 
 #[derive(Debug, Format)]
 pub enum MpuError {
@@ -29,11 +30,18 @@ pub enum MpuError {
 pub struct MPU6500Driver<S: SpiBus, O: OutputPin> {
     spi: S,
     cs: O,
+    gyro_scale: GyroScale,
+    accel_scale: AccelScale,
 }
 
 impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn new(spi: S, cs: O) -> Self {
-        Self { spi, cs }
+        Self {
+            spi,
+            cs,
+            gyro_scale: GyroScale::Dps250,
+            accel_scale: AccelScale::Range2G,
+        }
     }
 
     /// Do initialisation of the IMU. Ideally, you should run it right after creating the
@@ -114,13 +122,31 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.read_multi(Register::ACCEL_XOUT_H, &mut buf)?;
 
         Ok(RawMeasurements {
-            accel_x: make_val!(buf, 0) as i16,
-            accel_y: make_val!(buf, 2) as i16,
-            accel_z: make_val!(buf, 4) as i16,
-            gyro_x: make_val!(buf, 8) as i16,
-            gyro_y: make_val!(buf, 10) as i16,
-            gyro_z: make_val!(buf, 12) as i16,
-            temp: make_val!(buf, 6),
+            accel_x: i16::from_be_bytes([buf[0], buf[1]]),
+            accel_y: i16::from_be_bytes([buf[2], buf[3]]),
+            accel_z: i16::from_be_bytes([buf[4], buf[5]]),
+            gyro_x: i16::from_be_bytes([buf[8], buf[9]]),
+            gyro_y: i16::from_be_bytes([buf[10], buf[11]]),
+            gyro_z: i16::from_be_bytes([buf[12], buf[13]]),
+            temp: i16::from_be_bytes([buf[6], buf[7]]),
+        })
+    }
+
+    pub fn get_measurements(&mut self) -> Result<Measurements, MpuError> {
+        let raw = self.get_raw_measurements()?;
+        // temp conversion
+        //  / 333.87 + 21.0
+        Ok(Measurements {
+            accel: Vector3::new(
+                raw.accel_x as f32 * self.accel_scale.resolution(),
+                raw.accel_y as f32 * self.accel_scale.resolution(),
+                raw.accel_z as f32 * self.accel_scale.resolution(),
+            ),
+            gyro: Vector3::new(
+                raw.gyro_x as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
+                raw.gyro_y as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
+                raw.gyro_z as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
+            ),
         })
     }
 }
@@ -153,8 +179,8 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 
     pub fn read_register(&mut self, reg: Register) -> Result<u8, MpuError> {
         self.start_operation()?;
-        let _ = self.write(reg as u8 + 0x80)?; // 0x80 sets the RW bit, indicating that
-                                               // this is a read operation
+        // 0x80 sets the RW bit, indicating that this is a read operation
+        let _ = self.write(reg as u8 + 0x80)?;
         let res = self.write(0xFF)?;
         self.end_operation()?;
         Ok(res)
@@ -194,6 +220,12 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 }
 
 #[derive(Debug, Clone, Copy, Format, Default)]
+pub struct Measurements {
+    pub accel: Vector3<f32>,
+    pub gyro: Vector3<f32>,
+}
+
+#[derive(Debug, Clone, Copy, Format, Default)]
 pub struct FIFOChannels {
     pub temp: bool,
     pub gyro_x: bool,
@@ -211,6 +243,17 @@ pub enum GyroScale {
     Dps2000 = 0b11,
 }
 
+impl GyroScale {
+    pub fn resolution(&self) -> f32 {
+        match self {
+            GyroScale::Dps250 => 250.0 / 32768.0,
+            GyroScale::Dps500 => 500.0 / 32768.0,
+            GyroScale::Dps1000 => 1000.0 / 32768.0,
+            GyroScale::Dps2000 => 2000.0 / 32768.0,
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Format, IntEnum)]
 pub enum AccelScale {
@@ -218,6 +261,17 @@ pub enum AccelScale {
     Range4G,
     Range8G,
     Range16G,
+}
+
+impl AccelScale {
+    pub fn resolution(&self) -> f32 {
+        match self {
+            AccelScale::Range2G => 2.0 / 32768.0,
+            AccelScale::Range4G => 4.0 / 32768.0,
+            AccelScale::Range8G => 8.0 / 32768.0,
+            AccelScale::Range16G => 16.0 / 32768.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Format, Default)]
@@ -228,7 +282,7 @@ pub struct RawMeasurements {
     pub gyro_x: i16,
     pub gyro_y: i16,
     pub gyro_z: i16,
-    pub temp: u16,
+    pub temp: i16,
 }
 
 #[repr(u8)]
@@ -245,6 +299,8 @@ pub enum ClockSource {
 #[derive(Debug, Clone, Copy, Format, IntEnum)]
 pub enum DeviceModel {
     MPU6500 = 0x70,
+    MPU9250 = 0x71,
+    MPU9255 = 0x73,
 }
 
 #[allow(dead_code, non_camel_case_types)]
