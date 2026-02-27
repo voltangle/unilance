@@ -31,17 +31,24 @@ pub enum MpuError {
 pub struct MPU6500Driver<S: SpiBus, O: OutputPin> {
     spi: S,
     cs: O,
-    gyro_scale: GyroScale,
-    accel_scale: AccelScale,
+    gyro_range: GyroRange,
+    gyro_bias: Vector3<f32>,
+    accel_range: AccelRange,
+    accel_bias: Vector3<f32>,
+    accel_scale: Vector3<f32>,
 }
 
+// Starting functions
 impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn new(spi: S, cs: O) -> Self {
         Self {
             spi,
             cs,
-            gyro_scale: GyroScale::Dps250,
-            accel_scale: AccelScale::Range2G,
+            gyro_range: GyroRange::Dps250,
+            gyro_bias: Vector3::new(0.0, 0.0, 0.0),
+            accel_range: AccelRange::Range2G,
+            accel_bias: Vector3::new(0.0, 0.0, 0.0),
+            accel_scale: Vector3::new(0.0, 0.0, 0.0),
         }
     }
 
@@ -57,7 +64,7 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     }
 }
 
-// Safe API over raw register reads
+// High level safe API over raw register reads
 impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn whoami(&mut self) -> Result<DeviceModel, MpuError> {
         let val = self.read_register(Register::WHO_AM_I)?;
@@ -109,16 +116,20 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.write_register(Register::SMPLRT_DIV, div - 1)
     }
 
-    pub fn set_gyro_scale(&mut self, scale: GyroScale) -> Result<(), MpuError> {
-        self.gyro_scale = scale;
-        self.set_register(Register::GYRO_CONFIG, 0b11000, (scale as u8) << 3)
+    /// Set gyroscope range. Check out [GyroRange] for all available values.
+    pub fn set_gyro_range(&mut self, range: GyroRange) -> Result<(), MpuError> {
+        self.gyro_range = range;
+        self.set_register(Register::GYRO_CONFIG, 0b11000, (range as u8) << 3)
     }
 
-    pub fn set_accel_scale(&mut self, scale: AccelScale) -> Result<(), MpuError> {
-        self.accel_scale = scale;
-        self.set_register(Register::ACCEL_CONFIG, 0b11000, (scale as u8) << 3)
+    /// Set accelerometer range. Check out [AccelRange] for all available values.
+    pub fn set_accel_range(&mut self, range: AccelRange) -> Result<(), MpuError> {
+        self.accel_range = range;
+        self.set_register(Register::ACCEL_CONFIG, 0b11000, (range as u8) << 3)
     }
 
+    /// Read current IMU data, without doing any processing on it. Values from the IMU
+    /// are passed as-is, directly from the chip.
     pub fn get_raw_measurements(&mut self) -> Result<RawMeasurements, MpuError> {
         let mut buf: [u8; 14] = [0; 14];
 
@@ -134,22 +145,68 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
             temp: i16::from_be_bytes([buf[6], buf[7]]),
         })
     }
+}
 
+// Higher level helper functions
+impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
+    /// Fetch current measurements, applying calibration offsets and scaling.
+    ///
+    /// Output units of measurement are Rad/s for gyro, m/s^2 for accelerometer, and
+    /// Celcius for temperature.
     pub fn get_measurements(&mut self) -> Result<Measurements, MpuError> {
         let raw = self.get_raw_measurements()?;
         Ok(Measurements {
+            accel: (Vector3::new(
+                raw.accel_x as f32 * self.accel_range.conv_multiplier() * STD_GRAVITY,
+                raw.accel_y as f32 * self.accel_range.conv_multiplier() * STD_GRAVITY,
+                raw.accel_z as f32 * self.accel_range.conv_multiplier() * STD_GRAVITY,
+            ) - self.accel_bias)
+                .component_mul(&self.accel_scale),
+            gyro: Vector3::new(
+                raw.gyro_x as f32 * self.gyro_range.conv_multiplier() * DEG_TO_RAD,
+                raw.gyro_y as f32 * self.gyro_range.conv_multiplier() * DEG_TO_RAD,
+                raw.gyro_z as f32 * self.gyro_range.conv_multiplier() * DEG_TO_RAD,
+            ) - self.gyro_bias,
+            temp: raw.temp as f32 / 333.87 + 21.0,
+        })
+    }
+
+    /// Fetch current measurements without applying calibration offsets and scaling.
+    ///
+    /// Output units of measurement are Rad/s for gyro, m/s^2 for accelerometer, and
+    /// Celcius for temperature.
+    pub fn get_measurements_uncalibrated(&mut self) -> Result<Measurements, MpuError> {
+        let raw = self.get_raw_measurements()?;
+        Ok(Measurements {
             accel: Vector3::new(
-                raw.accel_x as f32 * self.accel_scale.resolution() * STD_GRAVITY,
-                raw.accel_y as f32 * self.accel_scale.resolution() * STD_GRAVITY,
-                raw.accel_z as f32 * self.accel_scale.resolution() * STD_GRAVITY,
+                raw.accel_x as f32 * self.accel_range.conv_multiplier() * STD_GRAVITY,
+                raw.accel_y as f32 * self.accel_range.conv_multiplier() * STD_GRAVITY,
+                raw.accel_z as f32 * self.accel_range.conv_multiplier() * STD_GRAVITY,
             ),
             gyro: Vector3::new(
-                raw.gyro_x as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
-                raw.gyro_y as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
-                raw.gyro_z as f32 * self.gyro_scale.resolution() * DEG_TO_RAD,
+                raw.gyro_x as f32 * self.gyro_range.conv_multiplier() * DEG_TO_RAD,
+                raw.gyro_y as f32 * self.gyro_range.conv_multiplier() * DEG_TO_RAD,
+                raw.gyro_z as f32 * self.gyro_range.conv_multiplier() * DEG_TO_RAD,
             ),
             temp: raw.temp as f32 / 333.87 + 21.0,
         })
+    }
+
+    /// Saves the offsets and applies them on each [MPU6500Driver::get_measurement] call.
+    ///
+    /// Accel and gyro units are m/s^2 and Rad/s, same as in the previously mentioned
+    /// function.
+    pub fn set_biases(&mut self, accel: Vector3<f32>, gyro: Vector3<f32>) {
+        self.accel_bias = accel;
+        self.gyro_bias = gyro;
+    }
+
+    /// Saves the accelerometer scaling values. They are then applied in
+    /// [MPU6500Driver::get_measurement] calls.
+    ///
+    /// Units are m/s^2, same as in the previously mentioned function.
+    pub fn set_accel_scale(&mut self, scale: Vector3<f32>) {
+        self.accel_scale = scale;
     }
 }
 
@@ -165,6 +222,12 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.write_register(reg, (current & !mask) | value & mask)
     }
 
+    /// Read multiple registers sequentially.
+    ///
+    /// For example, if you pass in [Register::ACCEL_XOUT_H] and size the buffer to have
+    /// 14 bytes of capacity, it will read 14 registers starting with the address of the
+    /// register passed in, and then effectively incrementing the register address with
+    /// each subsequent read.
     pub fn read_multi<const SIZE: usize>(
         &mut self,
         reg: Register,
@@ -231,51 +294,44 @@ pub struct Measurements {
     pub temp: f32,
 }
 
-#[derive(Debug, Clone, Copy, Format, Default)]
-pub struct FIFOChannels {
-    pub temp: bool,
-    pub gyro_x: bool,
-    pub gyro_y: bool,
-    pub gyro_z: bool,
-    pub accel: bool,
-}
-
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Format, IntEnum)]
-pub enum GyroScale {
+pub enum GyroRange {
     Dps250 = 0b00,
     Dps500 = 0b01,
     Dps1000 = 0b10,
     Dps2000 = 0b11,
 }
 
-impl GyroScale {
-    pub fn resolution(&self) -> f32 {
+impl GyroRange {
+    /// Conversion multiplier for converting from raw counts to Rad/s.
+    pub fn conv_multiplier(&self) -> f32 {
         match self {
-            GyroScale::Dps250 => 250.0 / 32768.0,
-            GyroScale::Dps500 => 500.0 / 32768.0,
-            GyroScale::Dps1000 => 1000.0 / 32768.0,
-            GyroScale::Dps2000 => 2000.0 / 32768.0,
+            GyroRange::Dps250 => 250.0 / 32768.0,
+            GyroRange::Dps500 => 500.0 / 32768.0,
+            GyroRange::Dps1000 => 1000.0 / 32768.0,
+            GyroRange::Dps2000 => 2000.0 / 32768.0,
         }
     }
 }
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Format, IntEnum)]
-pub enum AccelScale {
+pub enum AccelRange {
     Range2G,
     Range4G,
     Range8G,
     Range16G,
 }
 
-impl AccelScale {
-    pub fn resolution(&self) -> f32 {
+impl AccelRange {
+    /// Conversion multiplier for converting from raw counts to m/s^2.
+    pub fn conv_multiplier(&self) -> f32 {
         match self {
-            AccelScale::Range2G => 2.0 / 32768.0,
-            AccelScale::Range4G => 4.0 / 32768.0,
-            AccelScale::Range8G => 8.0 / 32768.0,
-            AccelScale::Range16G => 16.0 / 32768.0,
+            AccelRange::Range2G => 2.0 / 32768.0,
+            AccelRange::Range4G => 4.0 / 32768.0,
+            AccelRange::Range8G => 8.0 / 32768.0,
+            AccelRange::Range16G => 16.0 / 32768.0,
         }
     }
 }
@@ -309,7 +365,7 @@ pub enum DeviceModel {
     MPU9255 = 0x73,
 }
 
-#[allow(dead_code, non_camel_case_types)]
+#[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy, Format)]
 pub enum Register {
     SELF_TEST_X_GYRO = 0x00,

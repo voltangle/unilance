@@ -13,7 +13,7 @@ use crate::bsp::PlatformConfig;
 use crate::roles::{CoreChannel, MemChannelCoreLink};
 use core::{ptr::read_volatile, sync::atomic::Ordering};
 use cortex_m::Peripherals;
-use cortex_m_rt::{exception, ExceptionFrame};
+use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_stm32::{Config, bind_interrupts};
