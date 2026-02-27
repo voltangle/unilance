@@ -11,10 +11,10 @@ mod roles;
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use core::sync::atomic::Ordering;
+use core::{ptr::read_volatile, sync::atomic::Ordering};
 use cortex_m::Peripherals;
 use cortex_m_rt::{exception, ExceptionFrame};
-use defmt::info;
+use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_stm32::{Config, bind_interrupts};
 #[for_role("combined")]
