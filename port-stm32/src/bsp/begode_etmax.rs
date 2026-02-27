@@ -2,12 +2,13 @@ use super::PlatformConfig;
 use crate::Irqs;
 use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::roles::control;
+use ahrs::{Ahrs, Madgwick};
 use core::mem::MaybeUninit;
 use core::ptr::read_volatile;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
 use drivers::mpu6500::{
-    self, AccelScale, FIFOChannels, GyroScale, MPU6500Driver, Measurements, RawMeasurements, Vector3
+    AccelScale, GyroScale, MPU6500Driver, Measurements, Vector3,
 };
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
@@ -79,7 +80,7 @@ use static_cell::StaticCell;
  * - DMA2 Stream 3 on ADC2: I_phaceC, T_driver
  *
  * Custom IRQs:
- * - TIM2: balance loop
+ * - TIM2: Auxiliary loop
  * - ADC: MESC ADC handler
  * - TIM8_UP_TIM13: MESC PWM handler
  */
@@ -91,18 +92,16 @@ use static_cell::StaticCell;
 
 pub const STARTUP_DELAY_MS: u64 = 1500;
 
-// TODO: Figure out how to store the balance configuration settings
-// Maybe do as an array of tuples that has all control value assignments
-
 static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
 static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
-// just enough space for smooth operation
-static mut WS281X_BUF: [u16; 500] = [0; 500];
+
 static mut IMU_DATA: Measurements = Measurements {
     accel: Vector3::new(0.0, 0.0, 0.0),
-    gyro: Vector3::new(0.0, 0.0, 0.0)
+    gyro: Vector3::new(0.0, 0.0, 0.0),
+    temp: 0.0,
 };
+static mut AHRS: MaybeUninit<Madgwick<f32>> = MaybeUninit::uninit();
 
 #[allow(unused)]
 pub struct BspPeripherals<'a> {
@@ -132,6 +131,9 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 /// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
 pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
+    unsafe {
+        AHRS.write(Madgwick::new(0.002, 0.1));
+    }
     let mut serial_config = usart::Config::default();
     serial_config.baudrate = 115200;
     let serial = Uart::new(
@@ -439,19 +441,6 @@ impl PlatformConfig for Config {
  * Interrupts
  */
 
-#[exception]
-unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
-    unsafe {
-        const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
-        error!(
-            "HardFault triggered! xpsr: {:#010x}, cfsr: {:#010x}",
-            frame.xpsr(),
-            read_volatile(CFSR)
-        );
-        loop {}
-    }
-}
-
 #[interrupt]
 fn TIM8_UP_TIM13() {
     rtos_trace::trace::isr_enter();
@@ -473,7 +462,11 @@ fn TIM2() {
 
     unsafe {
         IMU_DATA = bsp_periph().imu.get_measurements().unwrap();
-        info!("IMU state: {}", IMU_DATA);
+        let pos = (*AHRS.as_mut_ptr())
+            .update_imu(&IMU_DATA.gyro, &IMU_DATA.accel)
+            .unwrap()
+            .euler_angles();
+        info!("Roll: {}, pitch: {}, yaw: {}", pos.0, pos.1, pos.2);
     }
     control::aux_loop();
     // Clear update flag
