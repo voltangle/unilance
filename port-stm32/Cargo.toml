@@ -70,6 +70,7 @@ board_begode_etmax = [
     "role_supervisor",
     "role_control",
     "stm32f405rg",
+    "drivers/mpu6500",
     "embassy-stm32/time-driver-tim5",
     "embassy-executor/scheduler-deadline"
 ]
