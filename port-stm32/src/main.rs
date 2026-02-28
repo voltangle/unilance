@@ -8,15 +8,13 @@ mod driver;
 mod mesc_impl;
 mod roles;
 
+use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use crate::{
-    bsp::PlatformConfig,
-    cpu_usage::{init, now_cycles, Snapshot},
-};
-use core::sync::atomic::Ordering;
+use core::{ptr::read_volatile, sync::atomic::Ordering};
 use cortex_m::Peripherals;
-use defmt::info;
+use cortex_m_rt::{ExceptionFrame, exception};
+use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_stm32::{Config, bind_interrupts};
 #[for_role("combined")]
@@ -43,7 +41,7 @@ async fn main(spawner: Spawner) -> ! {
     let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
     Timer::after_millis(2000).await;
 
-    bsp::init(p, &spawner);
+    bsp::init(p, &spawner).await;
     info!("BSP init finished");
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::init();
@@ -96,4 +94,17 @@ fn make_core_link(is_for_supervisor: bool) -> MemChannelCoreLink<'static> {
 #[for_role("either")]
 fn make_core_link(is_for_supervisor: bool) -> CanBusCoreLink {
     unimplemented!()
+}
+
+#[exception]
+unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
+    unsafe {
+        const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
+        error!(
+            "HardFault triggered! xpsr: {:#010x}, cfsr: {:#010x}",
+            frame.xpsr(),
+            read_volatile(CFSR)
+        );
+        loop {}
+    }
 }

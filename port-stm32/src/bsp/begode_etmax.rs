@@ -2,10 +2,10 @@ use super::PlatformConfig;
 use crate::Irqs;
 use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::roles::control;
+use ahrs::{Ahrs, Madgwick};
 use core::mem::MaybeUninit;
-use core::ptr::read_volatile;
-use cortex_m_rt::{ExceptionFrame, exception};
-use defmt::{error, info};
+use defmt::info;
+use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Measurements, Vector3};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -13,7 +13,9 @@ use embassy_stm32::adc::{
 };
 use embassy_stm32::gpio::OutputType;
 use embassy_stm32::interrupt::typelevel::{self, Interrupt};
+use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::Async;
+use embassy_stm32::pac::timer::vals::Urs;
 use embassy_stm32::pac::DMA2;
 use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
@@ -21,12 +23,14 @@ use embassy_stm32::rcc::{
     RtcClockSource, Sysclk,
 };
 use embassy_stm32::spi::Spi;
+use embassy_stm32::spi::mode::Master;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
-use embassy_stm32::timer::low_level::{CountingMode, RoundTo};
+use embassy_stm32::timer::low_level::{self, CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::usart::{self, Uart};
-use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi, timer};
+use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi};
+use embassy_time::Timer;
 use mesc::MescMotorExt;
 use static_cell::StaticCell;
 
@@ -40,7 +44,8 @@ use static_cell::StaticCell;
  * - TIM3 on PA6: Tail light WS281x
  * - TIM4 on PB9: Passive buzzer
  * - TIM5: Embassy time source
- * - SPI1 on PB3,4,5 + SPI1 SS PA15: MPU6500 IMU
+ * - TIM2: Auxiliary loop
+ * - SPI3 on PB3,4,5 + SPI3 SS PA15: MPU6500 IMU
  * - USART1 on PA9,10: BLE module
  * - USART3 on PB10,11: BMS
  * - PB6, PB7, PB8: hall sensors
@@ -54,7 +59,7 @@ use static_cell::StaticCell;
  *
  * Clock sources:
  * - HSI: unused
- * - HSE: 8 MHz bypass
+ * - HSE: 8 MHz oscillator
  * - LSI: unused
  *
  * ADC pins:
@@ -71,7 +76,7 @@ use static_cell::StaticCell;
  * - DMA2 Stream 3 on ADC2: I_phaceC, T_driver
  *
  * Custom IRQs:
- * - TIM2: balance loop
+ * - TIM2: Auxiliary loop
  * - ADC: MESC ADC handler
  * - TIM8_UP_TIM13: MESC PWM handler
  */
@@ -83,14 +88,17 @@ use static_cell::StaticCell;
 
 pub const STARTUP_DELAY_MS: u64 = 1500;
 
-// TODO: Figure out how to store the balance configuration settings
-// Maybe do as an array of tuples that has all control value assignments
-
 static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
 static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
-// just enough space for smooth operation
-static mut WS281X_BUF: [u16; 500] = [0; 500];
+
+static mut IMU_DATA: Measurements = Measurements {
+    accel: Vector3::new(0.0, 0.0, 0.0),
+    gyro: Vector3::new(0.0, 0.0, 0.0),
+    temp: 0.0,
+};
+static mut AHRS: MaybeUninit<Madgwick<f32>> = MaybeUninit::uninit();
+static mut AHRS_DATA: (f32, f32, f32) = (0.0, 0.0, 0.0);
 
 #[allow(unused)]
 pub struct BspPeripherals<'a> {
@@ -100,9 +108,10 @@ pub struct BspPeripherals<'a> {
     adc1: RingBufferedAdc<'a, ADC1>,
     adc2: RingBufferedAdc<'a, ADC2>,
     adc3: RingBufferedAdc<'a, ADC3>,
-    balance_loop_tim: timer::low_level::Timer<'a, TIM2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
     ws281x_tim: SimplePwm<'a, TIM3>,
+    aux_loop_tim: low_level::Timer<'a, TIM2>,
+    imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
 }
 
 static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
@@ -119,7 +128,10 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
 /// Peripherals initialized here have to be ONLY initialized. They have to be either off
 /// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
-pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
+pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
+    unsafe {
+        AHRS.write(Madgwick::new(1.0 / 500.0, 0.1));
+    }
     let mut serial_config = usart::Config::default();
     serial_config.baudrate = 115200;
     let serial = Uart::new(
@@ -135,6 +147,37 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     defmt_serial::defmt_serial(DEFMT_SERIAL.init(serial));
     info!("defmt-serial started");
+
+    let mut imu_spi_conf = spi::Config::default();
+    imu_spi_conf.mode = spi::MODE_0;
+    imu_spi_conf.frequency = Hertz::mhz(1);
+
+    // TODO: verify that this IMU SPI conf is enough
+
+    let mut imu = MPU6500Driver::new(
+        Spi::new(
+            p.SPI3,
+            p.PB3,
+            p.PB5,
+            p.PB4,
+            p.DMA1_CH5,
+            p.DMA1_CH2,
+            imu_spi_conf,
+        ),
+        gpio::Output::new(p.PA15, gpio::Level::High, gpio::Speed::VeryHigh),
+    );
+    // FIXME: not great to have a hardfault here. Should instead raise a global error
+    // and let it run
+    imu.reset().unwrap();
+    Timer::after_millis(100).await;
+    imu.init().unwrap();
+    imu.set_sample_rate_divider(2).unwrap();
+    imu.set_gyro_range(GyroRange::Dps500).unwrap();
+    imu.set_accel_range(AccelRange::Range4G).unwrap();
+
+    Timer::after_millis(150).await;
+
+    info!("IMU whoami response: {}", imu.whoami().unwrap());
 
     let i_battery = p.PC0.degrade_adc();
     let t_driver = p.PC1.degrade_adc();
@@ -200,10 +243,6 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         )
     };
 
-    let balance_loop_tim = timer::low_level::Timer::new(p.TIM2);
-    balance_loop_tim.set_frequency(Hertz::khz(1), RoundTo::Slower);
-    balance_loop_tim.enable_update_interrupt(true);
-
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
         Some(PwmPin::new(p.PC6, OutputType::PushPull)),
@@ -214,7 +253,7 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         Some(ComplementaryPwmPin::new(p.PB1, OutputType::PushPull)),
         None,
         None,
-        Hertz::hz(10_000),
+        Hertz::khz(10),
         CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
@@ -235,19 +274,27 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         CountingMode::EdgeAlignedUp,
     );
 
-    let mut imu_spi_conf = spi::Config::default();
-    imu_spi_conf.mode = spi::MODE_0;
-    imu_spi_conf.frequency = Hertz::mhz(1);
+    // NOTE: 500 Hz was chosen because Begode did the same and it works well enough for
+    // them, so idk
+    // And I also save some processing power (at the time of writing, CPU usage difference
+    // between 1 kHz and 500 Hz is 73% and 65% with rudimentary IMU read logic)
+    let aux_loop_tim = low_level::Timer::new(p.TIM2);
+    aux_loop_tim.stop(); // can never be too cautious
+    aux_loop_tim.set_frequency(Hertz::hz(500), RoundTo::Slower);
+    aux_loop_tim.set_counting_mode(CountingMode::EdgeAlignedUp);
+    aux_loop_tim.generate_update_event();
+    aux_loop_tim.clear_update_interrupt();
+    aux_loop_tim.enable_update_interrupt(true);
+    aux_loop_tim.regs_core().cr1().modify(|w| {
+        w.set_urs(Urs::COUNTER_ONLY);
+        w.set_arpe(true)
+    });
+    unsafe {
+        cortex_m::peripheral::NVIC::unmask(pac::Interrupt::TIM2);
+    }
+    pac::Interrupt::TIM2.set_priority(Priority::P2);
 
-    let _imu_spi = Spi::new(
-        p.SPI3,
-        p.PB3,
-        p.PB5,
-        p.PB4,
-        p.DMA1_CH5,
-        p.DMA1_CH2,
-        imu_spi_conf,
-    );
+    aux_loop_tim.start();
 
     unsafe {
         BSP_PERIPH.write(BspPeripherals {
@@ -257,16 +304,158 @@ pub fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             adc1: adc1_rb,
             adc2: adc2_rb,
             adc3: adc3_rb,
-            balance_loop_tim,
             motor_tim,
             ws281x_tim,
+            aux_loop_tim,
+            imu,
         });
     }
+    spawner.spawn(ahrs_display().unwrap());
     info!("BSP peripherals initialized");
 }
 
+#[allow(static_mut_refs)]
+#[embassy_executor::task]
+async fn ahrs_display() {
+    unsafe {
+        const RAD_TO_DEG: f32 = 57.2957795129;
+        loop {
+            info!(
+                "Roll: {}, pitch: {}, yaw: {}",
+                AHRS_DATA.0 * RAD_TO_DEG,
+                AHRS_DATA.1 * RAD_TO_DEG,
+                AHRS_DATA.2 * RAD_TO_DEG
+            );
+            Timer::after_millis(100).await;
+        }
+    }
+}
+
 /*
- * MESC configuration
+ * Clock configurations
+ */
+
+impl PlatformConfig for Config {
+    /// Clock configurations here result in the following frequencies:
+    ///
+    /// - FCLK Cortex: 168 MHz
+    /// - Cortex System timer: 168 MHz
+    /// - Ethernet PTP: 168 MHz
+    /// - HCLK: 168 MHz
+    /// - APB1 peripherals: 42 MHz
+    /// - APB1 timers: 84 MHz
+    /// - APB2 peripherals: 84 MHz
+    /// - APB2 timers: 168 MHz
+    fn for_platform() -> Self {
+        let mut conf = Config::default();
+
+        conf.rcc.hsi = false;
+
+        conf.rcc.hse = Some(Hse {
+            freq: Hertz::mhz(8),
+            mode: HseMode::Oscillator,
+        });
+
+        conf.rcc.sys = Sysclk::PLL1_P;
+        conf.rcc.pll_src = PllSource::HSE;
+        conf.rcc.pll = Some(Pll {
+            prediv: PllPreDiv::DIV4,
+            mul: PllMul::MUL168,
+            divp: Some(PllPDiv::DIV2),
+            divq: None,
+            divr: None,
+        });
+
+        conf.rcc.ahb_pre = AHBPrescaler::DIV1;
+        conf.rcc.apb1_pre = APBPrescaler::DIV4;
+        conf.rcc.apb2_pre = APBPrescaler::DIV2;
+        conf.rcc.mux.rtcsel = RtcClockSource::HSE;
+
+        conf
+    }
+}
+
+/*
+ * Interrupts
+ */
+
+#[interrupt]
+fn TIM8_UP_TIM13() {
+    rtos_trace::trace::isr_enter();
+
+    adc_dma_read();
+    control::motor_loop();
+
+    // Clear update flag
+    pac::TIM8.sr().modify(|w| w.set_uif(false));
+
+    rtos_trace::trace::isr_exit();
+}
+
+/// The balance loop interrupt
+#[allow(static_mut_refs)]
+#[interrupt]
+fn TIM2() {
+    rtos_trace::trace::isr_enter();
+
+    // Clear update flag
+    pac::TIM2.sr().modify(|w| w.set_uif(false));
+
+    unsafe {
+        IMU_DATA = bsp_periph().imu.get_measurements().unwrap();
+        AHRS_DATA = (*AHRS.as_mut_ptr())
+            .update_imu(&IMU_DATA.gyro, &IMU_DATA.accel)
+            .unwrap()
+            .euler_angles();
+    }
+    control::aux_loop();
+
+    rtos_trace::trace::isr_exit();
+}
+
+/*
+ * Platform functions
+ */
+
+pub fn startup_successful() {
+    bsp_periph().poweron.set_high();
+    bsp_periph().motor_tim.set_master_output_enable(true);
+}
+
+/*
+ * BSP-specific functions
+ */
+
+fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
+    let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
+
+    // if the amount of data to write is smaller than half the buffer, then DMA is
+    // writing to the second half of the buffer
+    if ndtr < (buf.len() - 1) / 2 {
+        &buf[..buf.len() / 2]
+    } else {
+        &buf[(buf.len() / 2) - 1..]
+    }
+}
+
+#[allow(static_mut_refs)]
+fn adc_dma_read() {
+    unsafe {
+        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
+        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
+        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
+
+        control::get_state().motor.set_raw_adc(
+            adc1_buf[0], // I_phaseA
+            2048,        // Phase B doesn't have a sensor attached
+            adc2_buf[1], // I_phaseC
+            adc3_buf[0], // V_battery
+        );
+    }
+}
+
+/*
+ * MESC hooks
  */
 
 pub mod foc {
@@ -390,128 +579,5 @@ pub mod foc {
         let tick_ns = ns_in_sec / tim_clk;
 
         bsp_periph().motor_tim.set_dead_time(ns / tick_ns as u16);
-    }
-}
-
-/*
- * Clock configurations
- */
-
-impl PlatformConfig for Config {
-    /// Clock configurations here result in the following frequencies:
-    ///
-    /// - FCLK Cortex: 168 MHz
-    /// - Cortex System timer: 168 MHz
-    /// - Ethernet PTP: 168 MHz
-    /// - HCLK: 168 MHz
-    /// - APB1 peripherals: 42 MHz
-    /// - APB1 timers: 84 MHz
-    /// - APB2 peripherals: 84 MHz
-    /// - APB2 timers: 168 MHz
-    fn for_platform() -> Self {
-        let mut conf = Config::default();
-
-        conf.rcc.hsi = false;
-
-        conf.rcc.hse = Some(Hse {
-            freq: Hertz::mhz(8),
-            mode: HseMode::Oscillator,
-        });
-
-        conf.rcc.sys = Sysclk::PLL1_P;
-        conf.rcc.pll_src = PllSource::HSE;
-        conf.rcc.pll = Some(Pll {
-            prediv: PllPreDiv::DIV4,
-            mul: PllMul::MUL168,
-            divp: Some(PllPDiv::DIV2),
-            divq: None,
-            divr: None,
-        });
-
-        conf.rcc.ahb_pre = AHBPrescaler::DIV1;
-        conf.rcc.apb1_pre = APBPrescaler::DIV4;
-        conf.rcc.apb2_pre = APBPrescaler::DIV2;
-        conf.rcc.mux.rtcsel = RtcClockSource::HSE;
-
-        conf
-    }
-}
-
-/*
- * Interrupts
- */
-
-#[exception]
-unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
-    unsafe {
-        const CFSR: *mut u32 = 0xE000ED28 as *mut u32;
-        error!(
-            "HardFault triggered! xpsr: {:#010x}, cfsr: {:#010x}",
-            frame.xpsr(),
-            read_volatile(CFSR)
-        );
-        loop {}
-    }
-}
-
-#[interrupt]
-fn TIM8_UP_TIM13() {
-    rtos_trace::trace::isr_enter();
-
-    adc_dma_read();
-    control::motor_loop();
-
-    // Clear update flag
-    pac::TIM8.sr().modify(|w| w.set_uif(false));
-
-    rtos_trace::trace::isr_exit();
-}
-
-/// The balance loop interrupt
-#[interrupt]
-fn TIM2() {
-    rtos_trace::trace::isr_enter();
-    control::aux_loop();
-    rtos_trace::trace::isr_exit();
-}
-
-/*
- * Platform functions
- */
-
-pub fn startup_successful() {
-    bsp_periph().poweron.set_high();
-    bsp_periph().motor_tim.set_master_output_enable(true);
-}
-
-/*
- * BSP-specific functions
- */
-
-fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
-    let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
-
-    // if the amount of data to write is smaller than half the buffer, then DMA is
-    // writing to the second half of the buffer
-    if ndtr < (buf.len() - 1) / 2 {
-        &buf[..buf.len() / 2]
-    } else {
-        &buf[(buf.len() / 2) - 1..]
-    }
-}
-
-#[allow(static_mut_refs)]
-fn adc_dma_read() {
-    unsafe {
-        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
-        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
-        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
-
-        control::get_state().motor.set_raw_adc(
-            adc1_buf[0], // I_phaseA
-            2048,        // Phase B doesn't have a sensor attached
-            adc2_buf[1], // I_phaseC
-            adc3_buf[0], // V_battery
-        );
     }
 }

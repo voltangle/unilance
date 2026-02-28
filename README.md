@@ -92,7 +92,7 @@ completely off tho, most of the time it's just in a power saving state.
 - [x] Figure out ports for different MCUs and boards
 - [x] Implement support for both single and dual MCU boards
 - [x] Make MESC work (no linker errors, all functions (at least theoretically) properly start)
-    - [ ] Refactor the configuration system
+    - [x] Refactor the configuration system
 - [x] Properly do the ET Max config
 - [x] Implement input method gestures
 - [ ] Make the power button work (only turn on and off for now)
