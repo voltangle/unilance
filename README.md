@@ -7,8 +7,10 @@ and motor control stuff. All credit for that goes to the creator, David Molony.
 - Rust (of course)
 - embassy-rs as the async runtime and HAL
 - littlefs as the filesystem
-- postcard as the wire message format
+- postcard as the wire message and (sometimes) storage format
 - MESC as the FOC implementation
+- Madgwick algorithm as AHRS
+- Compose Multiplatform for the LANCEmate app
 
 ## Building
 
