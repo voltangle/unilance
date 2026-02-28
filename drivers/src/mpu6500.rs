@@ -236,7 +236,9 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         self.start_operation()?;
         _ = self.write(reg as u8 | 0x80)?;
         let write_buf: [u8; SIZE] = [0xFF; SIZE];
-        self.spi.transfer(buf, &write_buf).map_err(|_| MpuError::SpiWriteFailed)?;
+        self.spi
+            .transfer(buf, &write_buf)
+            .map_err(|_| MpuError::SpiWriteFailed)?;
         self.end_operation()?;
         Ok(())
     }

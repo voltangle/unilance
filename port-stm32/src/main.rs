@@ -11,7 +11,8 @@ mod roles;
 use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use core::{ptr::read_volatile, sync::atomic::Ordering};
+use core::ptr::read_volatile;
+use core::sync::atomic::Ordering;
 use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};

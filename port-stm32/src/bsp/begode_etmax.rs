@@ -11,12 +11,12 @@ use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
     SampleTime,
 };
-use embassy_stm32::gpio::OutputType;
+use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
 use embassy_stm32::interrupt::typelevel::{self, Interrupt};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::Async;
-use embassy_stm32::pac::timer::vals::Urs;
 use embassy_stm32::pac::DMA2;
+use embassy_stm32::pac::timer::vals::Urs;
 use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
     AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource,
@@ -152,8 +152,6 @@ pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
     imu_spi_conf.mode = spi::MODE_0;
     imu_spi_conf.frequency = Hertz::mhz(1);
 
-    // TODO: verify that this IMU SPI conf is enough
-
     let mut imu = MPU6500Driver::new(
         Spi::new(
             p.SPI3,
@@ -162,9 +160,9 @@ pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
             p.PB4,
             p.DMA1_CH5,
             p.DMA1_CH2,
-            imu_spi_conf,
+            imu_spi_conf.clone(),
         ),
-        gpio::Output::new(p.PA15, gpio::Level::High, gpio::Speed::VeryHigh),
+        Output::new(p.PA15, Level::High, Speed::VeryHigh),
     );
     // FIXME: not great to have a hardfault here. Should instead raise a global error
     // and let it run
@@ -178,6 +176,11 @@ pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
     Timer::after_millis(150).await;
 
     info!("IMU whoami response: {}", imu.whoami().unwrap());
+    // Begode pushes 20 MHz SPI in their firmware and I'm yet to see a wheel with an IMU
+    // error, so should be safe for me to do this too
+    imu_spi_conf.frequency = Hertz::mhz(20);
+    imu.spi.set_config(&imu_spi_conf).unwrap();
+    info!("IMU whoami response @20MHz: {}", imu.whoami().unwrap());
 
     let i_battery = p.PC0.degrade_adc();
     let t_driver = p.PC1.degrade_adc();
