@@ -15,10 +15,9 @@ and motor control stuff. All credit for that goes to the creator, David Molony.
 ## Building
 
 To check out all available targets, run `task all_targets:list`. To build for a target, run
-`task <target-name>:build`, for example `task begode_etmax:build`.
+`task <target-name>:build`, for example `task naegi:build`.
 
-The naming convention for target names is `<manufacturer>_<model>`. If there is no
-name for a manufacturer, just skip it.
+The naming convention for target names is just Danganronpa character surnames. That's it.
 
 ## Resource sharing between the Rust and C sections
 

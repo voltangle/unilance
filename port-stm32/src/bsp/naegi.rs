@@ -35,7 +35,8 @@ use mesc::MescMotorExt;
 use static_cell::StaticCell;
 
 /*
- * BSP for the Begode ET Max electric unicycle motherboard.
+ * BSP for the Begode ET Max and Panther electric unicycles.
+ * Codename: naegi
  *
  * MCU: STM32F405RG
  *
@@ -462,7 +463,7 @@ fn adc_dma_read() {
  */
 
 pub mod foc {
-    use crate::bsp::begode_etmax::bsp_periph;
+    use crate::bsp::naegi::bsp_periph;
     use crate::mesc_impl::HCLK_HZ;
     use core::mem;
     use core::sync::atomic::Ordering;

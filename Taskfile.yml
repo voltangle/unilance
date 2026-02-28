@@ -14,41 +14,41 @@ tasks:
   all_targets:list: task --list-all | grep --color=never build
   all_targets:build:
     cmds:
-      - task: begode_etmax:build
+      - task: naegi:build
 
-  begode_etmax:
+  naegi:
     internal: true
     vars:
       CARGO_METHOD: '{{.CARGO_METHOD}}'
     cmds:
       - |
         cargo {{.CARGO_METHOD}} -p port-stm32 \
-          --no-default-features --features board_begode_etmax \
+          --no-default-features --features board_naegi \
           --target thumbv7em-none-eabihf {{.CLI_ARGS}}
 
-  begode_etmax:build:
+  naegi:build:
     cmds:
-      - task: begode_etmax
+      - task: naegi
         vars:
           CARGO_METHOD: build
-  begode_etmax:fix:
+  naegi:fix:
     cmds:
-      - task: begode_etmax
+      - task: naegi
         vars:
           CARGO_METHOD: fix
-  begode_etmax:expand:
+  naegi:expand:
     cmds:
-      - task: begode_etmax
+      - task: naegi
         vars:
           CARGO_METHOD: expand
-  begode_etmax:clippy:
+  naegi:clippy:
     cmds:
-      - task: begode_etmax
+      - task: naegi
         vars:
           CARGO_METHOD: clippy
-  begode_etmax:bloat:
+  naegi:bloat:
     cmds:
-      - task: begode_etmax
+      - task: naegi
         vars:
           CARGO_METHOD: bloat
   control:doc:

@@ -60,7 +60,7 @@ ahrs = { version = "0.8.0", default-features = false }
 # These only exist here for LSP ease-of-use. When building, ALWAYS use
 # --no-default-features, and ideally, just use pre-configured build commands in the
 # Taskfile.
-default = ["board_begode_etmax"]
+default = ["board_naegi"]
 # Roles
 role_control = ["dep:core-control"]
 role_supervisor = ["dep:core-supervisor"]
@@ -68,7 +68,7 @@ role_supervisor = ["dep:core-supervisor"]
 stm32f405rg = ["embassy-stm32/stm32f405rg"]
 
 # BSP definitions
-board_begode_etmax = [
+board_naegi = [
     "role_supervisor",
     "role_control",
     "stm32f405rg",
