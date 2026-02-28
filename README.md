@@ -98,13 +98,12 @@ completely off tho, most of the time it's just in a power saving state.
 - [x] Implement input method gestures
 - [ ] Make the power button work (only turn on and off for now)
 - [x] PI2D (Progressive + Integral + Double (sided) Derivative) part of the balance algo
-- [ ] Implement simple FLASH storage littlefs driver + littlefs orchestration
+- [ ] Implement simple in-RAM littlefs driver + littlefs orchestration
 - [ ] Implement basic CORElink communication
     - [x] Initial hello exchange
     - [ ] Config transmission
     - [ ] (maybe) error reporting
 - [x] CPU usage - total percentage
-- [ ] Buzzer support; adjust tone and volume, make the patterns platform independent
 - [x] Make MESC NOT use direct register access (or be dependent on hardware at all), and
 make it use functions defined in Rust instead
 
@@ -113,13 +112,9 @@ make it use functions defined in Rust instead
 - [ ] Implement some kind of bootloader with embassy_boot
 - [ ] Add Slint and a minimal UI
 - [ ] Implement support for different displays
-- [ ] Implement storage with littlefs
-    - [ ] Do block device with embedded parity info
-    - [ ] Do system config with a postcard type
 - [ ] Implement protocols with postcard
     - [ ] LANCElink (BLE) (postcard)
     - [ ] CORElink (internal CAN bus) (postcard)
-- [ ] Current sensor sanity checks and identifying if one or more are either damaged or dying
 - [ ] Allow to run core-supervisor in a "simulator", to test UI interactions
 - [ ] Auto shutoff timer on idle
 - [ ] Add current limiting via Ibus to MESC
@@ -132,8 +127,6 @@ make it use functions defined in Rust instead
     - [ ] Angle cut out (both on pitch and roll axis)
     - [ ] Ride Assist
 - [ ] Integrate Miri for UB checks
-- [ ] Support for different Smart BMSes
-    - [ ] Begode charge board UART
-    - [ ] Begode per-pack I2C
-- [ ] Rewrite MESC to be in Rust and do away with C in the codebase (maybe)
+- [ ] Replace MESC with a custom FOC implementation written in Rust and do away with C in
+the codebase (maybe)
 - [ ] Remove temperature sensor handling from MESC, make Rust handle it instead
