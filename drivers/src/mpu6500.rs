@@ -29,7 +29,7 @@ pub enum MpuError {
 /// The MPU6500 SPI driver. Because of the shared protocol, also implicitly supports
 /// the MPU925x series.
 pub struct MPU6500Driver<S: SpiBus, O: OutputPin> {
-    spi: S,
+    pub spi: S,
     cs: O,
     gyro_range: GyroRange,
     gyro_bias: Vector3<f32>,
@@ -48,7 +48,7 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
             gyro_bias: Vector3::new(0.0, 0.0, 0.0),
             accel_range: AccelRange::Range2G,
             accel_bias: Vector3::new(0.0, 0.0, 0.0),
-            accel_scale: Vector3::new(0.0, 0.0, 0.0),
+            accel_scale: Vector3::new(1.0, 1.0, 1.0),
         }
     }
 
@@ -234,10 +234,9 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
         buf: &mut [u8; SIZE],
     ) -> Result<(), MpuError> {
         self.start_operation()?;
-        _ = self.write(reg as u8 + 0x80)?;
-        for i in 0..SIZE {
-            buf[i] = self.write(0xFF)?;
-        }
+        _ = self.write(reg as u8 | 0x80)?;
+        let write_buf: [u8; SIZE] = [0xFF; SIZE];
+        self.spi.transfer(buf, &write_buf).map_err(|_| MpuError::SpiWriteFailed)?;
         self.end_operation()?;
         Ok(())
     }
