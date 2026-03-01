@@ -32,15 +32,15 @@ jobs:
         target: ${{ fromJSON(needs.define-matrix.outputs.targets) }}
 
     steps:
+      - uses: actions/checkout@v4
+      - name: Install arm-none-eabi-gcc
+        run: chmod +x ./.github/arm_none_eabi_ubuntu_install.sh && ./.github/arm_none_eabi_ubuntu_install.sh
+
       - name: Set up Bear
         run: |
           pip3 install loguru --break-system-packages
           ln -s /usr/bin/python3 /usr/local/bin/python3
           chmod +x bear
-
-      - uses: actions/checkout@v4
-      - name: Install arm-none-eabi-gcc
-        run: chmod +x ./.github/arm_none_eabi_ubuntu_install.sh && ./.github/arm_none_eabi_ubuntu_install.sh
 
       - name: Verify arm-none-eabi-gcc version
         run: arm-none-eabi-gcc --version \ 
