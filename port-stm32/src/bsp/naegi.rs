@@ -285,7 +285,6 @@ pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
     let aux_loop_tim = low_level::Timer::new(p.TIM2);
     aux_loop_tim.stop(); // can never be too cautious
     aux_loop_tim.set_frequency(Hertz::hz(500), RoundTo::Slower);
-    aux_loop_tim.set_counting_mode(CountingMode::EdgeAlignedUp);
     aux_loop_tim.generate_update_event();
     aux_loop_tim.clear_update_interrupt();
     aux_loop_tim.enable_update_interrupt(true);

@@ -1,0 +1,255 @@
+#!/usr/local/bin/python3
+
+import argparse
+import json
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from loguru import logger
+import sys
+
+# A custom script for compiling, building, etc etc, just a lot of useful stuff for writing
+# this lovely piece of software
+
+# TODO: prettify log output
+# TODO: When split-role targets become a thing, add support for them
+logger.remove()
+logger.add(
+    sys.stderr,
+    colorize=True,
+    format="<d>[bear]</d> <level>{message}</level>",
+    level="INFO",
+)
+
+
+def get_cargo_meta():
+    meta = subprocess.check_output(
+        ["cargo", "metadata", "--format-version", "1"]
+    ).decode("utf-8")
+    return json.loads(meta)
+
+
+@dataclass
+class BuildTarget:
+    port: str
+    bsp: str
+    role: str
+    arch: str
+
+
+def get_port_targets(meta):
+    pkgs = list(filter(lambda x: x["name"].startswith("port-"), meta["packages"]))
+    pkgs = list(
+        filter(lambda x: filter(lambda y: "bin" in y["kind"], x["targets"]), pkgs)
+    )
+    all_targets = list()
+    for pkg in pkgs:
+        targets = list(filter(lambda x: x.startswith("board_"), pkg["features"].keys()))
+        for target in targets:
+            name = target.replace("board_", "")
+            if name in pkg["metadata"]["bear"]:
+                metadata = pkg["metadata"]["bear"][name]
+                all_targets.append(
+                    BuildTarget(
+                        port=pkg["name"],
+                        bsp=target,
+                        role=metadata["role"],
+                        arch=metadata["arch"],
+                    )
+                )
+            else:
+                logger.error(f"No metadata found for {target}")
+                exit(1)
+    return all_targets
+
+
+def run_cargo(target: BuildTarget, release: bool, features):
+    command = [
+        "cargo",
+        "build",
+        "-p",
+        target.port,
+        "--no-default-features",
+        "--features",
+        target.bsp,
+    ]
+    if features != None:
+        for f in features:
+            command.append(f)
+    command.append("--target")
+    command.append(target.arch)
+    if release:
+        command.append("--release")
+    subprocess.run(command, check=True)
+
+
+def build(args):
+    logger.info("Getting cargo metadata...")
+    meta = get_cargo_meta()
+    targets = get_port_targets(meta)
+    target = list(filter(lambda x: x.bsp.replace("board_", "") == args.target, targets))
+    if target == []:
+        logger.error(f"No target {args.target} exists")
+        exit(1)
+    target = target[0]
+    logger.info("Building firmware...")
+    run_cargo(target, args.release, args.features)
+    logger.info("Creating artifacts...")
+    out_path = Path("./out") / args.target
+    out_path.mkdir(parents=True, exist_ok=True)
+    cargo_elf_path = Path(f"./target/{target.arch}")
+    if args.release:
+        cargo_elf_path = cargo_elf_path / "release"
+    else:
+        cargo_elf_path = cargo_elf_path / "debug"
+    cargo_elf_path = cargo_elf_path / target.port
+    # TODO: if it's a split role, use the role name
+    name_suffix = ""
+    if args.release:
+        name_suffix = "rel"
+    else:
+        name_suffix = "dev"
+    target_elf_path = cargo_elf_path.copy(out_path / f"{args.target}-{name_suffix}.elf")
+    subprocess.run(
+        [
+            "arm-none-eabi-objcopy",
+            "-O",
+            "binary",
+            target_elf_path,
+            out_path / f"{args.target}-{name_suffix}.bin",
+        ],
+        check=True,
+    )
+    logger.info("Done!")
+
+
+def fmt(args):
+    subprocess.run("cargo +nightly fmt", shell=True, check=True)
+    logger.info("cargo fmt successful")
+    subprocess.run("black bear", shell=True, check=True)
+    logger.info("black bear successful")
+    subprocess.run(
+        "find mesc/c_src/MESC_Common/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp'| xargs clang-format -i",
+        shell=True,
+        check=True,
+    )
+    logger.info("clang-format successfull")
+
+
+def flash(args):
+    logger.info("Running stm32flash...")
+    fw_path = Path(f"./out/{args.target}")
+    if args.release:
+        fw_path = fw_path / f"{args.target}-rel.bin"
+    else:
+        fw_path = fw_path / f"{args.target}-dev.bin"
+    subprocess.run(
+        ["stm32flash", "-w", fw_path, "-b" "115200", args.device], check=True
+    )
+    logger.info("Flash successful!")
+
+
+def log(args):
+    fw_path = Path(f"./out/{args.target}")
+    if args.release:
+        fw_path = fw_path / f"{args.target}-rel.bin"
+    else:
+        fw_path = fw_path / f"{args.target}-dev.bin"
+    cmd = "(stty speed 115200 >/dev/null && cat) <"
+    cmd += args.device
+    cmd += '| defmt-print -e out/naegi/naegi-rel.elf --log-format "{t} {{[{L}]%bold} {m}:{l}%35} {s}"'
+    if not Path(args.device).exists():
+        logger.info(f"Waiting for device {args.device} to come online...")
+        while not Path(args.device).exists():
+            pass
+        logger.info("Device appeared!")
+    subprocess.run(cmd, shell=True, check=True)
+
+
+def clean(args):
+    subprocess.run("cargo +nightly clean", shell=True, check=True)
+    logger.info("Cleaning LANCEmate caches...")
+    subprocess.run("rm -rf ./lancemate/build", shell=True, check=True)
+    subprocess.run("rm -rf ./lancemate/.gradle", shell=True, check=True)
+    subprocess.run("rm -rf ./lancemate/.kotlin", shell=True, check=True)
+    subprocess.run("rm -rf ./out", shell=True, check=True)
+    logger.info("Done!")
+
+
+def target_list(args):
+    meta = get_cargo_meta()
+    targets = get_port_targets(meta)
+    target_list = []
+    for t in targets:
+        target_list.append(t.bsp.replace("board_", ""))
+    print(target_list)
+
+
+parser = argparse.ArgumentParser(
+    prog="bear",
+    description="The UniLANCE Executioner",
+    epilog="Dare to guess what the name means?",
+)
+subparsers = parser.add_subparsers(help="Execution methods")
+
+parser_fmt = subparsers.add_parser("fmt", help="Make all code fall into formation")
+parser_fmt.set_defaults(func=fmt)
+
+parser_build = subparsers.add_parser("build", help="Build firmware image(s)")
+parser_build.add_argument("target", type=str, help="Who is to be executed")
+parser_build.add_argument(
+    "-r",
+    "--release",
+    action=argparse.BooleanOptionalAction,
+    help="Build in release mode",
+)
+parser_build.add_argument(
+    "-f",
+    "--features",
+    nargs="*",
+    help="Enable additional Cargo features for this target",
+)
+parser_build.set_defaults(func=build)
+
+parser_flash = subparsers.add_parser(
+    "flash", help="Send the firmware to the shado... ahem, device"
+)
+parser_flash.add_argument("target", type=str, help="Who is to be sent for execution")
+parser_flash.add_argument(
+    "-r",
+    "--release",
+    action=argparse.BooleanOptionalAction,
+    help="Build in release mode",
+)
+# NOTE: Only stm32flash is supported for now
+# TODO: Also support SWD flashing using probe-rs
+parser_flash.add_argument(
+    "-d", "--device", type=str, required=True, help="Which device to send it to"
+)
+parser_flash.set_defaults(func=flash)
+
+parser_log = subparsers.add_parser(
+    "log", help="Check on the execution room (view logs)"
+)
+parser_log.add_argument("target", type=str, help="Who is to be checked on")
+parser_log.add_argument("device", type=str, help="Which device to check on")
+parser_log.add_argument(
+    "-r",
+    "--release",
+    action=argparse.BooleanOptionalAction,
+    help="Was the firmware built in release mode?",
+)
+parser_log.set_defaults(func=log)
+
+parser_clean = subparsers.add_parser("clean", help="Nuke local caches")
+parser_clean.set_defaults(func=clean)
+
+parser_target = subparsers.add_parser(
+    "target", help="Information about (potential) targets"
+)
+target_sp = parser_target.add_subparsers(help="What info do you need?")
+parser_target_list = target_sp.add_parser("list", help="List all targets")
+parser_target_list.set_defaults(func=target_list)
+
+args = parser.parse_args()
+args.func(args)

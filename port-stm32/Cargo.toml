@@ -80,3 +80,6 @@ board_naegi = [
 [build-dependencies]
 bindgen = "0.72.0"
 cc = "1.2.52"
+
+[package.metadata.bear]
+naegi = { arch = "thumbv7em-none-eabihf", role = "combined" }

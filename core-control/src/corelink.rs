@@ -173,7 +173,7 @@ fn get_value_by_key(
 #[allow(unused)]
 enum ValueByKeyError {
     SerializationFailed(postcard::Error),
-    ConversionFailed
+    ConversionFailed,
 }
 
 impl From<postcard::Error> for ValueByKeyError {
