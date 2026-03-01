@@ -109,7 +109,9 @@ def build(args):
         name_suffix = "rel"
     else:
         name_suffix = "dev"
-    target_elf_path = cargo_elf_path.copy(out_path / f"{args.target}-{name_suffix}.elf")
+    target_elf_path = out_path / f"{args.target}-{name_suffix}.elf"
+    target_elf_path.write_bytes(cargo_elf_path.read_bytes())
+
     subprocess.run(
         [
             "arm-none-eabi-objcopy",
