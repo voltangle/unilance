@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Define targets
         id: bear
-        run: whereis python3 && chmod +x bear && echo targets=$(./bear target list) >> "$GITHUB_OUTPUT"
+        run: ln -s /usr/bin/python3 /usr/local/bin/python3 && chmod +x bear && echo targets=$(./bear target list) >> "$GITHUB_OUTPUT"
 
   build:
     runs-on: ubuntu-latest
