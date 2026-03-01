@@ -16,6 +16,9 @@ jobs:
       targets: ${{ steps.bear.outputs.targets }}
 
     steps:
+      - name: Install Bear dependencies
+        run: pip3 install loguru --break-system-packages
+
       - uses: actions/checkout@v4
       - name: Define targets
         id: bear
@@ -29,8 +32,8 @@ jobs:
         target: ${{ fromJSON(needs.define-matrix.outputs.targets) }}
 
     steps:
-      - name: Install Task
-        run: curl -1sLf 'https://dl.cloudsmith.io/public/task/task/setup.deb.sh' | sudo -E bash && sudo apt install task
+      - name: Install Bear dependencies
+        run: pip3 install loguru --break-system-packages
 
       - uses: actions/checkout@v4
       - name: Install arm-none-eabi-gcc
