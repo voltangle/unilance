@@ -1,3 +1,4 @@
+use heapless::Vec;
 use proto::corelink::control::ControlValueKey;
 use proto::corelink::{CoreLink, Message, ValueNackReason};
 
@@ -27,7 +28,7 @@ pub(crate) async fn handle_corelink(state: &mut State, link: &mut impl CoreLink)
             .await;
         }
         Message::WriteValue { key, value } => match ControlValueKey::try_from(key) {
-            Ok(key) => match handle_write(state, key, &value) {
+            Ok(key) => match handle_write(state, key, value.as_slice()) {
                 Ok(_) => {
                     link.core_send(Message::WriteValueAck { key: key.into() })
                         .await
@@ -84,7 +85,7 @@ pub(crate) async fn handle_corelink(state: &mut State, link: &mut impl CoreLink)
 fn handle_write(
     state: &mut State,
     key: ControlValueKey,
-    value: &[u8; 58],
+    value: &[u8],
 ) -> Result<(), postcard::Error> {
     match key {
         ControlValueKey::PI2D_kP => {
@@ -129,8 +130,8 @@ fn handle_write(
 fn get_value_by_key(
     state: &mut State,
     key: ControlValueKey,
-) -> Result<[u8; 58], postcard::Error> {
-    let mut buf: [u8; 58] = [0; 58];
+) -> Result<Vec<u8, 57>, ValueByKeyError> {
+    let mut buf: [u8; 57] = [0; 57];
     match key {
         ControlValueKey::PI2D_kP => {
             postcard::to_slice(&state.balance.config.kp, &mut buf)?;
@@ -166,5 +167,17 @@ fn get_value_by_key(
             postcard::to_slice(&state.balance.config.rideassist.enable, &mut buf)?;
         }
     }
-    Ok(buf)
+    Ok(Vec::from_slice(&buf).map_err(|_| ValueByKeyError::ConversionFailed)?)
+}
+
+#[allow(unused)]
+enum ValueByKeyError {
+    SerializationFailed(postcard::Error),
+    ConversionFailed
+}
+
+impl From<postcard::Error> for ValueByKeyError {
+    fn from(value: postcard::Error) -> Self {
+        Self::SerializationFailed(value)
+    }
 }

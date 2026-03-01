@@ -4,7 +4,7 @@
 pub mod control;
 pub mod supervisor;
 
-use heapless::String;
+use heapless::{String, Vec};
 use postcard::experimental::max_size::MaxSize;
 use serde::{Deserialize, Serialize};
 
@@ -84,15 +84,13 @@ pub enum Message {
     /// Similar to a BLE "notification". The data in it depends on the sender; it can
     /// always be parsed by a corresponding enum.
     Notify {
-        #[serde(with = "serde_arrays")]
-        data: [u8; 63],
+        data: Vec<u8, 62>,
     },
     /// Akin to a "write register". The key is a value from an enum belonging to the node
     /// that this message is sent to, for example, ControlValueKey.
     WriteValue {
         key: u32,
-        #[serde(with = "serde_arrays")]
-        value: [u8; 58],
+        value: Vec<u8, 57>,
     },
     /// Akin to a "read register". The key is a value from an enum belonging to the node
     /// that this message is sent to, for example, [ControlValueKey].
@@ -104,8 +102,7 @@ pub enum Message {
     },
     ReadValueAck {
         key: u32,
-        #[serde(with = "serde_arrays")]
-        value: [u8; 58],
+        value: Vec<u8, 57>,
     },
     WriteValueNack {
         key: u32,
@@ -141,8 +138,7 @@ pub enum Message {
         /// the transmitting party.
         packet_num: u32,
         /// Sized right up the CAN-FD limit (64 bytes).
-        #[serde(with = "serde_arrays")]
-        data: [u8; 53],
+        data: Vec<u8, 52>,
     },
     /// The file packet was received successfully, continue on with the transmission
     FileTransmissionAck {
