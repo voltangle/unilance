@@ -2,7 +2,7 @@
 # use for example `task naegi:build`. For all supported targets, do `task --list-all`.
 
 [build]
-target = "thumbv7em-none-eabi"
+target = "thumbv7em-none-eabihf"
 
 [env]
 DEFMT_LOG = "trace"

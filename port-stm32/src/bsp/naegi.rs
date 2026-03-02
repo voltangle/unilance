@@ -2,10 +2,9 @@ use super::PlatformConfig;
 use crate::Irqs;
 use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::roles::control;
-use ahrs::{Ahrs, Madgwick};
 use core::mem::MaybeUninit;
 use defmt::info;
-use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Measurements, Vector3};
+use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
     Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
@@ -93,14 +92,6 @@ static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
 static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
 
-static mut IMU_DATA: Measurements = Measurements {
-    accel: Vector3::new(0.0, 0.0, 0.0),
-    gyro: Vector3::new(0.0, 0.0, 0.0),
-    temp: 0.0,
-};
-static mut AHRS: MaybeUninit<Madgwick<f32>> = MaybeUninit::uninit();
-static mut AHRS_DATA: (f32, f32, f32) = (0.0, 0.0, 0.0);
-
 #[allow(unused)]
 pub struct BspPeripherals<'a> {
     poweron: gpio::Output<'a>,
@@ -124,15 +115,16 @@ fn bsp_periph() -> &'static mut BspPeripherals<'static> {
     unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
+/*
+ * Platform functions
+ */
+
 /// Gather all peripherals required for opereration and initialize anything that
 /// needs to be initialized at this point. This function has to be called ONCE on boot.
 /// Peripherals initialized here have to be ONLY initialized. They have to be either off
 /// or doing something "invisible", like DMA ADC.
 #[allow(static_mut_refs)]
-pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
-    unsafe {
-        AHRS.write(Madgwick::new(1.0 / 500.0, 0.1));
-    }
+pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let mut serial_config = usart::Config::default();
     serial_config.baudrate = 115200;
     let serial = Uart::new(
@@ -313,25 +305,21 @@ pub async fn init<'a>(p: Peripherals, spawner: &Spawner) {
             imu,
         });
     }
-    spawner.spawn(ahrs_display().unwrap());
     info!("BSP peripherals initialized");
 }
 
-#[allow(static_mut_refs)]
-#[embassy_executor::task]
-async fn ahrs_display() {
-    unsafe {
-        const RAD_TO_DEG: f32 = 57.2957795129;
-        loop {
-            info!(
-                "Roll: {}, pitch: {}, yaw: {}",
-                AHRS_DATA.0 * RAD_TO_DEG,
-                AHRS_DATA.1 * RAD_TO_DEG,
-                AHRS_DATA.2 * RAD_TO_DEG
-            );
-            Timer::after_millis(100).await;
-        }
+pub fn startup_successful() {
+    bsp_periph().poweron.set_high();
+    bsp_periph().motor_tim.set_master_output_enable(true);
+}
+
+/// Fetch data from the IMU. Returns an optional tuple, where first element is the accel
+/// vector, and second is gyro vector.
+pub fn get_imu_data() -> Option<(Vector3<f32>, Vector3<f32>)> {
+    if let Some(meas) = bsp_periph().imu.get_measurements().ok() {
+        return Some((meas.accel, meas.gyro));
     }
+    None
 }
 
 /*
@@ -403,26 +391,9 @@ fn TIM2() {
 
     // Clear update flag
     pac::TIM2.sr().modify(|w| w.set_uif(false));
-
-    unsafe {
-        IMU_DATA = bsp_periph().imu.get_measurements().unwrap();
-        AHRS_DATA = (*AHRS.as_mut_ptr())
-            .update_imu(&IMU_DATA.gyro, &IMU_DATA.accel)
-            .unwrap()
-            .euler_angles();
-    }
     control::aux_loop();
 
     rtos_trace::trace::isr_exit();
-}
-
-/*
- * Platform functions
- */
-
-pub fn startup_successful() {
-    bsp_periph().poweron.set_high();
-    bsp_periph().motor_tim.set_master_output_enable(true);
 }
 
 /*

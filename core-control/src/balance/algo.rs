@@ -48,6 +48,12 @@ impl BalanceState {
             self.pid_integral_accum -= self.config.ki as f32 * angle_error * self.dt_sec;
         }
 
+        // self.cnt += 1;
+        // if self.cnt == 200 {
+        //     info!("{}; {}", pos_state, p_term + self.pid_integral_accum + d_term);
+        //     self.cnt = 0;
+        // }
+
         return p_term + self.pid_integral_accum + d_term;
     }
 
