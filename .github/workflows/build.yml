@@ -18,12 +18,14 @@ jobs:
 
     steps:
       - name: Install Bear dependencies
-        run: pip3 install loguru --break-system-packages
+        run: pip3 install loguru --break-system-packages && where rustc
 
-      - name: Cache Rust toolchains
+      - name: Cache Rust toolchains and Cargo git checkouts
         uses: actions/cache@v4
         with:
-          path: ~/.rustup/toolchains/
+          path: |
+            ~/.rustup/toolchains/
+            ~/.cargo/git/
           key: ${{ runner.os }}-rust-toolchains
 
       - uses: actions/checkout@v4
@@ -43,6 +45,14 @@ jobs:
         target: ${{ fromJSON(needs.define-matrix.outputs.targets) }}
 
     steps:
+      - name: Cache Rust toolchains and Cargo git checkouts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.rustup/toolchains/
+            ~/.cargo/git/
+          key: ${{ runner.os }}-rust-toolchains
+
       - uses: actions/checkout@v4
       - name: Install arm-none-eabi-gcc
         run: chmod +x ./.github/arm_none_eabi_ubuntu_install.sh && ./.github/arm_none_eabi_ubuntu_install.sh
