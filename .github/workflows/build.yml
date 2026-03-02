@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Install Bear dependencies
-        run: pip3 install loguru --break-system-packages && where rustc
+        run: pip3 install loguru --break-system-packages
 
       - name: Cache Rust toolchains and Cargo git checkouts
         uses: actions/cache@v4
