@@ -5,6 +5,8 @@ pub struct BalanceState {
     pub config: BalanceConfig,
     pub(crate) dt_sec: f32,
 
+    // Uncomment if you want to do logging in the balance loop
+    // cnt: u64,
     pub(crate) setpoint: f32,
     pub(crate) pid_integral_accum: f32,
 

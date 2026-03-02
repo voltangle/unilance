@@ -5,6 +5,7 @@ use embassy_time::{Duration, Ticker};
 use mesc::{MESC_motor_typedef, MescMotorExt};
 use proto::corelink::CoreLink;
 
+use crate::ahrs::Ahrs;
 use crate::balance::BalanceState;
 use crate::corelink::handle_corelink;
 
@@ -32,6 +33,7 @@ pub enum FaultType {
 }
 
 pub struct State {
+    pub ahrs: Ahrs,
     pub state: SystemState,
     pub motor: MESC_motor_typedef,
     pub balance: BalanceState,
@@ -41,6 +43,7 @@ impl State {
     pub fn new() -> Self {
         Self {
             state: SystemState::Booting,
+            ahrs: Ahrs::new(),
             balance: BalanceState::new(),
             motor: MESC_motor_typedef::default(),
         }

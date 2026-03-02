@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Define targets
         id: bear
-        run: ln -s /usr/bin/python3 /usr/local/bin/python3 && chmod +x bear && echo targets=$(./bear target list) >> "$GITHUB_OUTPUT"
+        run: ln -s /usr/bin/python3 /usr/local/bin/python3 && source build/env.sh && echo targets=$(bear target list) >> "$GITHUB_OUTPUT"
 
   build:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
         run: |
           pip3 install loguru --break-system-packages
           ln -s /usr/bin/python3 /usr/local/bin/python3
-          chmod +x bear
+          source build/env.sh
 
       - name: Verify arm-none-eabi-gcc version
         run: arm-none-eabi-gcc --version \ 
@@ -48,11 +48,8 @@ jobs:
           && arm-none-eabi-gdb --version \
           && arm-none-eabi-size --version \
 
-      - name: Make Bear script executable
-        run: chmod +x bear
-
       - name: Build
-        run: ./bear build ${{ matrix.target }} --release
+        run: ./build/bear build ${{ matrix.target }} --release
         # TODO: when there will be any tests, make sure that they are executed here
         # TODO: make it also upload all built binaries
         # For that I will most likely need a modification to the task runner commands so

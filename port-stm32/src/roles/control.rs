@@ -1,3 +1,4 @@
+use crate::bsp;
 use crate::roles::MemChannelCoreLink;
 use core::mem::MaybeUninit;
 use core_control::State;
@@ -48,11 +49,13 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn aux_loop() {
     get_state().motor.foc_aux_update();
-    get_state().motor.request_q(
-        get_state()
-            .balance
-            .update(core_control::ahrs::SpacialState::default()),
-    );
+    // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
+    // Fix once some kind of error passing system is implemented.
+    let imu = bsp::get_imu_data().unwrap();
+    let spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
+    get_state()
+        .motor
+        .request_q(get_state().balance.update(spacial));
 }
 
 pub fn motor_loop() {
