@@ -31,6 +31,7 @@ pub fn init() {
     unsafe {
         CONTROL_STATE.write(State::new());
         get_state().motor.init();
+        get_state().motor.set_current_sensor_opts(2048, 2048, 2048);
     }
 }
 

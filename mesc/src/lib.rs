@@ -4,6 +4,7 @@ mod bindings;
 mod types;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
+use defmt::trace;
 pub use types::*;
 
 use crate::bindings::{
@@ -23,6 +24,12 @@ pub trait MescMotorExt {
     fn foc_aux_update(&mut self);
     fn get_state(&self) -> MotorState;
     fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16);
+    fn set_current_sensor_opts(
+        &mut self,
+        i_u_offset: u16,
+        i_v_offset: u16,
+        i_w_offset: u16,
+    );
     fn request_q(&mut self, i_q: f32);
     fn request_d(&mut self, i_d: f32);
 }
@@ -70,6 +77,26 @@ impl MescMotorExt for MESC_motor_typedef {
     // itself, and not the balance loop/anything else
     fn request_d(&mut self, i_d: f32) {
         self.FOC.Idq_req.d = i_d;
+    }
+
+    // Calculated with this: (ADC_Value - 2048) * ((3.3 / 4095) / gain) = ~350
+    // Total current measurement range = 350A
+    // Should show 350A as 2,97V on the output, as BSO6920BSO-50A has 1,65V as zero and each
+    // amp is each 26,7 mV. 1650mV + (26,7mV * 50) = 2,97V, and 1650mV - (26,7mV * 50) = 0,315V.
+    // The sensor itself only sees 50A, as the setup is done with two 3 mΩ shunts in parallel
+    // with a 9mΩ hall effect current sensor, with equivalent series resistance of 1,3mΩ.
+    // Essentially, the sensor only sees 1/7 of the total current going through the phase its
+    // measuring.
+    /// Configure the current sensor raw data conversion system
+    fn set_current_sensor_opts(
+        &mut self,
+        i_u_offset: u16,
+        i_v_offset: u16,
+        i_w_offset: u16,
+    ) {
+        self.offset.Iu = i_u_offset as f32;
+        self.offset.Iv = i_v_offset as f32;
+        self.offset.Iw = i_w_offset as f32;
     }
 }
 

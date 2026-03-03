@@ -21,7 +21,7 @@ pub enum MpuError {
     SpiFlushFailed,
     /// If the device responded to a whoami request with an ID that is unknown to the
     /// driver
-    UnknownDeviceIdentifier,
+    UnknownDeviceIdentifier(u8),
     /// If the divider value in [MPU6500Driver::set_sample_rate_divider] is set as 0
     ZeroDividerNumber,
 }
@@ -68,7 +68,7 @@ impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
 impl<S: SpiBus, O: OutputPin> MPU6500Driver<S, O> {
     pub fn whoami(&mut self) -> Result<DeviceModel, MpuError> {
         let val = self.read_register(Register::WHO_AM_I)?;
-        Ok(DeviceModel::try_from(val).map_err(|_| MpuError::UnknownDeviceIdentifier)?)
+        DeviceModel::try_from(val).map_err(|_| MpuError::UnknownDeviceIdentifier(val))
     }
 
     /// Resets the internal registers and restores the default settings.
