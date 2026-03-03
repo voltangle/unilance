@@ -98,7 +98,7 @@ static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
 static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
 
 #[allow(unused)]
-pub struct BspPeripherals<'a> {
+pub struct Bsp<'a> {
     poweron: gpio::Output<'a>,
     power_button: gpio::Input<'a>,
     park_button: gpio::Input<'a>,
@@ -109,14 +109,19 @@ pub struct BspPeripherals<'a> {
     ws281x_tim: SimplePwm<'a, TIM3>,
     aux_loop_tim: low_level::Timer<'a, TIM2>,
     imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
+    /// Used as a counter to calibrate offsets when initializing ADCs
+    adc_current_sensor_offset_cnt: u16,
+    // TODO: this *maybe* should not be in the BSP, but honestly no idea
+    adc_phase_a_offset: u16,
+    adc_phase_c_offset: u16
 }
 
-static mut BSP_PERIPH: MaybeUninit<BspPeripherals<'static>> = MaybeUninit::uninit();
+static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Async>> = StaticCell::new();
 
 #[allow(static_mut_refs)]
-fn bsp_periph() -> &'static mut BspPeripherals<'static> {
+fn get_bsp() -> &'static mut Bsp<'static> {
     unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
@@ -243,11 +248,6 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
-
-    adc1_rb.start();
-    adc2_rb.start();
-    adc3_rb.start();
-
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
         Some(PwmPin::new(p.PC6, OutputType::PushPull)),
@@ -298,10 +298,8 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     }
     pac::Interrupt::TIM2.set_priority(Priority::P2);
 
-    aux_loop_tim.start();
-
     unsafe {
-        BSP_PERIPH.write(BspPeripherals {
+        BSP_PERIPH.write(Bsp {
             poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
             power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
             park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
@@ -312,14 +310,23 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             ws281x_tim,
             aux_loop_tim,
             imu,
+            adc_current_sensor_offset_cnt: 0,
+            adc_phase_a_offset: 0,
+            adc_phase_c_offset: 0,
         });
     }
+
+    get_bsp().aux_loop_tim.start();
+    get_bsp().adc1.start();
+    get_bsp().adc2.start();
+    get_bsp().adc3.start();
+
     info!("BSP peripherals initialized");
 }
 
 pub fn startup_successful() {
-    bsp_periph().poweron.set_high();
-    bsp_periph().motor_tim.set_master_output_enable(true);
+    get_bsp().poweron.set_high();
+    get_bsp().motor_tim.set_master_output_enable(true);
 }
 
 /// Fetch data from the IMU. Returns an optional tuple, where first element is the accel
@@ -327,7 +334,7 @@ pub fn startup_successful() {
 // TODO: This guy can most likely be implemented in some better and uhhhh "cleaner" way,
 // just have to think how exactly
 pub fn get_imu_data() -> Option<(Vector3<f32>, Vector3<f32>)> {
-    if let Some(meas) = bsp_periph().imu.get_measurements().ok() {
+    if let Some(meas) = get_bsp().imu.get_measurements().ok() {
         return Some((meas.accel, meas.gyro));
     }
     None
@@ -429,11 +436,23 @@ fn adc_dma_read() {
         let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
         let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
         let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
+        
+        let bsp = get_bsp();
+
+        let cnt = &mut bsp.adc_current_sensor_offset_cnt;
+        if *cnt < 1000 {
+            *cnt += 1;
+            return;
+        } else if *cnt == 1000 {
+            bsp.adc_phase_a_offset = adc1_buf[0] - 2048;
+            bsp.adc_phase_c_offset = adc2_buf[1] - 2048;
+            *cnt += 1;
+        }
 
         control::get_state().motor.set_raw_adc(
-            adc1_buf[0], // I_phaseA
+            adc1_buf[0] - bsp.adc_phase_a_offset, // I_phaseA
             2048,        // Phase B doesn't have a sensor attached
-            adc2_buf[1], // I_phaseC
+            adc2_buf[1] - bsp.adc_phase_c_offset, // I_phaseC
             adc3_buf[0], // V_battery
         );
     }
@@ -475,76 +494,76 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn set_pwm_frequency(_motor: &mut MESC_motor_typedef, freq: u32) {
-        bsp_periph().motor_tim.set_frequency(Hertz::hz(freq));
+        get_bsp().motor_tim.set_frequency(Hertz::hz(freq));
     }
 
     #[inline(always)]
     fn get_max_duty(_motor: &mut MESC_motor_typedef) -> u16 {
-        bsp_periph().motor_tim.get_max_duty() as u16
+        get_bsp().motor_tim.get_max_duty() as u16
     }
 
     #[inline(always)]
     fn phase_a_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
-        bsp_periph().motor_tim.get_duty(Channel::Ch1)
+        get_bsp().motor_tim.get_duty(Channel::Ch1)
     }
 
     #[inline(always)]
     fn phase_b_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
-        bsp_periph().motor_tim.get_duty(Channel::Ch2)
+        get_bsp().motor_tim.get_duty(Channel::Ch2)
     }
 
     #[inline(always)]
     fn phase_c_get_duty(_motor: &mut MESC_motor_typedef) -> u16 {
-        bsp_periph().motor_tim.get_duty(Channel::Ch3)
+        get_bsp().motor_tim.get_duty(Channel::Ch3)
     }
 
     #[inline(always)]
     fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        bsp_periph().motor_tim.set_duty(Channel::Ch1, duty.into());
+        get_bsp().motor_tim.set_duty(Channel::Ch1, duty.into());
     }
 
     #[inline(always)]
     fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        bsp_periph().motor_tim.set_duty(Channel::Ch2, duty.into());
+        get_bsp().motor_tim.set_duty(Channel::Ch2, duty.into());
     }
 
     #[inline(always)]
     fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        bsp_periph().motor_tim.set_duty(Channel::Ch3, duty.into());
+        get_bsp().motor_tim.set_duty(Channel::Ch3, duty.into());
     }
 
     #[inline(always)]
     fn phase_d_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        bsp_periph().motor_tim.set_duty(Channel::Ch4, duty.into());
+        get_bsp().motor_tim.set_duty(Channel::Ch4, duty.into());
     }
 
     #[inline(always)]
     fn enable_output(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.set_master_output_enable(true);
+        get_bsp().motor_tim.set_master_output_enable(true);
     }
 
     fn phase_a_enable(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.enable(Channel::Ch1);
+        get_bsp().motor_tim.enable(Channel::Ch1);
     }
 
     fn phase_b_enable(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.enable(Channel::Ch2);
+        get_bsp().motor_tim.enable(Channel::Ch2);
     }
 
     fn phase_c_enable(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.enable(Channel::Ch3);
+        get_bsp().motor_tim.enable(Channel::Ch3);
     }
 
     fn phase_a_break(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.disable(Channel::Ch1);
+        get_bsp().motor_tim.disable(Channel::Ch1);
     }
 
     fn phase_b_break(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.disable(Channel::Ch2);
+        get_bsp().motor_tim.disable(Channel::Ch2);
     }
 
     fn phase_c_break(_motor: &mut MESC_motor_typedef) {
-        bsp_periph().motor_tim.disable(Channel::Ch3);
+        get_bsp().motor_tim.disable(Channel::Ch3);
     }
 
     fn set_deadtime(_motor: &mut MESC_motor_typedef, ns: u16) {
@@ -555,7 +574,7 @@ impl Hal for MotorHal {
         // how many nanoseconds equal to one timer counter tick
         let tick_ns = ns_in_sec / tim_clk;
 
-        bsp_periph().motor_tim.set_dead_time(ns / tick_ns as u16);
+        get_bsp().motor_tim.set_dead_time(ns / tick_ns as u16);
     }
 }
 
