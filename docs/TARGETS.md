@@ -1,11 +1,17 @@
-# List of supported targets
+# List of available targets
 
-## Begode ET Max/Panther/GT Pro/GT Pro+
+## `naegi`
 
-| Key | Value |
+Compatible models:
+
+- Begode ET Max
+- Begode Panther
+- Extreme Bull GT Pro
+- Extreme Bull GT Pro+
+
+| Key | Spec sheet |
 | --- | ----- |
-| Codename | `naegi` |
-| Architecture | combined roles |
+| Architecture | combined role |
 | MCU | STM32F405RG |
 | Phase current sensing | dual-sensor (phases A and C) |
 | Phase voltage sensing | abscent |
