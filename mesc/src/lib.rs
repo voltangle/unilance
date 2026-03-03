@@ -6,6 +6,7 @@ mod types;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
 pub use types::*;
+use micromath::F32Ext;
 
 use crate::bindings::{
     MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop,
@@ -24,7 +25,7 @@ pub trait MescMotorExt {
     fn foc_aux_update(&mut self);
     fn get_state(&self) -> MotorState;
     fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16);
-    fn set_current_sensor_opts(
+    fn set_raw_adc_offsets(
         &mut self,
         i_u_offset: u16,
         i_v_offset: u16,
@@ -39,6 +40,20 @@ impl MescMotorExt for MESC_motor_typedef {
         unsafe {
             MESCfoc_Init(self);
         }
+        // Specs for the Sherman-L motor
+        self.m.Imax = 5.0;
+        self.m.Pmax = 500.0;
+        self.m.IBatmax = 5.0;
+        self.m.pole_pairs = 27;
+        self.m.L_D = 0.00026978;
+        self.m.L_Q = 0.00034389;
+        self.m.L_QD = self.m.L_Q - self.m.L_D;
+        self.m.R = 0.1225;
+        self.m.flux_linkage = 0.0533;
+        self.m.flux_linkage_min = self.m.flux_linkage * 0.7;
+        self.m.flux_linkage_max = self.m.flux_linkage * 2.0;
+        self.m.flux_linkage_gain = self.m.flux_linkage.sqrt() * 10.0;
+        self.m.non_linear_centering_gain = 5000.0;
     }
 
     // TODO: do proper documentation
@@ -88,7 +103,7 @@ impl MescMotorExt for MESC_motor_typedef {
     // Essentially, the sensor only sees 1/7 of the total current going through the phase its
     // measuring.
     /// Configure the current sensor raw data conversion system
-    fn set_current_sensor_opts(
+    fn set_raw_adc_offsets(
         &mut self,
         i_u_offset: u16,
         i_v_offset: u16,
@@ -133,8 +148,8 @@ pub trait CoreHal {
     // instead
     fn get_cpu_cycles() -> u32;
     fn log_trace(msg: &str);
-    fn log_trace_int(num: u32);
-    fn log_trace_double(num: f64);
+    fn log_trace_int(msg: &str, num: u32);
+    fn log_trace_double(msg: &str, num: f64);
     fn log_debug(msg: &str);
     fn log_info(msg: &str);
     fn log_warn(msg: &str);

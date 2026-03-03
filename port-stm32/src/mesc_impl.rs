@@ -32,12 +32,12 @@ impl CoreHal for MescImpl {
         trace!("{:?}", msg);
     }
 
-    fn log_trace_int(num: u32) {
-        trace!("{:?}", num);
+    fn log_trace_int(msg: &str, num: u32) {
+        trace!("{}{:?}", msg, num);
     }
 
-    fn log_trace_double(num: f64) {
-        trace!("{:?}", num);
+    fn log_trace_double(msg: &str, num: f64) {
+        trace!("{}{:?}", msg, num);
     }
 
     fn log_debug(msg: &str) {

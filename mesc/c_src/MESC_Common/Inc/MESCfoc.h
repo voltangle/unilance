@@ -898,8 +898,8 @@ uint32_t MESChal_getCPUCycles();
 bool MESChal_isTimerCountingDown(MESC_motor_typedef* motor);
 
 void MESChal_logTrace(char* string);
-void MESChal_logTraceDouble(double num);
-void MESChal_logTraceInt(uint32_t num);
+void MESChal_logTraceDouble(char* msg, double num);
+void MESChal_logTraceInt(char* msg, uint32_t num);
 void MESChal_logDebug(char* string);
 void MESChal_logInfo(char* string);
 void MESChal_logWarn(char* string);

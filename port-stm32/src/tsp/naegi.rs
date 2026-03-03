@@ -109,14 +109,10 @@ pub struct Bsp<'a> {
     ws281x_tim: SimplePwm<'a, TIM3>,
     aux_loop_tim: low_level::Timer<'a, TIM2>,
     imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
-    /// Used as a counter to calibrate offsets when initializing ADCs
-    adc_current_sensor_offset_cnt: u16,
-    // TODO: this *maybe* should not be in the BSP, but honestly no idea
-    adc_phase_a_offset: u16,
-    adc_phase_c_offset: u16
 }
 
 static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
+static mut ADC_STARTUP_COUNTER: u16 = 0;
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Async>> = StaticCell::new();
 
@@ -248,6 +244,11 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
+
+    adc1_rb.start();
+    adc2_rb.start();
+    adc3_rb.start();
+    
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
         Some(PwmPin::new(p.PC6, OutputType::PushPull)),
@@ -310,16 +311,10 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             ws281x_tim,
             aux_loop_tim,
             imu,
-            adc_current_sensor_offset_cnt: 0,
-            adc_phase_a_offset: 0,
-            adc_phase_c_offset: 0,
         });
     }
 
     get_bsp().aux_loop_tim.start();
-    get_bsp().adc1.start();
-    get_bsp().adc2.start();
-    get_bsp().adc3.start();
 
     info!("BSP peripherals initialized");
 }
@@ -436,23 +431,19 @@ fn adc_dma_read() {
         let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
         let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
         let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
-        
-        let bsp = get_bsp();
 
-        let cnt = &mut bsp.adc_current_sensor_offset_cnt;
-        if *cnt < 1000 {
-            *cnt += 1;
+        if ADC_STARTUP_COUNTER < 1000 {
+            ADC_STARTUP_COUNTER += 1;
             return;
-        } else if *cnt == 1000 {
-            bsp.adc_phase_a_offset = adc1_buf[0] - 2048;
-            bsp.adc_phase_c_offset = adc2_buf[1] - 2048;
-            *cnt += 1;
+        } else if ADC_STARTUP_COUNTER == 1000 {
+            control::get_state().motor.set_raw_adc_offsets(adc1_buf[0], 2048, adc2_buf[1]);
+            ADC_STARTUP_COUNTER += 1;
         }
 
         control::get_state().motor.set_raw_adc(
-            adc1_buf[0] - bsp.adc_phase_a_offset, // I_phaseA
-            2048,        // Phase B doesn't have a sensor attached
-            adc2_buf[1] - bsp.adc_phase_c_offset, // I_phaseC
+            adc1_buf[0], // I_phaseA
+            2048, // Phase B doesn't have a sensor attached
+            adc2_buf[1], // I_phaseC
             adc3_buf[0], // V_battery
         );
     }
