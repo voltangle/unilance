@@ -192,7 +192,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     // that the motor timer update interrupt runs every 100 microseconds. Technically,
     // I can just get rid of the third ADC and sample input voltage/current with the
     // first two ADCs, but no harm in using all three.
-    let adc1_rb = unsafe {
+    let mut adc1_rb = unsafe {
         adc1.into_ring_buffered(
             p.DMA2_CH0,
             &mut ADC1_DMA_BUF,
@@ -208,7 +208,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
-    let adc2_rb = unsafe {
+    let mut adc2_rb = unsafe {
         adc2.into_ring_buffered(
             p.DMA2_CH3,
             &mut ADC2_DMA_BUF,
@@ -223,7 +223,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
-    let adc3_rb = unsafe {
+    let mut adc3_rb = unsafe {
         adc3.into_ring_buffered(
             p.DMA2_CH1,
             &mut ADC3_DMA_BUF,
@@ -238,6 +238,10 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             }),
         )
     };
+
+    adc1_rb.start();
+    adc2_rb.start();
+    adc3_rb.start();
 
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
