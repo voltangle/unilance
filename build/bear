@@ -169,7 +169,7 @@ def log(args):
 
 
 def clean(args):
-    subprocess.run("cargo +nightly clean", shell=True, check=True)
+    subprocess.run("cargo clean", shell=True, check=True)
     logger.info("Cleaning LANCEmate caches...")
     subprocess.run("rm -rf ./lancemate/build", shell=True, check=True)
     subprocess.run("rm -rf ./lancemate/.gradle", shell=True, check=True)

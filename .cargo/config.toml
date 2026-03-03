@@ -1,5 +1,5 @@
 # NOTE: This file is only here so that my LSP works properly. To actually build the firmware,
-# use for example `task naegi:build`. For all supported targets, do `task --list-all`.
+# use for example `bear build naegi`. For all supported targets, do `bear target list`.
 
 [build]
 target = "thumbv7em-none-eabihf"
