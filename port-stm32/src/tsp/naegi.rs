@@ -136,7 +136,7 @@ fn get_bsp() -> &'static mut Bsp<'static> {
 #[allow(static_mut_refs)]
 pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let mut serial_config = usart::Config::default();
-    serial_config.baudrate = 115200;
+    serial_config.baudrate = 460_800;
     let serial = Uart::new(
         p.USART1,
         p.PA10,

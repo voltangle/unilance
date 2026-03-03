@@ -160,7 +160,7 @@ def log(args):
         fw_path = fw_path / f"{args.target}-rel.bin"
     else:
         fw_path = fw_path / f"{args.target}-dev.bin"
-    cmd = "(stty speed 115200 >/dev/null && cat) <"
+    cmd = "(stty speed 460800 >/dev/null && cat) <"
     cmd += args.device
     cmd += '| defmt-print -e out/naegi/naegi-rel.elf --log-format "{t} {{[{L}]%bold} {m}:{l}%35} {s}"'
     if not Path(args.device).exists():
