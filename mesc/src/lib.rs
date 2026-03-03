@@ -1,10 +1,10 @@
 #![no_std]
 
 mod bindings;
+pub mod macros;
 mod types;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
-use defmt::trace;
 pub use types::*;
 
 use crate::bindings::{
@@ -98,6 +98,47 @@ impl MescMotorExt for MESC_motor_typedef {
         self.offset.Iv = i_v_offset as f32;
         self.offset.Iw = i_w_offset as f32;
     }
+}
+
+pub trait Hal {
+    fn get_hall_state() -> u8;
+    fn refresh_adc();
+    fn refresh_adc_for_vphase();
+    fn set_irq(motor: &mut MESC_motor_typedef, state: bool);
+    fn is_tim_counting_down(motor: &mut MESC_motor_typedef) -> bool;
+    fn set_pwm_frequency(motor: &mut MESC_motor_typedef, freq: u32);
+    fn get_max_duty(motor: &mut MESC_motor_typedef) -> u16;
+    fn phase_a_get_duty(motor: &mut MESC_motor_typedef) -> u16;
+    fn phase_b_get_duty(motor: &mut MESC_motor_typedef) -> u16;
+    fn phase_c_get_duty(motor: &mut MESC_motor_typedef) -> u16;
+    fn phase_a_set_duty(motor: &mut MESC_motor_typedef, duty: u16);
+    fn phase_b_set_duty(motor: &mut MESC_motor_typedef, duty: u16);
+    fn phase_c_set_duty(motor: &mut MESC_motor_typedef, duty: u16);
+    fn phase_d_set_duty(motor: &mut MESC_motor_typedef, duty: u16);
+    fn enable_output(motor: &mut MESC_motor_typedef);
+    fn phase_a_enable(motor: &mut MESC_motor_typedef);
+    fn phase_b_enable(motor: &mut MESC_motor_typedef);
+    fn phase_c_enable(motor: &mut MESC_motor_typedef);
+    fn phase_a_break(motor: &mut MESC_motor_typedef);
+    fn phase_b_break(motor: &mut MESC_motor_typedef);
+    fn phase_c_break(motor: &mut MESC_motor_typedef);
+    fn set_deadtime(motor: &mut MESC_motor_typedef, ns: u16);
+}
+
+pub trait CoreHal {
+    fn delay_ms(ms: u32);
+    // TODO: this one is also useless, replace with something more platform-agnostic
+    fn get_timer_hz() -> u32;
+    // TODO: remove any usage of CPU cycles from MESC, use rtos_trace in consumer code
+    // instead
+    fn get_cpu_cycles() -> u32;
+    fn log_trace(msg: &str);
+    fn log_trace_int(num: u32);
+    fn log_trace_double(num: f64);
+    fn log_debug(msg: &str);
+    fn log_info(msg: &str);
+    fn log_warn(msg: &str);
+    fn log_error(msg: &str);
 }
 
 // pub struct Hardware {

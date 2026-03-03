@@ -108,8 +108,8 @@ void hw_init(
                                   // simplifies some into useful overall gain values
 
 void setAWDVals();
-void getRawADC(MESC_motor_typedef* _motor);
-void getRawADCVph(MESC_motor_typedef* _motor);
+void MESCfoc_getRawADC(MESC_motor_typedef* _motor);
+void MESCfoc_getRawADCVph(MESC_motor_typedef* _motor);
 uint32_t getFlashBaseAddress(void);
 uint32_t getFlashBaseSize(void);
 

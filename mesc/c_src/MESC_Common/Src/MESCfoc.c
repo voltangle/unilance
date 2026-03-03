@@ -403,7 +403,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
             if (_motor->options.use_phase_sensors) {
                 // Track using BEMF from phase sensors
                 MESCpwm_generateBreak(_motor);
-                getRawADCVph(_motor);
+                MESCfoc_getRawADCVph(_motor);
                 ADCPhaseConversion(_motor);
                 MESCTrack(_motor);
                 switch (_motor->MotorSensorMode) {
@@ -491,7 +491,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
                 _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
             } else {
                 // Do the same for the flux observer...
-                getRawADCVph(_motor);
+                MESCfoc_getRawADCVph(_motor);
                 ADCPhaseConversion(_motor);
                 MESCTrack(_motor);
                 MESCfluxobs_run(_motor);
@@ -593,7 +593,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
             }
             break;
             //   case MOTOR_STATE_RUN_BLDC:
-            //   	getRawADCVph(_motor);
+            //   	MESCfoc_getRawADCVph(_motor);
             //   	ADCPhaseConversion(_motor);
             //   	BLDCCommute(_motor);
             // __NOP();
@@ -618,7 +618,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     tle5012(_motor);
 #endif
 
-    // RunPLL for all angle options
+    // Run PLL for all angle options
     _motor->FOC.PLL_angle = _motor->FOC.PLL_angle + (int16_t)_motor->FOC.PLL_int +
                             (int16_t)_motor->FOC.PLL_error;
     // We add the proportional error here since we did not add it last iteration
@@ -678,7 +678,7 @@ void ADCConversion(MESC_motor_typedef* _motor) {
     _motor->FOC.Idq_smoothed.q =
         (_motor->FOC.Idq_smoothed.q * 99.0f + _motor->FOC.Idq.q) * 0.01f;
 
-    getRawADC(_motor);
+    MESCfoc_getRawADC(_motor);
 
     // Here we take the raw ADC values, offset, cast to (float) and use the
     // hardware gain values to create volt and amp variables
