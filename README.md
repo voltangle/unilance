@@ -5,6 +5,7 @@ project for all FOC and motor control stuff. All credit for that goes to the cre
 David Molony.
 
 ## Technologies used
+
 - Rust (of course)
 - embassy-rs as the async runtime and HAL
 - littlefs as the filesystem
@@ -15,8 +16,14 @@ David Molony.
 
 ## Building
 
-To check out all available targets, run `task all_targets:list`. To build for a target, run
-`task <target-name>:build`, for example `task naegi:build`.
+The UniLANCE project uses a custom "build system" (effectively just a glorified task runner)
+called "bear". To use it, you have to source the build environment script: `source build/env.sh`.
+Note that Windows *not* through WSL is not supported, please use WSL when building this
+thing on Windows.
+
+To check out all available targets, run `bear target list`. To build for a target, run
+`bear build <target-name>`, for example `bear build naegi`. For the entire commands list,
+just run `bear` or `bear -h`, and it will show all functionality it has.
 
 The naming convention for target names is just Danganronpa character surnames. That's it.
 
@@ -47,7 +54,7 @@ on the port itself. Each port has:
 Each port has its own BSPs or Board Support Packages, which are basically different
 configurations of the same port for different target hardware. Each BSP has:
 
-- Taskfile entry for building that target
+- `[package.metadata.bear]` entry for target metadata
 - Feature flags in its port that looks like `board_<bsp_name>`
 - Its own module in `src/bsp` of its port, named `<bsp_name>.rs` if a single file or just
 `<bsp_name>` if it's a folder.
