@@ -44,7 +44,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "MESCApp.h"
 #include "MESCBLDC.h"
 #include "MESCerror.h"
 #include "MESCfluxobs.h"
