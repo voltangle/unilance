@@ -5,8 +5,9 @@ pub mod macros;
 mod types;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
-pub use types::*;
+use defmt::trace;
 use micromath::F32Ext;
+pub use types::*;
 
 use crate::bindings::{
     MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop,
@@ -25,18 +26,14 @@ pub trait MescMotorExt {
     fn foc_aux_update(&mut self);
     fn get_state(&self) -> MotorState;
     fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16);
-    fn set_raw_adc_offsets(
-        &mut self,
-        i_u_offset: u16,
-        i_v_offset: u16,
-        i_w_offset: u16,
-    );
+    fn set_raw_adc_offsets(&mut self, i_u_offset: u16, i_v_offset: u16, i_w_offset: u16);
     fn request_q(&mut self, i_q: f32);
     fn request_d(&mut self, i_d: f32);
 }
 
 impl MescMotorExt for MESC_motor_typedef {
     fn init(&mut self) {
+        trace!("Running motor init");
         unsafe {
             MESCfoc_Init(self);
         }
@@ -85,13 +82,13 @@ impl MescMotorExt for MESC_motor_typedef {
     }
 
     fn request_q(&mut self, i_q: f32) {
-        self.FOC.Idq_req.q = i_q;
+        self.FOC.Idq_prereq.q = i_q;
     }
 
     // NOTE: this one I will most likely be scrapping, as Id should be controlled by the FOC loop
     // itself, and not the balance loop/anything else
     fn request_d(&mut self, i_d: f32) {
-        self.FOC.Idq_req.d = i_d;
+        self.FOC.Idq_prereq.d = i_d;
     }
 
     // Calculated with this: (ADC_Value - 2048) * ((3.3 / 4095) / gain) = ~350
@@ -103,12 +100,7 @@ impl MescMotorExt for MESC_motor_typedef {
     // Essentially, the sensor only sees 1/7 of the total current going through the phase its
     // measuring.
     /// Configure the current sensor raw data conversion system
-    fn set_raw_adc_offsets(
-        &mut self,
-        i_u_offset: u16,
-        i_v_offset: u16,
-        i_w_offset: u16,
-    ) {
+    fn set_raw_adc_offsets(&mut self, i_u_offset: u16, i_v_offset: u16, i_w_offset: u16) {
         self.offset.Iu = i_u_offset as f32;
         self.offset.Iv = i_v_offset as f32;
         self.offset.Iw = i_w_offset as f32;

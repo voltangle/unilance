@@ -157,12 +157,14 @@ def flash(args):
 def log(args):
     fw_path = Path(f"./out/{args.target}")
     if args.release:
-        fw_path = fw_path / f"{args.target}-rel.bin"
+        fw_path = fw_path / f"{args.target}-rel.elf"
     else:
-        fw_path = fw_path / f"{args.target}-dev.bin"
+        fw_path = fw_path / f"{args.target}-dev.elf"
     cmd = "(stty speed 460800 >/dev/null && cat) <"
     cmd += args.device
-    cmd += '| defmt-print -e out/naegi/naegi-rel.elf --log-format "{t} {{[{L}]%bold} {m}:{l}%35} {s}"'
+    cmd += "| defmt-print -e "
+    cmd += f"{fw_path}"
+    cmd += ' --log-format "{t} {{[{L}]%bold} {m}:{l}%35} {s}"'
     if not Path(args.device).exists():
         logger.info(f"Waiting for device {args.device} to come online...")
         while not Path(args.device).exists():

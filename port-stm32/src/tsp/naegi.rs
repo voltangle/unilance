@@ -7,7 +7,7 @@ use core::mem;
 use core::mem::MaybeUninit;
 use core::sync::atomic::Ordering;
 use cortex_m::prelude::_embedded_hal_Pwm;
-use defmt::info;
+use defmt::{info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{
@@ -30,7 +30,7 @@ use embassy_stm32::spi::mode::Master;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::Channel;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
-use embassy_stm32::timer::low_level::{self, CountingMode, RoundTo};
+use embassy_stm32::timer::low_level::{self, CountingMode, MasterMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
 use embassy_stm32::usart::{self, Uart};
 use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi};
@@ -112,7 +112,6 @@ pub struct Bsp<'a> {
 }
 
 static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
-static mut ADC_STARTUP_COUNTER: u16 = 0;
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Async>> = StaticCell::new();
 
@@ -248,7 +247,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     adc1_rb.start();
     adc2_rb.start();
     adc3_rb.start();
-    
+
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
         Some(PwmPin::new(p.PC6, OutputType::PushPull)),
@@ -265,10 +264,13 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     motor_tim.set_master_output_enable(false);
     // Enable the TIM8 update interrupt
     pac::TIM8.dier().modify(|w| w.set_uie(true));
+    // Enable TIM8_TRGO updates, so the ADCs can see the updates
+    pac::TIM8.cr2().modify(|w| w.set_mms(MasterMode::UPDATE));
     typelevel::TIM8_UP_TIM13::unpend();
     unsafe {
         typelevel::TIM8_UP_TIM13::enable();
     }
+    trace!("Motor timer max duty: {}", motor_tim.get_max_duty());
 
     let ws281x_tim = SimplePwm::new(
         p.TIM3,
@@ -313,7 +315,6 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             imu,
         });
     }
-
     get_bsp().aux_loop_tim.start();
 
     info!("BSP peripherals initialized");
@@ -432,17 +433,9 @@ fn adc_dma_read() {
         let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
         let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
 
-        if ADC_STARTUP_COUNTER < 1000 {
-            ADC_STARTUP_COUNTER += 1;
-            return;
-        } else if ADC_STARTUP_COUNTER == 1000 {
-            control::get_state().motor.set_raw_adc_offsets(adc1_buf[0], 2048, adc2_buf[1]);
-            ADC_STARTUP_COUNTER += 1;
-        }
-
         control::get_state().motor.set_raw_adc(
             adc1_buf[0], // I_phaseA
-            2048, // Phase B doesn't have a sensor attached
+            2048,        // Phase B doesn't have a sensor attached
             adc2_buf[1], // I_phaseC
             adc3_buf[0], // V_battery
         );
@@ -510,21 +503,33 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        // if duty != 0 {
+        //     trace!("Duty for phase A: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(Channel::Ch1, duty.into());
     }
 
     #[inline(always)]
     fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        // if duty != 0 {
+        //     trace!("Duty for phase B: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(Channel::Ch2, duty.into());
     }
 
     #[inline(always)]
     fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        // if duty != 0 {
+        //     trace!("Duty for phase C: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(Channel::Ch3, duty.into());
     }
 
     #[inline(always)]
     fn phase_d_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
+        // if duty != 0 {
+        //     trace!("Duty for phase D: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(Channel::Ch4, duty.into());
     }
 

@@ -271,22 +271,32 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
 void initialiseInverter(MESC_motor_typedef* _motor) {
     static int Iuoff, Ivoff, Iwoff;
-    Iuoff += (float)_motor->Raw.Iu;
-    Ivoff += (float)_motor->Raw.Iv;
-    Iwoff += (float)_motor->Raw.Iw;
+    if (_motor->Raw.Iu != 0) {
+        Iuoff += _motor->Raw.Iu;
+    }
+    if (_motor->Raw.Iv != 0) {
+        Ivoff += _motor->Raw.Iv;
+    }
+    if (_motor->Raw.Iw != 0) {
+        Iwoff += _motor->Raw.Iw;
+    }
 
     static int initcycles = 0;
     initcycles = initcycles + 1;
-    // Exit the initialisation after 1000cycles
-    if (initcycles == 1000) {
+    // Exit the initialisation after 5000cycles
+    if (initcycles == 5000) {
+        MESChal_logTrace("Inverter init start");
         calculateGains(_motor);
         calculateVoltageGain(_motor);
         _motor->FOC.flux_b = 0.001f;
         _motor->FOC.flux_a = 0.001f;
 
-        _motor->offset.Iu = Iuoff / initcycles;
-        _motor->offset.Iv = Ivoff / initcycles;
-        _motor->offset.Iw = Iwoff / initcycles;
+        _motor->offset.Iu = (float)Iuoff / (float)initcycles;
+        _motor->offset.Iv = (float)Ivoff / (float)initcycles;
+        _motor->offset.Iw = (float)Iwoff / (float)initcycles;
+        MESChal_logTraceInt("Iu: ", _motor->offset.Iu);
+        MESChal_logTraceInt("Iv: ", _motor->offset.Iv);
+        MESChal_logTraceInt("Iw: ", _motor->offset.Iw);
         initcycles = 0;
         Iuoff = 0;
         Ivoff = 0;
@@ -323,6 +333,11 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     // First thing we ever want to do is convert the ADC values
     // to real, useable numbers.
     ADCConversion(_motor);
+    static motor_state_e prev_motor_state;
+    if (_motor->MotorState != prev_motor_state) {
+        MESChal_logTraceInt("MotorState changed: ", _motor->MotorState);
+    }
+    prev_motor_state = _motor->MotorState;
 
     switch (_motor->MotorState) {
         case MOTOR_STATE_INITIALISING:

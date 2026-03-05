@@ -10,8 +10,6 @@ macro_rules! global_hal {
             <$ident as $crate::Hal>::get_hall_state() as i32
         }
 
-        // TODO: Make the naming convention correct
-
         #[allow(non_snake_case)]
         #[unsafe(no_mangle)]
         extern "C" fn MESCfoc_getRawADC() {
@@ -153,16 +151,18 @@ macro_rules! global_core_hal {
 
         #[unsafe(no_mangle)]
         extern "C" fn MESChal_logTraceDouble(msg: *const c_char, num: c_double) {
-            <$ident as $crate::CoreHal>::log_trace_double(unsafe {
-                CStr::from_ptr(msg).to_str().unwrap()
-            }, num as f64)
+            <$ident as $crate::CoreHal>::log_trace_double(
+                unsafe { CStr::from_ptr(msg).to_str().unwrap() },
+                num as f64,
+            )
         }
 
         #[unsafe(no_mangle)]
         extern "C" fn MESChal_logTraceInt(msg: *const c_char, num: c_uint) {
-            <$ident as $crate::CoreHal>::log_trace_int(unsafe {
-                CStr::from_ptr(msg).to_str().unwrap()
-            }, num as u32)
+            <$ident as $crate::CoreHal>::log_trace_int(
+                unsafe { CStr::from_ptr(msg).to_str().unwrap() },
+                num as u32,
+            )
         }
 
         #[unsafe(no_mangle)]
