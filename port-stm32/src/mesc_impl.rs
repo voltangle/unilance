@@ -1,4 +1,4 @@
-use crate::{tsp, cpu_usage};
+use crate::{cpu_usage, tsp};
 use core::ffi::c_str::CStr;
 use core::ffi::{c_char, c_double, c_uint};
 use core::sync::atomic::{AtomicU32, Ordering};

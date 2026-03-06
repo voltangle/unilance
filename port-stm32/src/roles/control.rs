@@ -1,5 +1,5 @@
-use crate::tsp;
 use crate::roles::MemChannelCoreLink;
+use crate::tsp;
 use core::mem::MaybeUninit;
 use core_control::State;
 use defmt::info;
@@ -55,7 +55,7 @@ pub fn aux_loop() {
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
-    get_state().motor.request_q(2.0);
+    get_state().motor.request_q(4.0);
 }
 
 pub fn motor_loop() {

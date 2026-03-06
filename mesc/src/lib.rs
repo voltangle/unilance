@@ -11,6 +11,7 @@ pub use types::*;
 
 use crate::bindings::{
     MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
 };
 
 // NOTE: High size usage by MESC_motor_typedef is because of the logging struct inside it.
@@ -37,6 +38,8 @@ impl MescMotorExt for MESC_motor_typedef {
         unsafe {
             MESCfoc_Init(self);
         }
+        self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
+        self.FOC.openloop_step = 20;
         // Specs for the Sherman-L motor
         self.m.Imax = 5.0;
         self.m.Pmax = 500.0;

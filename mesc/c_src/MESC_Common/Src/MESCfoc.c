@@ -134,6 +134,8 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
     _motor->options.mtpa_mode = MESC_MTPA_NONE;
 
+    _motor->options.use_phase_sensors = false;
+    _motor->options.use_deadshort = false;
     _motor->options.use_phase_balancing = false;
 
     _motor->options.field_weakening = FIELD_WEAKENING_OFF;
@@ -233,7 +235,7 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 #endif
 
     // Set the keybits
-    _motor->key_bits = UNINITIALISED_KEY + KILLSWITCH_KEY + SAFESTART_KEY;
+    _motor->key_bits = UNINITIALISED_KEY;
 
     while (_motor->MotorState == MOTOR_STATE_INITIALISING) {
         // At this point, the ADCs have started and we want nothing to happen until
@@ -541,6 +543,8 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
             if (_motor->options.use_deadshort) {
                 deadshort(_motor);  // Function to startup motor from running without
                                     // phase sensors
+            } else {
+                _motor->MotorState = MOTOR_STATE_RUN;
             }
             break;
 
