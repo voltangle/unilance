@@ -1,45 +1,62 @@
 # Naming convention and architecture
 
-The core organisation of the project is done with ports, targets, and target variants.
+The core organization of the project is built around three things: ports, targets, and
+target variants. That's the whole game here.
 
-Ports are crates that implement the foundational stuff for a specific platform, like
-`port-stm32` is a port for the STM32 family of MCUs, and a supposed future `port-nrf`
-will support the nRF family. Ports do not have any "runtime" logic, their job is to do
-proper bootstrapping, initialization, and giving an environment to implement TSPs
-(Target Support Packages).
+## Ports
 
-Speaking of - TSPs are components inside a port that define how specific hardware setups
-should be used. A TSP is responsible for implementing the MESC HAL, configuring peripherals
-like timers and I/O, setting up drivers for components like IMUs and displays, and
-implementing binding functions that are then called by the outside system to actually
-interact with those components.
-TSPs are always tied to just one target, although one TSP can reuse code from another
-if they have a "shared module" so to speak.
+Ports are crates that provide the foundational support for a specific MCU family. For
+example, `port-stm32` supports the STM32 family, and a future `port-nrf` would support the
+nRF family.
 
-Speaking of targets - targets represent the hardware UniLANCE runs on. A single target
-is only for a specific set of hardware, it should NOT have any compile-time features in it.
-If a target needs some features that can be only tweaked using compile-time features,
-the target needs to be split up, so that any compile-time variation abilities are removed.
-Each target also defines its "role" configuration. Roles, in this case, mean how responsibilities
-are split between MCUs on the target hardware. As of writing this doc, UniLANCE has two
-roles, `control` and `supervisor`. `control`, for example, is responsible for all
-mission-critical stuff, like motor control, balance, safety alarms, etc etc, while
-`supervisor` does everything else, and like the name implies, `supervisor`, uhh,
-supervises the system and monitors its health. I will go into detail on roles a bit later,
-back to targets - it would be easier to explain with an example how it all works.
+Ports should not contain runtime application logic. Their job is to do bootstrapping,
+low-level initialization, and generally provide the environment in which TSPs (Target
+Support Packages) are implemented.
 
-Imagine we need to add support for the Begode Race board. The board is built with a single
-MCU that does basically everything, from motor control to lights and displays. The MCU itself
-is an STM32F405, so its in the STM32 family. In this case, we do this:
+## TSPs
+
+TSPs are components inside a port that define how a specific hardware setup should be used.
+A TSP is responsible for implementing the MESC HAL, configuring peripherals such as timers
+and I/O, setting up drivers for components such as IMUs and displays, and exposing binding
+functions that the rest of the system uses to interact with that hardware.
+
+Each TSP is tied to exactly one target, although TSPs can absolutely reuse shared code when
+multiple targets have common hardware support requirements.
+
+## Targets
+
+Targets represent the concrete hardware that UniLANCE runs on. A single target should map to
+one specific hardware configuration, and it should not rely on compile-time feature toggles
+for behavioral variation. If you have to start playing feature-flag games to make one
+target cover multiple hardware setups, it is probably not one target anymore.
+
+If supporting a piece of hardware would require compile-time feature flags to alter the
+target's behavior, that hardware should be split into multiple targets instead. The point is
+to keep targets explicit and avoid sneaky build-time variation.
+
+Each target also defines its role configuration. A role describes how responsibilities are
+split between MCUs on the target hardware. As of writing this doc, UniLANCE has two roles:
+
+- `control`, responsible for mission-critical stuff such as motor control, balance, and safety handling
+- `supervisor`, responsible for everything else, and like the name implies, it supervises the system and monitors its health
+
+### Example: adding a target
+
+Imagine we need to add support for the Begode Race board. The board uses a single MCU that
+handles basically everything, from motor control to lights and displays. The MCU is an
+STM32F405, so it belongs to the STM32 port. In that case, the flow looks something like
+this:
 
 - Choose a target name, for example `komaeda`
-- Define a TSP (Target Support Package) file in `port-stm32/src/tsp/komaeda.rs`
+- Define a TSP file in `port-stm32/src/tsp/komaeda.rs`
 - Add a `[package.metadata.bear]` entry:
+
 ```toml
 komaeda = { combined = "thumbv7em-none-eabihf" }
 ```
 
 - Add a new feature to `port-stm32`:
+
 ```toml
 target_komaeda = [
     "role_supervisor",
@@ -50,42 +67,47 @@ target_komaeda = [
 ]
 ```
 
-The Bear metadata entry defines that the target `komaeda` uses this port, and defines a
-"combined" role. Roles names are not "governed" by Bear, it only checks the metadata of
-all `port-*` crates, looks for target declarations, and uses the names in those declarations
-when building the firmware itself. 
+The Bear metadata entry declares that the target `komaeda` is implemented by this port and
+that it exposes a `combined` role. Role names are not really governed by Bear itself. Bear
+just reads the metadata of all `port-*` crates, looks for target declarations, and then uses
+those role names when building firmware. Nothing too magical there.
 
-> NOTE: if there is only one role defined for a target in a given port, Bear will omit the
-> role suffix when adding the target feature. For example, if you only have a `control`
-> role defined for `komaeda`, Bear will use the `target_komaeda` feature. But, if you have
-> both `control` and `supervisor` defined, it will use `target_komaeda_control` and
-> `target_komaeda_supervisor` features instead.
+### Bear feature naming
 
-Now that we've covered that, lets go to the last topic - target variants.
+If only one role is defined for a target in a given port, Bear omits the role suffix when
+constructing the target feature name. For example, if `komaeda` only had a `control` role,
+Bear would just use `target_komaeda`.
 
-UniLANCE uses a filesystem for storing configs, logs, state, etc etc, and that filesystem
-is split into two main partitions - system and data. The filesystem architecture is
-explained in [here](FILESYSTEM.md), so going back to target variants - a variant
-is ONLY a different system partition configuration. A target variant can *only* change
-the *configuration* of UniLANCE, not how its compiled or where. Bear will not emit
-any Cargo feature flags when building the firmware related to target variants, specifically
-to enforce this rule. As of writing this doc, the filesystem architecture is not yet defined,
-so any details on how *exactly* a target variant can influence the system partition is unknown
-yet.
+If multiple roles exist for the same target, Bear includes the role suffix. For example, if
+`komaeda` defines both `control` and `supervisor`, Bear will use
+`target_komaeda_control` and `target_komaeda_supervisor`.
 
-So, TL;DR: ports implement foundations for different uC families, targets implement specific
-hardware support with TSPs (Target Support Packages) in those ports, and target variants
-give different tunes and configurations on top of those targets.
+## Target Variants
 
-As of the naming convention:
+UniLANCE uses a filesystem to store configuration, logs, state, and other persistent data.
+That filesystem is split into two main partitions: system and data. The filesystem
+architecture is described in [`FILESYSTEM.md`](./FILESYSTEM.md).
 
-- For ports, its `port-<family>`, like if a port supports all
-STM32s, it's gonna be `port-stm32`, and if it supports just the ESP32C series, it will be
-`port-esp32c`. 
-- For targets, it's Danganronpa character surnames. Yes, i'm not joking. Danganronpa
-characters. Examples: `naegi`, `kirigiri`, `komaeda`, `sayonji`, etc.
-- For target variants, it depends on the specific situation, but usually it's something
-like `naegi/panther` for a Begode Panther variant of the `naegi` target.
+A target variant is only a different system partition configuration. A variant may change
+UniLANCE configuration, but it must not change how the firmware is compiled or where it
+runs. Bear intentionally does not emit Cargo feature flags for target variants, specifically
+to enforce that rule. If a "variant" needs compile-time behavior changes, then it is not a
+variant anymore.
+
+As of writing this doc, the filesystem architecture is not fully defined yet, so the exact
+mechanism by which a variant influences the system partition is still undecided. So for now,
+the important part is the rule: variants change configuration, not compilation. That's the
+part that matters.
+
+## Naming convention
+
+- Ports use `port-<family>`, for example `port-stm32` or `port-esp32c`
+- Targets use Danganronpa character surnames. Yes, I'm not joking. Examples: `naegi`, `kirigiri`, `komaeda`, or `sayonji`
+- Target variants depend on the target and use case, but they usually look like `naegi/panther`
+
+So, TL;DR: ports provide support for MCU families, targets describe concrete hardware through
+TSPs inside those ports, and target variants provide configuration differences on top of a
+target without introducing build-time variation. Simple enough.
 
 # List of available targets
 
@@ -110,4 +132,3 @@ Compatible models:
 | FETs | x48 HYG100N20 in DPAK packaging |
 | Current sensors | CC6920BSO-50A + dual 0.3 Ohm parallel shunts |
 | FET drivers | EG2186 |
-
