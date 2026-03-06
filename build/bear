@@ -187,6 +187,7 @@ def target_list(args):
     target_list = []
     for t in targets:
         target_list.append(t.bsp.replace("target_", ""))
+    print(target_list)
 
 
 parser = argparse.ArgumentParser(
