@@ -1,8 +1,10 @@
-use crate::bsp;
+use crate::tsp;
 use crate::roles::MemChannelCoreLink;
 use core::mem::MaybeUninit;
 use core_control::State;
+use defmt::info;
 use embassy_executor::Spawner;
+use embassy_time::Timer;
 use mesc::{MescMotorExt, hw_setup_s};
 use proc_macros::for_role;
 use static_cell::StaticCell;
@@ -36,14 +38,10 @@ pub fn init() {
 /// tasks.
 pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     let corelink = CONTROL_CORELINK.init(link);
-    spawner.spawn({
-        match main_task(get_state(), corelink) {
-            Ok(result) => result,
-            Err(_) => {
-                panic!("Failed to initialize control main task");
-            }
-        }
-    });
+    spawner.spawn(
+        main_task(get_state(), corelink).expect("Controls' main task should start"),
+    );
+    spawner.spawn(motor_control_view().expect("Motor control view should start"));
 }
 
 /// BALANCE_STATE MUST be initialized when this function runs.
@@ -51,15 +49,29 @@ pub fn aux_loop() {
     get_state().motor.foc_aux_update();
     // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
     // Fix once some kind of error passing system is implemented.
-    let imu = bsp::get_imu_data().unwrap();
+    let imu = tsp::get_imu_data().unwrap();
     let spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
-    get_state()
-        .motor
-        .request_q(get_state().balance.update(spacial));
+    // TODO: Reenable when I finish testing motor control
+    // get_state()
+    //     .motor
+    //     .request_q(get_state().balance.update(spacial));
+    get_state().motor.request_q(2.0);
 }
 
 pub fn motor_loop() {
     core_control::pwm_isr(get_state());
+}
+
+#[embassy_executor::task]
+async fn motor_control_view() {
+    loop {
+        let m = &get_state().motor;
+        info!(
+            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}",
+            m.Conv.Iu, m.Conv.Iv, m.Conv.Iw, m.Conv.Vbus
+        );
+        Timer::after_millis(500).await;
+    }
 }
 
 #[embassy_executor::task]
@@ -70,20 +82,21 @@ async fn main_task(
     core_control::main_task(state, link).await;
 }
 
-// NOTE: ideally this default init should be in the mesc crate
+// NOTE: ideally this default init should be in the mesc crate, and be merged into the
+// MESC_motor_typedef struct. All of this should NOT be a global.
 #[unsafe(export_name = "g_hw_setup")]
-pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
-    Imax: 0.0,
-    Vmax: 0.0,
+pub static HW_SETUP: hw_setup_s = hw_setup_s {
+    Imax: 5.0,
+    Vmax: 168.0,
     Vmin: 0.0,
     Rshunt: 0.0,
     RVBT: 0.0,
     RVBB: 0.0,
-    VBGain: 0.0,
+    VBGain: 0.0514064227,
     RIphPU: 0.0,
     RIphSR: 0.0,
     OpGain: 0.0,
-    Igain: 0.0,
-    RawCurrLim: 0,
-    RawVoltLim: 0,
+    Igain: 0.00377,
+    RawCurrLim: 4096,
+    RawVoltLim: 4096,
 };

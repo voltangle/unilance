@@ -60,15 +60,15 @@ ahrs = { version = "0.8.0", default-features = false }
 # These only exist here for LSP ease-of-use. When building, ALWAYS use
 # --no-default-features, and ideally, just use pre-configured build commands in the
 # Taskfile.
-default = ["board_naegi"]
+default = ["target_naegi"]
 # Roles
 role_control = ["dep:core-control"]
 role_supervisor = ["dep:core-supervisor"]
 
 stm32f405rg = ["embassy-stm32/stm32f405rg"]
 
-# BSP definitions
-board_naegi = [
+# Target definitions
+target_naegi = [
     "role_supervisor",
     "role_control",
     "stm32f405rg",
@@ -78,8 +78,9 @@ board_naegi = [
 ]
 
 [build-dependencies]
-bindgen = "0.72.0"
-cc = "1.2.52"
+bindgen = "0.72.1"
+cc = "1.2.56"
 
 [package.metadata.bear]
-naegi = { arch = "thumbv7em-none-eabihf", role = "combined" }
+naegi = { combined = "thumbv7em-none-eabihf" }
+

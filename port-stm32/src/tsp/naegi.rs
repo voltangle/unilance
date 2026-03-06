@@ -315,6 +315,8 @@ pub fn startup_successful() {
 
 /// Fetch data from the IMU. Returns an optional tuple, where first element is the accel
 /// vector, and second is gyro vector.
+// TODO: This guy can most likely be implemented in some better and uhhhh "cleaner" way,
+// just have to think how exactly
 pub fn get_imu_data() -> Option<(Vector3<f32>, Vector3<f32>)> {
     if let Some(meas) = bsp_periph().imu.get_measurements().ok() {
         return Some((meas.accel, meas.gyro));
@@ -433,7 +435,7 @@ fn adc_dma_read() {
  */
 
 pub mod foc {
-    use crate::bsp::naegi::bsp_periph;
+    use crate::tsp::naegi::bsp_periph;
     use crate::mesc_impl::HCLK_HZ;
     use core::mem;
     use core::sync::atomic::Ordering;

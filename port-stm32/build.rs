@@ -8,14 +8,14 @@ fn main() {
 
     let target_name = match std::env::vars()
         .map(|(a, _)| a)
-        .filter(|x| x.starts_with("CARGO_FEATURE_BOARD_"))
+        .filter(|x| x.starts_with("CARGO_FEATURE_TARGET_"))
         .get_one()
     {
         Ok(x) => x,
         Err(GetOneError::None) => panic!("No BSP feature defined"),
         Err(GetOneError::Multiple) => panic!("Multiple BSP features enabled"),
     }
-    .trim_start_matches("CARGO_FEATURE_BOARD_")
+    .trim_start_matches("CARGO_FEATURE_TARGET_")
     .to_lowercase();
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());

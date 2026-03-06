@@ -1,4 +1,4 @@
-use crate::{bsp, cpu_usage};
+use crate::{tsp, cpu_usage};
 use core::ffi::c_str::CStr;
 use core::ffi::{c_char, c_double, c_uint};
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -9,7 +9,7 @@ use mesc::MESC_motor_typedef;
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
 pub extern "C" fn MESC_getHallState() -> i32 {
-    bsp::foc::get_hall_state() as i32
+    tsp::foc::get_hall_state() as i32
 }
 
 // TODO: Make the naming convention correct
@@ -17,13 +17,13 @@ pub extern "C" fn MESC_getHallState() -> i32 {
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
 extern "C" fn getRawADC() {
-    bsp::foc::refresh_adc();
+    tsp::foc::refresh_adc();
 }
 
 #[allow(non_snake_case)]
 #[unsafe(no_mangle)]
 extern "C" fn getRawADCVph() {
-    bsp::foc::refresh_adc_for_vphase();
+    tsp::foc::refresh_adc_for_vphase();
 }
 
 // Set from main
@@ -44,57 +44,57 @@ pub extern "C" fn MESChal_getTimerHz() -> u32 {
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_setDeadtimeNs(motor: &mut MESC_motor_typedef, ns: u16) {
-    bsp::foc::set_deadtime(motor, ns);
+    tsp::foc::set_deadtime(motor, ns);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phA_break(motor: &mut MESC_motor_typedef) {
-    bsp::foc::phase_a_break(motor);
+    tsp::foc::phase_a_break(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phB_break(motor: &mut MESC_motor_typedef) {
-    bsp::foc::phase_b_break(motor);
+    tsp::foc::phase_b_break(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phC_break(motor: &mut MESC_motor_typedef) {
-    bsp::foc::phase_c_break(motor);
+    tsp::foc::phase_c_break(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phA_enable(motor: &mut MESC_motor_typedef) {
-    bsp::foc::phase_a_enable(motor);
+    tsp::foc::phase_a_enable(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phB_enable(motor: &mut MESC_motor_typedef) {
-    bsp::foc::phase_b_enable(motor);
+    tsp::foc::phase_b_enable(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phC_enable(motor: &mut MESC_motor_typedef) {
-    bsp::foc::phase_c_enable(motor);
+    tsp::foc::phase_c_enable(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_enableOutput(motor: &mut MESC_motor_typedef) {
-    bsp::foc::enable_output(motor);
+    tsp::foc::enable_output(motor);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phA_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {
-    bsp::foc::phase_a_set_duty(motor, duty);
+    tsp::foc::phase_a_set_duty(motor, duty);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phB_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {
-    bsp::foc::phase_b_set_duty(motor, duty);
+    tsp::foc::phase_b_set_duty(motor, duty);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phC_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {
-    bsp::foc::phase_c_set_duty(motor, duty);
+    tsp::foc::phase_c_set_duty(motor, duty);
 }
 
 // TODO: This is something that is not supposed to happen.
@@ -102,37 +102,37 @@ extern "C" fn MESChal_phC_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {
 // Make it work differently
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phD_setDuty(motor: &mut MESC_motor_typedef, duty: u16) {
-    bsp::foc::phase_d_set_duty(motor, duty);
+    tsp::foc::phase_d_set_duty(motor, duty);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phA_getDuty(motor: &mut MESC_motor_typedef) -> u16 {
-    bsp::foc::phase_a_get_duty(motor)
+    tsp::foc::phase_a_get_duty(motor)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phB_getDuty(motor: &mut MESC_motor_typedef) -> u16 {
-    bsp::foc::phase_b_get_duty(motor)
+    tsp::foc::phase_b_get_duty(motor)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_phC_getDuty(motor: &mut MESC_motor_typedef) -> u16 {
-    bsp::foc::phase_c_get_duty(motor)
+    tsp::foc::phase_c_get_duty(motor)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_getMaxDuty(motor: &mut MESC_motor_typedef) -> u16 {
-    bsp::foc::get_max_duty(motor)
+    tsp::foc::get_max_duty(motor)
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_setPWMFrequency(motor: &mut MESC_motor_typedef, freq: u32) {
-    bsp::foc::set_pwm_frequency(motor, freq);
+    tsp::foc::set_pwm_frequency(motor, freq);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_setIRQ(motor: &mut MESC_motor_typedef, state: bool) {
-    bsp::foc::set_irq(motor, state);
+    tsp::foc::set_irq(motor, state);
 }
 
 #[unsafe(no_mangle)]
@@ -142,7 +142,7 @@ extern "C" fn MESChal_getCPUCycles() -> u32 {
 
 #[unsafe(no_mangle)]
 extern "C" fn MESChal_isTimerCountingDown(motor: &mut MESC_motor_typedef) -> bool {
-    bsp::foc::is_tim_counting_down(motor)
+    tsp::foc::is_tim_counting_down(motor)
 }
 
 #[unsafe(no_mangle)]

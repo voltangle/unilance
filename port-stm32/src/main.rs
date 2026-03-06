@@ -1,14 +1,14 @@
 #![no_std]
 #![no_main]
 
-mod bsp;
+mod tsp;
 mod constants;
 mod cpu_usage;
 mod driver;
 mod mesc_impl;
 mod roles;
 
-use crate::bsp::PlatformConfig;
+use crate::tsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
 use core::ptr::read_volatile;
@@ -39,10 +39,10 @@ async fn main(spawner: Spawner) -> ! {
     let clocks = embassy_stm32::rcc::clocks(&p.RCC);
     mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
 
-    let startup_timer = Timer::after_millis(bsp::STARTUP_DELAY_MS);
+    let startup_timer = Timer::after_millis(tsp::STARTUP_DELAY_MS);
     Timer::after_millis(2000).await;
 
-    bsp::init(p, &spawner).await;
+    tsp::init(p, &spawner).await;
     info!("BSP init finished");
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::init();
@@ -59,7 +59,7 @@ async fn main(spawner: Spawner) -> ! {
     // the timer starts "counting" right after it was created (it just saves a timestamp of
     // when it's supposed to elapse), so .await will "let go" exactly after STARTUP_DELAY_MS
     startup_timer.await;
-    bsp::startup_successful();
+    tsp::startup_successful();
     info!("Hello from UniLANCE!");
 
     unsafe {
