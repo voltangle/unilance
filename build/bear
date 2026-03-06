@@ -63,7 +63,6 @@ def get_port_targets(meta):
                         arch=pkg["metadata"]["bear"][target][role]
                         ))
                 
-    print(all_targets)
     return all_targets
 
 
@@ -84,7 +83,6 @@ def run_cargo(target: BuildTarget, release: bool, features):
     command.append(target.arch)
     if release:
         command.append("--release")
-    print(command)
     subprocess.run(command, check=True)
 
 
@@ -189,7 +187,6 @@ def target_list(args):
     target_list = []
     for t in targets:
         target_list.append(t.bsp.replace("target_", ""))
-    print(target_list)
 
 
 parser = argparse.ArgumentParser(
