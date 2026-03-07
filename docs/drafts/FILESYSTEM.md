@@ -261,10 +261,31 @@ In practice this means:
 
 ## Security-sensitive data
 
-The firmware entitlement blob used for official encrypted updates should live in a dedicated
+Firmware entitlement state used for official encrypted updates should live in a dedicated
 sensitive location in writable storage, not mixed casually with normal user-facing config.
 
-That design is described in `docs/SECURE_BOOT_AND_KEYS.md`.
+That storage should support both active and staging entitlement blobs, mirroring the same
+active/inactive or active/staging idea used for firmware updates themselves.
+
+Recommended layout:
+
+- `/var/lib/unilance/security/entitlement-active.pc`
+- `/var/lib/unilance/security/entitlement-staging.pc`
+
+The intended meaning is:
+
+- `entitlement-active.pc` is the currently trusted entitlement blob
+- `entitlement-staging.pc` is the entitlement blob paired with a staging firmware update, if one
+  exists
+
+Promotion should happen together with the corresponding firmware commit, not earlier.
+
+These entitlement files intentionally live in the filesystem rather than internal flash. One
+of the filesystem's jobs is to absorb this kind of update-state churn and avoid unnecessary
+wear on MCU internal flash.
+
+That design is described in `docs/drafts/SECURE_BOOT_AND_KEYS.md` and
+`docs/drafts/FIRMWARE_UPDATES.md`.
 
 ## Variants
 

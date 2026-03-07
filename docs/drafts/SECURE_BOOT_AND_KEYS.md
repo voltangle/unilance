@@ -25,8 +25,9 @@ anti-repackaging, and anti-casual-cloning design.
 
 - `root key`: immutable per-device secret stored in OTP
 - `KEK`: key-encryption key derived from the root key
-- `entitlement blob`: wrapped erasable secret stored in the filesystem or another writable
-  storage area
+- `entitlement blob`: wrapped erasable secret stored in the filesystem
+- `active entitlement`: the currently trusted entitlement blob
+- `staging entitlement`: a replacement entitlement blob that is not active yet
 - `manifest`: signed metadata describing an update payload
 
 ## Trust model in one sentence
@@ -96,8 +97,8 @@ Recommended contents:
 
 - encrypted firmware payloads
 - signed manifests
-- wrapped entitlement blob
-- replacement wrapped entitlement blob, if an update carries one
+- active wrapped entitlement blob
+- staging wrapped entitlement blob, if an update carries one
 - full device certificate or cert chain, if needed
 - normal filesystem data
 
@@ -105,6 +106,21 @@ The important rule is that the entitlement blob must never be stored in plaintex
 
 The filesystem itself does not need to be fully encrypted. Only sensitive blobs such as the
 entitlement need wrapping.
+
+Entitlements are intentionally stored in the filesystem rather than internal flash. One of the
+main reasons for the filesystem design is to avoid unnecessary strain and wear on internal
+flash.
+
+Recommended entitlement storage naming:
+
+- `/var/lib/unilance/security/entitlement-active.pc`
+- `/var/lib/unilance/security/entitlement-staging.pc`
+
+These names are only a draft convention, but the important part is the semantics:
+
+- active entitlement is the blob used by the current committed system state
+- staging entitlement is the blob paired with a staging firmware update and must not become
+  active until that firmware state is committed
 
 ## Signing and encryption
 
@@ -126,14 +142,15 @@ In locked mode, the update process should be:
 2. verify the vendor signature on the manifest
 3. verify target compatibility and version policy
 4. derive a KEK from the OTP root key
-5. unwrap the current entitlement blob
+5. unwrap the active entitlement blob
 6. decrypt the firmware payload using the current key chain
 7. verify the decrypted firmware hash
 8. install the firmware
-9. if the update carries a new wrapped entitlement blob, store it for future updates only
+9. if the update carries a new wrapped entitlement blob, store it as staging for future
+   updates only
 
-The update that carries a replacement entitlement is still decrypted using the old trusted
-chain. The new entitlement only becomes active for subsequent updates.
+The update that carries a staging entitlement is still decrypted using the active trusted
+chain. The staging entitlement only becomes active for subsequent updates.
 
 This avoids circular dependency problems and keeps update trust progression simple.
 
@@ -141,19 +158,26 @@ This avoids circular dependency problems and keeps update trust progression simp
 
 Entitlement rotation is allowed on arbitrary releases.
 
-An official update package may optionally contain a replacement wrapped entitlement blob.
+An official update package may optionally contain a staging wrapped entitlement blob.
 If present, the update process should:
 
 1. decrypt and validate the current update using the current root key + entitlement chain
 2. install the update successfully
-3. atomically save the new wrapped entitlement blob
-4. use that new entitlement only for later updates
+3. atomically save the new entitlement as the staging entitlement
+4. keep the current active entitlement unchanged for the current booted system state
+5. use the staging entitlement only after the update has committed and become the new active
+   system state
 
 Important rule:
 
-- do not overwrite the old entitlement before the update is fully verified and committed
+- do not overwrite the active entitlement in place
 
-Otherwise, a failed or interrupted update can strand the device between trust states.
+Entitlements should follow the same active/staging pattern as firmware slots. This allows safe
+rollback and full restoration of the original firmware-entitlement state pair, ignoring normal
+filesystem state for now.
+
+The general update flow is described in `docs/drafts/FIRMWARE_UPDATES.md`, and the storage
+layout is described in `docs/drafts/FILESYSTEM.md`.
 
 ## Why not store the direct update key in OTP
 
@@ -202,8 +226,8 @@ This state should be permanent.
 
 At minimum:
 
-- current entitlement blob
-- any replacement entitlement blobs in staging
+- active entitlement blob
+- any staging entitlement blobs
 - device trust metadata used only for official locked mode
 - pairing secrets and tokens
 - update staging area
@@ -261,7 +285,7 @@ One possible provisioning flow:
 2. burn OTP structure: serial, target ID, flags, root key
 3. derive a KEK from the root key
 4. create or fetch the current model-batch entitlement blob and wrap it with that KEK
-5. write the wrapped entitlement blob to storage
+5. write the wrapped entitlement blob to the active entitlement location
 6. write device certificate and metadata if needed
 7. enable RDP for shipping firmware
 8. mark the lifecycle as `shipping locked`
@@ -273,11 +297,12 @@ One possible provisioning flow:
 3. read manifest and payload metadata
 4. verify signature
 5. derive KEK from OTP root key
-6. unwrap current entitlement blob
+6. unwrap the active entitlement blob
 7. decrypt firmware payload
 8. verify final firmware hash
 9. install and boot
-10. if present, commit replacement entitlement for future updates
+10. if present, keep the staging entitlement for the newly staged firmware and only promote it
+    as active when the update is committed
 
 ## Minimal unlocked boot flow
 
@@ -302,10 +327,10 @@ with ordinary application data.
 The intended minimal design is:
 
 - OTP stores a per-device root key and immutable identity/lifecycle data
-- the filesystem stores a wrapped entitlement blob
+- the filesystem keeps active and, when needed, staging entitlement blobs
 - official firmware updates are signed and encrypted
 - the current root key + entitlement chain decrypts the current update
-- an update may rotate the entitlement for future updates
+- an update may stage a new entitlement for future updates
 - developer unlock erases the entitlement and permanently disables official encrypted updates
 
 That gives UniLANCE:
