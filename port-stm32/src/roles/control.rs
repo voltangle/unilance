@@ -91,8 +91,8 @@ async fn main_task(
 // NOTE: ideally this default init should be in the mesc crate, and be merged into the
 // MESC_motor_typedef struct. All of this should NOT be a global.
 #[unsafe(export_name = "g_hw_setup")]
-pub static HW_SETUP: hw_setup_s = hw_setup_s {
-    Imax: 5.0,
+pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
+    Imax: 20.0,
     Vmax: 168.0,
     Vmin: 0.0,
     Rshunt: 0.0,

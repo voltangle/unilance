@@ -35,11 +35,6 @@ pub trait MescMotorExt {
 impl MescMotorExt for MESC_motor_typedef {
     fn init(&mut self) {
         trace!("Running motor init");
-        unsafe {
-            MESCfoc_Init(self);
-        }
-        self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
-        self.FOC.openloop_step = 20;
         // Specs for the Sherman-L motor
         self.m.Imax = 5.0;
         self.m.Pmax = 500.0;
@@ -54,6 +49,15 @@ impl MescMotorExt for MESC_motor_typedef {
         self.m.flux_linkage_max = self.m.flux_linkage * 2.0;
         self.m.flux_linkage_gain = self.m.flux_linkage.sqrt() * 10.0;
         self.m.non_linear_centering_gain = 5000.0;
+        self.input_vars.max_request_Idq.q = 100.0;
+        self.input_vars.min_request_Idq.q = 0.0;
+        self.limits.abs_max_phase_current = 40.0;
+        self.limits.abs_max_bus_voltage = 168.0;
+        unsafe {
+            MESCfoc_Init(self);
+        }
+        self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
+        self.FOC.openloop_step = 10;
     }
 
     // TODO: do proper documentation
