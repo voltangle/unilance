@@ -17,7 +17,7 @@ use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
 use embassy_executor::Spawner;
-use embassy_stm32::{Config, bind_interrupts};
+use embassy_stm32::{Config, bind_interrupts, pac};
 #[for_role("combined")]
 use embassy_sync::channel::Channel;
 use embassy_time::Timer;
@@ -32,6 +32,22 @@ bind_interrupts!(struct Irqs {
     USART1 => embassy_stm32::usart::InterruptHandler<embassy_stm32::peripherals::USART1>;
 });
 
+fn log_and_clear_reset_flags() {
+    let csr = pac::RCC.csr().read();
+    info!(
+        "Reset flags: raw={:#010x} bor={} pin={} por={} sft={} wdg={} wwdg={} lpwr={}",
+        csr.0,
+        csr.borrstf(),
+        csr.padrstf(),
+        csr.porrstf(),
+        csr.sftrstf(),
+        csr.wdgrstf(),
+        csr.wwdgrstf(),
+        csr.lpwrrstf(),
+    );
+    pac::RCC.csr().read().set_rmvf(true);
+}
+
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
     let p = embassy_stm32::init(Config::for_platform());
@@ -43,6 +59,7 @@ async fn main(spawner: Spawner) -> ! {
 
     tsp::init(p, &spawner).await;
     info!("BSP init finished");
+    log_and_clear_reset_flags();
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::init();
     #[cfg(feature = "role_control")]

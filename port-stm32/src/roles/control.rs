@@ -46,16 +46,16 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn aux_loop() {
-    get_state().motor.foc_aux_update();
     // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
     // Fix once some kind of error passing system is implemented.
     let imu = tsp::get_imu_data().unwrap();
-    let spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
+    let _spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
     // TODO: Reenable when I finish testing motor control
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
     get_state().motor.request_q(4.0);
+    get_state().motor.foc_aux_update();
 }
 
 pub fn motor_loop() {
@@ -67,8 +67,14 @@ async fn motor_control_view() {
     loop {
         let m = &get_state().motor;
         info!(
-            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}",
-            m.Conv.Iu, m.Conv.Iv, m.Conv.Iw, m.Conv.Vbus
+            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}",
+            m.Conv.Iu,
+            m.Conv.Iv,
+            m.Conv.Iw,
+            m.Conv.Vbus,
+            m.FOC.Idq_prereq.q,
+            m.key_bits,
+            m.get_state()
         );
         Timer::after_millis(500).await;
     }

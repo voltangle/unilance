@@ -1,3 +1,5 @@
+use defmt::Format;
+
 use crate::bindings::{
     motor_control_mode_e, motor_control_mode_e_MOTOR_CONTROL_MODE_DUTY,
     motor_control_mode_e_MOTOR_CONTROL_MODE_HANDBRAKE,
@@ -14,6 +16,7 @@ use crate::bindings::{
     motor_state_e_MOTOR_STATE_TEST, motor_state_e_MOTOR_STATE_TRACKING,
 };
 
+#[derive(Format)]
 pub enum ControlMode {
     Torque,
     Speed,
@@ -36,6 +39,7 @@ impl Into<motor_control_mode_e> for ControlMode {
     }
 }
 
+#[derive(Format)]
 pub enum MotorState {
     /// Starting up the inverter, we need to get the offsets for the current sensors and do
     /// any checks
