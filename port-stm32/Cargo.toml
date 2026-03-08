@@ -53,8 +53,6 @@ chrono = { version = "^0.4", default-features = false}
 littlefs2 = { version = "0.6.1", features = ["c-stubs"] }
 atomic_enum = "0.3.0"
 postcard = "1.1.3"
-# FIXME: TEMPORARY
-ahrs = { version = "0.8.0", default-features = false }
 
 [features]
 # These only exist here for LSP ease-of-use. When building, ALWAYS use
@@ -73,6 +71,7 @@ target_naegi = [
     "role_control",
     "stm32f405rg",
     "drivers/mpu6500",
+    "mesc/missing_vcurrsensor",
     "embassy-stm32/time-driver-tim5",
     "embassy-executor/scheduler-deadline"
 ]

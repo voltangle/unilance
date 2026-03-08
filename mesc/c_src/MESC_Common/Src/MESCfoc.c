@@ -44,7 +44,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "MESCApp.h"
 #include "MESCBLDC.h"
 #include "MESCerror.h"
 #include "MESCfluxobs.h"
@@ -135,6 +134,8 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
 
     _motor->options.mtpa_mode = MESC_MTPA_NONE;
 
+    _motor->options.use_phase_sensors = false;
+    _motor->options.use_deadshort = false;
     _motor->options.use_phase_balancing = false;
 
     _motor->options.field_weakening = FIELD_WEAKENING_OFF;
@@ -229,12 +230,13 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     MESClrobs_Init(_motor);
 // Reconfigure dead times
 // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
-#ifdef CUSTOM_DEADTIME
-    MESChal_setDeadtimeNs(_motor, CUSTOM_DEADTIME);
-#endif
+// FIXME: change to using a flag in the motor struct
+// #ifdef CUSTOM_DEADTIME
+    MESChal_setDeadtimeNs(_motor, 1200);
+// #endif
 
     // Set the keybits
-    _motor->key_bits = UNINITIALISED_KEY + KILLSWITCH_KEY + SAFESTART_KEY;
+    _motor->key_bits = UNINITIALISED_KEY;
 
     while (_motor->MotorState == MOTOR_STATE_INITIALISING) {
         // At this point, the ADCs have started and we want nothing to happen until
@@ -262,31 +264,41 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->conf_is_valid = true;
 
     // Lock it in initialising while the offsets not completed
-    //	while(_motor->key_bits & UNINITIALISED_KEY){
-    //		_motor->MotorState = MOTOR_STATE_INITIALISING;
-    //		HAL_Delay(0);
-    //		generateBreakAll();
-    //	}
+    while (_motor->key_bits & UNINITIALISED_KEY) {
+        _motor->MotorState = MOTOR_STATE_INITIALISING;
+        MESChal_delayMs(5);
+        MESCpwm_generateBreak(_motor);
+    }
 }
 
 void initialiseInverter(MESC_motor_typedef* _motor) {
     static int Iuoff, Ivoff, Iwoff;
-    Iuoff += (float)_motor->Raw.Iu;
-    Ivoff += (float)_motor->Raw.Iv;
-    Iwoff += (float)_motor->Raw.Iw;
+    if (_motor->Raw.Iu != 0) {
+        Iuoff += _motor->Raw.Iu;
+    }
+    if (_motor->Raw.Iv != 0) {
+        Ivoff += _motor->Raw.Iv;
+    }
+    if (_motor->Raw.Iw != 0) {
+        Iwoff += _motor->Raw.Iw;
+    }
 
     static int initcycles = 0;
     initcycles = initcycles + 1;
-    // Exit the initialisation after 1000cycles
-    if (initcycles == 1000) {
+    // Exit the initialisation after 5000cycles
+    if (initcycles == 5000) {
+        MESChal_logTrace("Inverter init start");
         calculateGains(_motor);
         calculateVoltageGain(_motor);
         _motor->FOC.flux_b = 0.001f;
         _motor->FOC.flux_a = 0.001f;
 
-        _motor->offset.Iu = Iuoff / initcycles;
-        _motor->offset.Iv = Ivoff / initcycles;
-        _motor->offset.Iw = Iwoff / initcycles;
+        _motor->offset.Iu = (float)Iuoff / (float)initcycles;
+        _motor->offset.Iv = (float)Ivoff / (float)initcycles;
+        _motor->offset.Iw = (float)Iwoff / (float)initcycles;
+        MESChal_logTraceInt("Iu: ", _motor->offset.Iu);
+        MESChal_logTraceInt("Iv: ", _motor->offset.Iv);
+        MESChal_logTraceInt("Iw: ", _motor->offset.Iw);
         initcycles = 0;
         Iuoff = 0;
         Ivoff = 0;
@@ -323,6 +335,11 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     // First thing we ever want to do is convert the ADC values
     // to real, useable numbers.
     ADCConversion(_motor);
+    static motor_state_e prev_motor_state;
+    if (_motor->MotorState != prev_motor_state) {
+        MESChal_logTraceInt("MotorState changed: ", _motor->MotorState);
+    }
+    prev_motor_state = _motor->MotorState;
 
     switch (_motor->MotorState) {
         case MOTOR_STATE_INITIALISING:
@@ -403,7 +420,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
             if (_motor->options.use_phase_sensors) {
                 // Track using BEMF from phase sensors
                 MESCpwm_generateBreak(_motor);
-                getRawADCVph(_motor);
+                MESCfoc_getRawADCVph(_motor);
                 ADCPhaseConversion(_motor);
                 MESCTrack(_motor);
                 switch (_motor->MotorSensorMode) {
@@ -491,7 +508,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
                 _motor->FOC.FOCAngle = _motor->FOC.enc_angle;
             } else {
                 // Do the same for the flux observer...
-                getRawADCVph(_motor);
+                MESCfoc_getRawADCVph(_motor);
                 ADCPhaseConversion(_motor);
                 MESCTrack(_motor);
                 MESCfluxobs_run(_motor);
@@ -527,6 +544,8 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
             if (_motor->options.use_deadshort) {
                 deadshort(_motor);  // Function to startup motor from running without
                                     // phase sensors
+            } else {
+                _motor->MotorState = MOTOR_STATE_RUN;
             }
             break;
 
@@ -593,7 +612,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
             }
             break;
             //   case MOTOR_STATE_RUN_BLDC:
-            //   	getRawADCVph(_motor);
+            //   	MESCfoc_getRawADCVph(_motor);
             //   	ADCPhaseConversion(_motor);
             //   	BLDCCommute(_motor);
             // __NOP();
@@ -618,7 +637,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
     tle5012(_motor);
 #endif
 
-    // RunPLL for all angle options
+    // Run PLL for all angle options
     _motor->FOC.PLL_angle = _motor->FOC.PLL_angle + (int16_t)_motor->FOC.PLL_int +
                             (int16_t)_motor->FOC.PLL_error;
     // We add the proportional error here since we did not add it last iteration
@@ -678,7 +697,7 @@ void ADCConversion(MESC_motor_typedef* _motor) {
     _motor->FOC.Idq_smoothed.q =
         (_motor->FOC.Idq_smoothed.q * 99.0f + _motor->FOC.Idq.q) * 0.01f;
 
-    getRawADC(_motor);
+    MESCfoc_getRawADC(_motor);
 
     // Here we take the raw ADC values, offset, cast to (float) and use the
     // hardware gain values to create volt and amp variables
@@ -691,20 +710,25 @@ void ADCConversion(MESC_motor_typedef* _motor) {
     // Check for over limit conditions. We want this after the conversion so that the
     // correct overcurrent values are logged
     // VICheck(_motor); //This uses the "raw" values, and requires an extra function call
-    if (_motor->Conv.Iu > g_hw_setup.Imax) {
-        handleError(_motor, ERROR_OVERCURRENT_PHA);
-    }
-    if (_motor->Conv.Iv > g_hw_setup.Imax) {
-        handleError(_motor, ERROR_OVERCURRENT_PHB);
-    }
-    if (_motor->Conv.Iw > g_hw_setup.Imax) {
-        handleError(_motor, ERROR_OVERCURRENT_PHC);
-    }
-    if (_motor->Conv.Vbus > g_hw_setup.Vmax) {
-        handleError(_motor, ERROR_OVERVOLTAGE);
-    }
-    if (_motor->Conv.Vbus < g_hw_setup.Vmin) {
-        handleError(_motor, ERROR_UNDERVOLTAGE);
+    if (_motor->MotorState == MOTOR_STATE_RUN) {
+        if (_motor->Conv.Iu > g_hw_setup.Imax) {
+            MESChal_logTraceDouble("Phase A overcurrent: ", _motor->Conv.Iu);
+            handleError(_motor, ERROR_OVERCURRENT_PHA);
+        }
+        if (_motor->Conv.Iv > g_hw_setup.Imax) {
+            MESChal_logTraceDouble("Phase B overcurrent: ", _motor->Conv.Iu);
+            handleError(_motor, ERROR_OVERCURRENT_PHB);
+        }
+        if (_motor->Conv.Iw > g_hw_setup.Imax) {
+            MESChal_logTraceDouble("Phase C overcurrent: ", _motor->Conv.Iu);
+            handleError(_motor, ERROR_OVERCURRENT_PHC);
+        }
+        if (_motor->Conv.Vbus > g_hw_setup.Vmax) {
+            handleError(_motor, ERROR_OVERVOLTAGE);
+        }
+        if (_motor->Conv.Vbus < g_hw_setup.Vmin) {
+            handleError(_motor, ERROR_UNDERVOLTAGE);
+        }
     }
 
 // Deal with terrible hardware choice of only having two current sensors
@@ -1172,7 +1196,9 @@ void calculateFlux(MESC_motor_typedef* _motor) {
 
 void calculateGains(MESC_motor_typedef* _motor) {
     _motor->FOC.pwm_period = 1.0f / _motor->FOC.pwm_frequency;
-    MESChal_setPWMFrequency(_motor, _motor->FOC.pwm_frequency);
+    // FIXME: check if I need it
+    // MESChal_setPWMFrequency(_motor, _motor->FOC.pwm_frequency);
+
     // Just short of dead center (dead center will
     // not actually trigger the conversion)
     MESChal_phD_setDuty(_motor, MESChal_getMaxDuty(_motor) - 5);
@@ -1410,7 +1436,8 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
     ///////////////////////Run the state machine//////////////////////////////////
     switch (_motor->MotorState) {
         case MOTOR_STATE_TRACKING:
-            ThrottleTemperature(_motor);
+            // FIXME: temporarily disabled, check if I actually need it
+            // ThrottleTemperature(_motor);
             _motor->FOC.was_last_tracking = 1;
             // Seperate based on control mode. We NEED to have a fallthrough here in
             // transition state! Does not seem possible to use nested switches due to
@@ -1464,8 +1491,9 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
 
         case MOTOR_STATE_RUN:
             calculatePower(_motor);
-            ThrottleTemperature(_motor);  // Gradually ramp down the Q current if motor or
-                                          // FETs are getting hot
+            // FIXME: check if I need it
+            // ThrottleTemperature(_motor);  // Gradually ramp down the Q current if motor
+            // or FETs are getting hot
             if (_motor->options.mtpa_mode) {
                 RunMTPA(_motor);  // Process MTPA
             }

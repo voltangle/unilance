@@ -47,22 +47,26 @@ def get_port_targets(meta):
         for target in pkg["metadata"]["bear"].keys():
             if len(pkg["metadata"]["bear"][target]) == 1:
                 role = list(pkg["metadata"]["bear"][target].keys())[0]
-                all_targets.append(BuildTarget(
-                    port=pkg["name"],
-                    bsp=f"target_{target}",
-                    # take first element, in this case the only one
-                    role=role,
-                    arch=pkg["metadata"]["bear"][target][role]
-                    ))
+                all_targets.append(
+                    BuildTarget(
+                        port=pkg["name"],
+                        bsp=f"target_{target}",
+                        # take first element, in this case the only one
+                        role=role,
+                        arch=pkg["metadata"]["bear"][target][role],
+                    )
+                )
             else:
                 for role in target.keys():
-                    all_targets.append(BuildTarget(
-                        port=pkg["name"],
-                        bsp=f"target_{target}_{role}",
-                        role=role,
-                        arch=pkg["metadata"]["bear"][target][role]
-                        ))
-                
+                    all_targets.append(
+                        BuildTarget(
+                            port=pkg["name"],
+                            bsp=f"target_{target}_{role}",
+                            role=role,
+                            arch=pkg["metadata"]["bear"][target][role],
+                        )
+                    )
+
     return all_targets
 
 
@@ -90,7 +94,9 @@ def build(args):
     logger.info("Getting cargo metadata...")
     meta = get_cargo_meta()
     targets = get_port_targets(meta)
-    target = list(filter(lambda x: x.bsp.replace("target_", "") == args.target, targets))
+    target = list(
+        filter(lambda x: x.bsp.replace("target_", "") == args.target, targets)
+    )
     if target == []:
         logger.error(f"No target {args.target} exists")
         exit(1)
@@ -157,12 +163,14 @@ def flash(args):
 def log(args):
     fw_path = Path(f"./out/{args.target}")
     if args.release:
-        fw_path = fw_path / f"{args.target}-rel.bin"
+        fw_path = fw_path / f"{args.target}-rel.elf"
     else:
-        fw_path = fw_path / f"{args.target}-dev.bin"
-    cmd = "(stty speed 115200 >/dev/null && cat) <"
+        fw_path = fw_path / f"{args.target}-dev.elf"
+    cmd = "(stty speed 460800 >/dev/null && cat) <"
     cmd += args.device
-    cmd += '| defmt-print -e out/naegi/naegi-rel.elf --log-format "{t} {{[{L}]%bold} {m}:{l}%35} {s}"'
+    cmd += "| defmt-print -e "
+    cmd += f"{fw_path}"
+    cmd += ' --log-format "{t} {{[{L}]%bold} {m}:{l}%35} {s}"'
     if not Path(args.device).exists():
         logger.info(f"Waiting for device {args.device} to come online...")
         while not Path(args.device).exists():

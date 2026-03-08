@@ -1,5 +1,5 @@
-use crate::tsp;
 use crate::roles::MemChannelCoreLink;
+use crate::tsp;
 use core::mem::MaybeUninit;
 use core_control::State;
 use defmt::info;
@@ -46,16 +46,16 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
 
 /// BALANCE_STATE MUST be initialized when this function runs.
 pub fn aux_loop() {
-    get_state().motor.foc_aux_update();
     // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
     // Fix once some kind of error passing system is implemented.
     let imu = tsp::get_imu_data().unwrap();
-    let spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
+    let _spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
     // TODO: Reenable when I finish testing motor control
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
-    get_state().motor.request_q(2.0);
+    get_state().motor.request_q(3.0);
+    get_state().motor.foc_aux_update();
 }
 
 pub fn motor_loop() {
@@ -67,10 +67,17 @@ async fn motor_control_view() {
     loop {
         let m = &get_state().motor;
         info!(
-            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}",
-            m.Conv.Iu, m.Conv.Iv, m.Conv.Iw, m.Conv.Vbus
+            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}, FOC angle: {}",
+            m.Conv.Iu,
+            m.Conv.Iv,
+            m.Conv.Iw,
+            m.Conv.Vbus,
+            m.FOC.Idq_prereq.q,
+            m.key_bits,
+            m.get_state(),
+            m.FOC.FOCAngle
         );
-        Timer::after_millis(500).await;
+        Timer::after_millis(100).await;
     }
 }
 
@@ -85,9 +92,9 @@ async fn main_task(
 // NOTE: ideally this default init should be in the mesc crate, and be merged into the
 // MESC_motor_typedef struct. All of this should NOT be a global.
 #[unsafe(export_name = "g_hw_setup")]
-pub static HW_SETUP: hw_setup_s = hw_setup_s {
-    Imax: 5.0,
-    Vmax: 168.0,
+pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
+    Imax: 20.0,
+    Vmax: 170.0,
     Vmin: 0.0,
     Rshunt: 0.0,
     RVBT: 0.0,

@@ -42,6 +42,22 @@
 
 static const float sqrt3_on_2 = 0.866025f;
 
+static inline uint16_t pwm_from_float(MESC_motor_typedef* _motor, float duty) {
+    float max_duty = (float)MESChal_getMaxDuty(_motor);
+
+    if (!isfinite(duty)) {
+        duty = 0.0f;
+    }
+
+    if (duty < 0.0f) {
+        duty = 0.0f;
+    } else if (duty > max_duty) {
+        duty = max_duty;
+    }
+
+    return (uint16_t)duty;
+}
+
 // Debug
 #define DEMCR_TRCENA 0x01000000
 #define DEMCR (*((volatile uint32_t*)0xE000EDFC))
@@ -72,6 +88,9 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
     float mid_value = 0;
     float top_value;
     float bottom_value;
+    float duty_a;
+    float duty_b;
+    float duty_c;
 
     float Vd, Vq;
 
@@ -155,17 +174,15 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
             mid_value = _motor->FOC.PWMmid -
                         0.5f * _motor->FOC.Vab_to_PWM * (top_value + bottom_value);
 
+            duty_a = _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0] + mid_value;
+            duty_b = _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1] + mid_value;
+            duty_c = _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2] + mid_value;
+
             ////////////////////////////////////////////////////////
             // Actually write the value to the timer registers
-            MESChal_phA_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
-                                                       _motor->FOC.inverterVoltage[0] +
-                                                   mid_value));
-            MESChal_phB_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
-                                                       _motor->FOC.inverterVoltage[1] +
-                                                   mid_value));
-            MESChal_phC_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
-                                                       _motor->FOC.inverterVoltage[2] +
-                                                   mid_value));
+            MESChal_phA_setDuty(_motor, pwm_from_float(_motor, duty_a));
+            MESChal_phB_setDuty(_motor, pwm_from_float(_motor, duty_b));
+            MESChal_phC_setDuty(_motor, pwm_from_float(_motor, duty_c));
 
             // Dead time compensation
             if (_motor->options.use_deadtime_compensation) {
@@ -188,28 +205,34 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
                 // ineffective. However, no torque is generated when the current and
                 // voltage are close to zero, so no adverse performance except the buzz.
                 if (_motor->Conv.Iu < -0.030f) {
-                    MESChal_phA_setDuty(
-                        _motor, MESChal_phA_getDuty(_motor) - _motor->FOC.deadtime_comp);
+                    duty_a =
+                        (float)MESChal_phA_getDuty(_motor) - _motor->FOC.deadtime_comp;
+                    MESChal_phA_setDuty(_motor, pwm_from_float(_motor, duty_a));
                 }
                 if (_motor->Conv.Iv < -0.030f) {
-                    MESChal_phB_setDuty(
-                        _motor, MESChal_phB_getDuty(_motor) - _motor->FOC.deadtime_comp);
+                    duty_b =
+                        (float)MESChal_phB_getDuty(_motor) - _motor->FOC.deadtime_comp;
+                    MESChal_phB_setDuty(_motor, pwm_from_float(_motor, duty_b));
                 }
                 if (_motor->Conv.Iw < -0.030f) {
-                    MESChal_phC_setDuty(
-                        _motor, MESChal_phC_getDuty(_motor) - _motor->FOC.deadtime_comp);
+                    duty_c =
+                        (float)MESChal_phC_getDuty(_motor) - _motor->FOC.deadtime_comp;
+                    MESChal_phC_setDuty(_motor, pwm_from_float(_motor, duty_c));
                 }
                 if (_motor->Conv.Iu > -0.030f) {
-                    MESChal_phA_setDuty(
-                        _motor, MESChal_phA_getDuty(_motor) + _motor->FOC.deadtime_comp);
+                    duty_a =
+                        (float)MESChal_phA_getDuty(_motor) + _motor->FOC.deadtime_comp;
+                    MESChal_phA_setDuty(_motor, pwm_from_float(_motor, duty_a));
                 }
                 if (_motor->Conv.Iv > -0.030f) {
-                    MESChal_phB_setDuty(
-                        _motor, MESChal_phB_getDuty(_motor) + _motor->FOC.deadtime_comp);
+                    duty_b =
+                        (float)MESChal_phB_getDuty(_motor) + _motor->FOC.deadtime_comp;
+                    MESChal_phB_setDuty(_motor, pwm_from_float(_motor, duty_b));
                 }
                 if (_motor->Conv.Iw > -0.030f) {
-                    MESChal_phC_setDuty(
-                        _motor, MESChal_phC_getDuty(_motor) + _motor->FOC.deadtime_comp);
+                    duty_c =
+                        (float)MESChal_phC_getDuty(_motor) + _motor->FOC.deadtime_comp;
+                    MESChal_phC_setDuty(_motor, pwm_from_float(_motor, duty_c));
                 }
             }
             break;
@@ -224,20 +247,18 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
                 mid_value = _motor->FOC.PWMmid -
                             0.5f * _motor->FOC.Vab_to_PWM * (top_value + bottom_value);
 
+                duty_a =
+                    _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0] + mid_value;
+                duty_b =
+                    _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1] + mid_value;
+                duty_c =
+                    _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2] + mid_value;
+
                 ////////////////////////////////////////////////////////
                 // Actually write the value to the timer registers
-                MESChal_phA_setDuty(
-                    _motor,
-                    (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0] +
-                               mid_value));
-                MESChal_phB_setDuty(
-                    _motor,
-                    (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1] +
-                               mid_value));
-                MESChal_phC_setDuty(
-                    _motor,
-                    (uint16_t)(_motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2] +
-                               mid_value));
+                MESChal_phA_setDuty(_motor, pwm_from_float(_motor, duty_a));
+                MESChal_phB_setDuty(_motor, pwm_from_float(_motor, duty_b));
+                MESChal_phC_setDuty(_motor, pwm_from_float(_motor, duty_c));
 
                 //    			_motor->FOC.inverterVoltage[0] =
                 //    _motor->FOC.inverterVoltage[0]+
@@ -254,13 +275,14 @@ void MESCpwm_Write(MESC_motor_typedef* _motor) {
                 _motor->FOC.inverterVoltage[2] =
                     _motor->FOC.inverterVoltage[2] - bottom_value;
 
+                duty_a = _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[0];
+                duty_b = _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[1];
+                duty_c = _motor->FOC.Vab_to_PWM * _motor->FOC.inverterVoltage[2];
+
                 // Write the timer registers
-                MESChal_phA_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
-                                                       _motor->FOC.inverterVoltage[0]));
-                MESChal_phB_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
-                                                       _motor->FOC.inverterVoltage[1]));
-                MESChal_phC_setDuty(_motor, (uint16_t)(_motor->FOC.Vab_to_PWM *
-                                                       _motor->FOC.inverterVoltage[2]));
+                MESChal_phA_setDuty(_motor, pwm_from_float(_motor, duty_a));
+                MESChal_phB_setDuty(_motor, pwm_from_float(_motor, duty_b));
+                MESChal_phC_setDuty(_motor, pwm_from_float(_motor, duty_c));
             }
 #ifdef OVERMOD_DT_COMP_THRESHOLD
             // Concept here is that if we are close to the VBus max, we just do not turn

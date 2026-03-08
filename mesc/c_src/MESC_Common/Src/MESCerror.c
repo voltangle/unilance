@@ -111,6 +111,7 @@ void handleError(MESC_motor_typedef* _motor, uint32_t error_code) {
     if (_motor->MotorState == MOTOR_STATE_INITIALISING) {
         MESC_errors |= (0b01 << (ERROR_STARTUP - 1));
     }
+    MESChal_logTraceInt("Error code asserted: ", error_code);
     _motor->MotorState = MOTOR_STATE_ERROR;
     // Log the nature of the fault
     MESC_errors |= (0b01 << (error_code - 1));
