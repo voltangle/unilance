@@ -263,11 +263,11 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->conf_is_valid = true;
 
     // Lock it in initialising while the offsets not completed
-    //	while(_motor->key_bits & UNINITIALISED_KEY){
-    //		_motor->MotorState = MOTOR_STATE_INITIALISING;
-    //		HAL_Delay(0);
-    //		generateBreakAll();
-    //	}
+    while (_motor->key_bits & UNINITIALISED_KEY) {
+        _motor->MotorState = MOTOR_STATE_INITIALISING;
+        MESChal_delayMs(5);
+        MESCpwm_generateBreak(_motor);
+    }
 }
 
 void initialiseInverter(MESC_motor_typedef* _motor) {
@@ -709,20 +709,25 @@ void ADCConversion(MESC_motor_typedef* _motor) {
     // Check for over limit conditions. We want this after the conversion so that the
     // correct overcurrent values are logged
     // VICheck(_motor); //This uses the "raw" values, and requires an extra function call
-    if (_motor->Conv.Iu > g_hw_setup.Imax) {
-        handleError(_motor, ERROR_OVERCURRENT_PHA);
-    }
-    if (_motor->Conv.Iv > g_hw_setup.Imax) {
-        handleError(_motor, ERROR_OVERCURRENT_PHB);
-    }
-    if (_motor->Conv.Iw > g_hw_setup.Imax) {
-        handleError(_motor, ERROR_OVERCURRENT_PHC);
-    }
-    if (_motor->Conv.Vbus > g_hw_setup.Vmax) {
-        handleError(_motor, ERROR_OVERVOLTAGE);
-    }
-    if (_motor->Conv.Vbus < g_hw_setup.Vmin) {
-        handleError(_motor, ERROR_UNDERVOLTAGE);
+    if (_motor->MotorState == MOTOR_STATE_RUN) {
+        if (_motor->Conv.Iu > g_hw_setup.Imax) {
+            MESChal_logTraceDouble("Phase A overcurrent: ", _motor->Conv.Iu);
+            handleError(_motor, ERROR_OVERCURRENT_PHA);
+        }
+        if (_motor->Conv.Iv > g_hw_setup.Imax) {
+            MESChal_logTraceDouble("Phase B overcurrent: ", _motor->Conv.Iu);
+            handleError(_motor, ERROR_OVERCURRENT_PHB);
+        }
+        if (_motor->Conv.Iw > g_hw_setup.Imax) {
+            MESChal_logTraceDouble("Phase C overcurrent: ", _motor->Conv.Iu);
+            handleError(_motor, ERROR_OVERCURRENT_PHC);
+        }
+        if (_motor->Conv.Vbus > g_hw_setup.Vmax) {
+            handleError(_motor, ERROR_OVERVOLTAGE);
+        }
+        if (_motor->Conv.Vbus < g_hw_setup.Vmin) {
+            handleError(_motor, ERROR_UNDERVOLTAGE);
+        }
     }
 
 // Deal with terrible hardware choice of only having two current sensors
@@ -1428,7 +1433,8 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
     ///////////////////////Run the state machine//////////////////////////////////
     switch (_motor->MotorState) {
         case MOTOR_STATE_TRACKING:
-            ThrottleTemperature(_motor);
+            // FIXME: temporarily disabled, check if I actually need it
+            // ThrottleTemperature(_motor);
             _motor->FOC.was_last_tracking = 1;
             // Seperate based on control mode. We NEED to have a fallthrough here in
             // transition state! Does not seem possible to use nested switches due to
@@ -1482,8 +1488,9 @@ void MESCfoc_slowLoop(MESC_motor_typedef* _motor) {
 
         case MOTOR_STATE_RUN:
             calculatePower(_motor);
-            ThrottleTemperature(_motor);  // Gradually ramp down the Q current if motor or
-                                          // FETs are getting hot
+            // FIXME: check if I need it
+            // ThrottleTemperature(_motor);  // Gradually ramp down the Q current if motor
+            // or FETs are getting hot
             if (_motor->options.mtpa_mode) {
                 RunMTPA(_motor);  // Process MTPA
             }
