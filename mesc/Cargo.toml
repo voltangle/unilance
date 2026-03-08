@@ -16,3 +16,7 @@ cc = { version = "1.2.52", features = ["parallel"] }
 
 [features]
 logging = []
+missing_ucurrsensor = []
+missing_vcurrsensor = []
+missing_wcurrsensor = []
+

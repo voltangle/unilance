@@ -71,6 +71,7 @@ target_naegi = [
     "role_control",
     "stm32f405rg",
     "drivers/mpu6500",
+    "mesc/missing_vcurrsensor",
     "embassy-stm32/time-driver-tim5",
     "embassy-executor/scheduler-deadline"
 ]
