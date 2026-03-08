@@ -71,7 +71,7 @@ use static_cell::StaticCell;
  * - PC0: I_battery
  * - PC1: T_driver
  * - PA0: V_battery
- * - PA4: I_phaseA
+ * - PA4: I_phaseA (inverted signal)
  * - PA5: I_phaseC
  *
  * DMA setup:
@@ -193,22 +193,20 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let vrefint = adc1.enable_vrefint().degrade_adc();
     let core_temp = adc1.enable_temperature().degrade_adc();
 
-    // NOTE: time to convert 3 channels is 17,5 microseconds, which is plenty, considering
-    // that the motor timer update interrupt runs every 100 microseconds. Technically,
-    // I can just get rid of the third ADC and sample input voltage/current with the
-    // first two ADCs, but no harm in using all three.
     let mut adc1_rb = unsafe {
         adc1.into_ring_buffered(
             p.DMA2_CH0,
             &mut ADC1_DMA_BUF,
             [
-                (i_phase_a, SampleTime::CYCLES480),
-                (vrefint, SampleTime::CYCLES480),
-                (core_temp, SampleTime::CYCLES480),
+                (i_phase_a, SampleTime::CYCLES112),
+                (vrefint, SampleTime::CYCLES112),
+                (core_temp, SampleTime::CYCLES112),
             ]
             .into_iter(),
             RegularConversionMode::Triggered(ConversionTrigger {
                 channel: ADC_CONV_TRIG_TIM8_TRGO,
+                // TODO: verify that RISING_EDGE is fine, and I don't need to switch to
+                // BOTH_EDGES
                 edge: Exten::RISING_EDGE,
             }),
         )
@@ -218,8 +216,8 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             p.DMA2_CH3,
             &mut ADC2_DMA_BUF,
             [
-                (i_phase_c, SampleTime::CYCLES480),
-                (t_driver, SampleTime::CYCLES480),
+                (i_phase_c, SampleTime::CYCLES112),
+                (t_driver, SampleTime::CYCLES112),
             ]
             .into_iter(),
             RegularConversionMode::Triggered(ConversionTrigger {
@@ -233,8 +231,8 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             p.DMA2_CH1,
             &mut ADC3_DMA_BUF,
             [
-                (i_battery, SampleTime::CYCLES480),
-                (v_battery, SampleTime::CYCLES480),
+                (i_battery, SampleTime::CYCLES112),
+                (v_battery, SampleTime::CYCLES112),
             ]
             .into_iter(),
             RegularConversionMode::Triggered(ConversionTrigger {
@@ -262,10 +260,14 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
+    // TODO: no idea if it actually does anything, but its used as the ADC sampling
+    // trigger by MESC
+    // motor_tim.enable(Channel::Ch4);
+
     // Enable the TIM8 update interrupt
     pac::TIM8.dier().modify(|w| w.set_uie(true));
     // Enable TIM8_TRGO updates, so the ADCs can see the updates
-    pac::TIM8.cr2().modify(|w| w.set_mms(MasterMode::UPDATE));
+    pac::TIM8.cr2().modify(|w| w.set_mms(MasterMode::COMPARE_OC4));
     typelevel::TIM8_UP_TIM13::unpend();
     unsafe {
         typelevel::TIM8_UP_TIM13::enable();
@@ -316,6 +318,8 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         });
     }
     get_bsp().aux_loop_tim.start();
+    // FIXME: temporary test
+    get_bsp().poweron.set_high();
 
     info!("BSP peripherals initialized");
 }
@@ -434,8 +438,9 @@ fn adc_dma_read() {
         let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
         let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
 
+        // Phase A current sensor is actually inverted
         control::get_state().motor.set_raw_adc(
-            adc1_buf[0], // I_phaseA
+            4095 - adc1_buf[0], // I_phaseA
             2048,        // Phase B doesn't have a sensor attached
             adc2_buf[0], // I_phaseC
             adc3_buf[1], // V_battery
@@ -509,9 +514,9 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        if duty > 3500 {
-            trace!("Duty for phase A: {}", duty);
-        }
+        // if duty > 3500 {
+        //     trace!("Duty for phase A: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(
             Channel::Ch1,
             (duty as u32).clamp(0, get_bsp().motor_tim.get_max_duty()),
@@ -520,9 +525,9 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        if duty > 3500 {
-            trace!("Duty for phase B: {}", duty);
-        }
+        // if duty > 3500 {
+        //     trace!("Duty for phase B: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(
             Channel::Ch2,
             (duty as u32).clamp(0, get_bsp().motor_tim.get_max_duty()),
@@ -531,9 +536,9 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        if duty > 3500 {
-            trace!("Duty for phase C: {}", duty);
-        }
+        // if duty > 3500 {
+        //     trace!("Duty for phase C: {}", duty);
+        // }
         get_bsp().motor_tim.set_duty(
             Channel::Ch3,
             (duty as u32).clamp(0, get_bsp().motor_tim.get_max_duty()),
@@ -542,9 +547,6 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn phase_d_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        // if duty != 0 {
-        //     trace!("Duty for phase D: {}", duty);
-        // }
         get_bsp().motor_tim.set_duty(Channel::Ch4, duty.into());
     }
 

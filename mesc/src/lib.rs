@@ -52,7 +52,7 @@ impl MescMotorExt for MESC_motor_typedef {
         self.input_vars.max_request_Idq.q = 100.0;
         self.input_vars.min_request_Idq.q = 0.0;
         self.limits.abs_max_phase_current = 40.0;
-        self.limits.abs_max_bus_voltage = 168.0;
+        self.limits.abs_max_bus_voltage = 170.0;
         unsafe {
             MESCfoc_Init(self);
         }

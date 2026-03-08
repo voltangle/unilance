@@ -230,9 +230,10 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     MESClrobs_Init(_motor);
 // Reconfigure dead times
 // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
-#ifdef CUSTOM_DEADTIME
-    MESChal_setDeadtimeNs(_motor, CUSTOM_DEADTIME);
-#endif
+// FIXME: change to using a flag in the motor struct
+// #ifdef CUSTOM_DEADTIME
+    MESChal_setDeadtimeNs(_motor, 1200);
+// #endif
 
     // Set the keybits
     _motor->key_bits = UNINITIALISED_KEY;
@@ -1195,7 +1196,9 @@ void calculateFlux(MESC_motor_typedef* _motor) {
 
 void calculateGains(MESC_motor_typedef* _motor) {
     _motor->FOC.pwm_period = 1.0f / _motor->FOC.pwm_frequency;
-    MESChal_setPWMFrequency(_motor, _motor->FOC.pwm_frequency);
+    // FIXME: check if I need it
+    // MESChal_setPWMFrequency(_motor, _motor->FOC.pwm_frequency);
+
     // Just short of dead center (dead center will
     // not actually trigger the conversion)
     MESChal_phD_setDuty(_motor, MESChal_getMaxDuty(_motor) - 5);

@@ -54,7 +54,7 @@ pub fn aux_loop() {
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
-    get_state().motor.request_q(4.0);
+    get_state().motor.request_q(3.0);
     get_state().motor.foc_aux_update();
 }
 
@@ -67,16 +67,17 @@ async fn motor_control_view() {
     loop {
         let m = &get_state().motor;
         info!(
-            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}",
+            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}, FOC angle: {}",
             m.Conv.Iu,
             m.Conv.Iv,
             m.Conv.Iw,
             m.Conv.Vbus,
             m.FOC.Idq_prereq.q,
             m.key_bits,
-            m.get_state()
+            m.get_state(),
+            m.FOC.FOCAngle
         );
-        Timer::after_millis(500).await;
+        Timer::after_millis(100).await;
     }
 }
 
@@ -93,7 +94,7 @@ async fn main_task(
 #[unsafe(export_name = "g_hw_setup")]
 pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
     Imax: 20.0,
-    Vmax: 168.0,
+    Vmax: 170.0,
     Vmin: 0.0,
     Rshunt: 0.0,
     RVBT: 0.0,
