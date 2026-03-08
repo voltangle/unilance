@@ -416,13 +416,14 @@ fn TIM2() {
 
 fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
     let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
+    let half = buf.len() / 2;
 
     // if the amount of data to write is smaller than half the buffer, then DMA is
     // writing to the second half of the buffer
-    if ndtr < (buf.len() - 1) / 2 {
-        &buf[..buf.len() / 2]
+    if ndtr < half {
+        &buf[..half]
     } else {
-        &buf[(buf.len() / 2) - 1..]
+        &buf[half..]
     }
 }
 
@@ -436,8 +437,8 @@ fn adc_dma_read() {
         control::get_state().motor.set_raw_adc(
             adc1_buf[0], // I_phaseA
             2048,        // Phase B doesn't have a sensor attached
-            adc2_buf[1], // I_phaseC
-            adc3_buf[0], // V_battery
+            adc2_buf[0], // I_phaseC
+            adc3_buf[1], // V_battery
         );
     }
 }
@@ -501,28 +502,42 @@ impl Hal for MotorHal {
         get_bsp().motor_tim.get_duty(Channel::Ch3)
     }
 
+    /*
+     * These guys have a clamp going on just so I remove the chance of it panicking
+     * if input duty is outside the allowed range
+     */
+
     #[inline(always)]
     fn phase_a_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        // if duty != 0 {
-        //     trace!("Duty for phase A: {}", duty);
-        // }
-        get_bsp().motor_tim.set_duty(Channel::Ch1, duty.into());
+        if duty > 3500 {
+            trace!("Duty for phase A: {}", duty);
+        }
+        get_bsp().motor_tim.set_duty(
+            Channel::Ch1,
+            (duty as u32).clamp(0, get_bsp().motor_tim.get_max_duty()),
+        );
     }
 
     #[inline(always)]
     fn phase_b_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        // if duty != 0 {
-        //     trace!("Duty for phase B: {}", duty);
-        // }
-        get_bsp().motor_tim.set_duty(Channel::Ch2, duty.into());
+        if duty > 3500 {
+            trace!("Duty for phase B: {}", duty);
+        }
+        get_bsp().motor_tim.set_duty(
+            Channel::Ch2,
+            (duty as u32).clamp(0, get_bsp().motor_tim.get_max_duty()),
+        );
     }
 
     #[inline(always)]
     fn phase_c_set_duty(_motor: &mut MESC_motor_typedef, duty: u16) {
-        // if duty != 0 {
-        //     trace!("Duty for phase C: {}", duty);
-        // }
-        get_bsp().motor_tim.set_duty(Channel::Ch3, duty.into());
+        if duty > 3500 {
+            trace!("Duty for phase C: {}", duty);
+        }
+        get_bsp().motor_tim.set_duty(
+            Channel::Ch3,
+            (duty as u32).clamp(0, get_bsp().motor_tim.get_max_duty()),
+        );
     }
 
     #[inline(always)]
