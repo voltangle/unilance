@@ -7,10 +7,11 @@ use core::sync::atomic::Ordering;
 use cortex_m::prelude::_embedded_hal_Pwm;
 use defmt::{info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
+use embassy_executor::raw::trace;
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, AdcChannel, Exten, InjectedAdc, SampleTime};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
-use embassy_stm32::interrupt::typelevel::{self, Interrupt};
+use embassy_stm32::interrupt::typelevel::{Interrupt, ADC, TIM8_UP_TIM13};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::{Async, Blocking};
 use embassy_stm32::pac::timer::vals::Urs;
@@ -186,38 +187,42 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let vrefint = adc1.enable_vrefint().degrade_adc();
     let core_temp = adc1.enable_temperature().degrade_adc();
 
-    let mut adc1 = adc1.setup_injected_conversions(
+    let adc1 = adc1.setup_injected_conversions(
         [
             (i_phase_a, SampleTime::CYCLES112),
             (vrefint, SampleTime::CYCLES112),
             (core_temp, SampleTime::CYCLES112),
         ],
         TIM8_CH4,
-        Exten::FALLING_EDGE,
+        Exten::RISING_EDGE,
         true,
     );
-    let mut adc2 = adc2.setup_injected_conversions(
+    let adc2 = adc2.setup_injected_conversions(
         [
             (i_phase_c, SampleTime::CYCLES112),
             (t_driver, SampleTime::CYCLES112),
         ],
         TIM8_CH4,
-        Exten::FALLING_EDGE,
+        Exten::RISING_EDGE,
         true,
     );
-    let mut adc3 = adc3.setup_injected_conversions(
+    let adc3 = adc3.setup_injected_conversions(
         [
             (i_battery, SampleTime::CYCLES112),
             (v_battery, SampleTime::CYCLES112),
         ],
         TIM8_CH4,
-        Exten::FALLING_EDGE,
+        Exten::RISING_EDGE,
         true,
     );
-
-    adc1.start_injected_conversions();
-    adc2.start_injected_conversions();
-    adc3.start_injected_conversions();
+    unsafe {
+        // Enable ADC interrupt
+        ADC::enable();
+    }
+    trace!("ADC1->CR1.SCAN: {}", ADC1.cr1().read().scan());
+    ADC1.cr1().modify(|w| w.set_scan(true));
+    ADC2.cr1().modify(|w| w.set_scan(true));
+    ADC3.cr1().modify(|w| w.set_scan(true));
 
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
@@ -239,9 +244,9 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     // Enable the TIM8 update interrupt
     pac::TIM8.dier().modify(|w| w.set_uie(true));
-    typelevel::TIM8_UP_TIM13::unpend();
+    TIM8_UP_TIM13::unpend();
     unsafe {
-        typelevel::TIM8_UP_TIM13::enable();
+        TIM8_UP_TIM13::enable();
     }
     trace!("Motor timer max duty: {}", motor_tim.get_max_duty());
 
@@ -360,8 +365,10 @@ impl PlatformConfig for Config {
  */
 
 #[interrupt]
-fn ADC() {
+unsafe fn ADC() {
     rtos_trace::trace::isr_enter();
+    
+    trace!("ADC");
 
     if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
         // Clear end of conversion flags

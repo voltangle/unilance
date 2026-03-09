@@ -262,13 +262,6 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     // interrupt
 
     _motor->conf_is_valid = true;
-
-    // Lock it in initialising while the offsets not completed
-    while (_motor->key_bits & UNINITIALISED_KEY) {
-        _motor->MotorState = MOTOR_STATE_INITIALISING;
-        MESChal_delayMs(5);
-        MESCpwm_generateBreak(_motor);
-    }
 }
 
 void initialiseInverter(MESC_motor_typedef* _motor) {

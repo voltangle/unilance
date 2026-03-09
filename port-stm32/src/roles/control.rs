@@ -83,7 +83,7 @@ async fn motor_control_view() {
             m.FOC.Idq_prereq.q,
             m.key_bits,
             m.get_state(),
-            m.FOC.FOCAngle
+            m.FOC.FOCAngle,
         );
         Timer::after_millis(100).await;
     }
