@@ -17,7 +17,7 @@ use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{error, info};
 use embassy_executor::Spawner;
-use embassy_stm32::{Config, bind_interrupts, pac};
+use embassy_stm32::{Config, pac};
 #[for_role("combined")]
 use embassy_sync::channel::Channel;
 use embassy_time::Timer;
@@ -27,10 +27,6 @@ use panic_probe as _;
 
 static CTRL_TO_SUPV_CHANNEL: CoreChannel = Channel::new();
 static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
-
-bind_interrupts!(struct Irqs {
-    USART1 => embassy_stm32::usart::InterruptHandler<embassy_stm32::peripherals::USART1>;
-});
 
 fn log_and_clear_reset_flags() {
     let csr = pac::RCC.csr().read();

@@ -24,6 +24,7 @@ use crate::bindings::{
 pub trait MescMotorExt {
     fn init(&mut self);
     fn foc_update(&mut self);
+    fn timer_write(&mut self);
     fn foc_aux_update(&mut self);
     fn get_state(&self) -> MotorState;
     fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16);
@@ -36,9 +37,9 @@ impl MescMotorExt for MESC_motor_typedef {
     fn init(&mut self) {
         trace!("Running motor init");
         // Specs for the Sherman-L motor
-        self.m.Imax = 5.0;
-        self.m.Pmax = 500.0;
-        self.m.IBatmax = 5.0;
+        self.m.Imax = 200.0;
+        self.m.Pmax = 4000.0;
+        self.m.IBatmax = 200.0;
         self.m.pole_pairs = 27;
         self.m.L_D = 0.00026978;
         self.m.L_Q = 0.00034389;
@@ -50,21 +51,28 @@ impl MescMotorExt for MESC_motor_typedef {
         self.m.flux_linkage_gain = self.m.flux_linkage.sqrt() * 10.0;
         self.m.non_linear_centering_gain = 5000.0;
         self.input_vars.max_request_Idq.q = 100.0;
-        self.input_vars.min_request_Idq.q = 0.0;
-        self.limits.abs_max_phase_current = 40.0;
+        self.input_vars.min_request_Idq.q = -100.0;
+        self.limits.abs_max_phase_current = 200.0;
         self.limits.abs_max_bus_voltage = 170.0;
         unsafe {
             MESCfoc_Init(self);
         }
         self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
-        self.FOC.openloop_step = 10;
+        self.FOC.openloop_step = 7;
     }
 
     // TODO: do proper documentation
-    /// Runs MESCfoc_fastLoop and MESC_PWM_IRQ_handler.
+    /// Runs MESCfoc_fastLoop.
     fn foc_update(&mut self) {
         unsafe {
             MESCfoc_fastLoop(self);
+        }
+    }
+
+    // TODO: do proper documentation
+    /// Runs MESC_PWM_IRQ_handler.
+    fn timer_write(&mut self) {
+        unsafe {
             MESC_PWM_IRQ_handler(self);
         }
     }
@@ -98,14 +106,6 @@ impl MescMotorExt for MESC_motor_typedef {
         self.FOC.Idq_prereq.d = i_d;
     }
 
-    // Calculated with this: (ADC_Value - 2048) * ((3.3 / 4095) / gain) = ~350
-    // Total current measurement range = 350A
-    // Should show 350A as 2,97V on the output, as BSO6920BSO-50A has 1,65V as zero and each
-    // amp is each 26,7 mV. 1650mV + (26,7mV * 50) = 2,97V, and 1650mV - (26,7mV * 50) = 0,315V.
-    // The sensor itself only sees 50A, as the setup is done with two 3 mΩ shunts in parallel
-    // with a 9mΩ hall effect current sensor, with equivalent series resistance of 1,3mΩ.
-    // Essentially, the sensor only sees 1/7 of the total current going through the phase its
-    // measuring.
     /// Configure the current sensor raw data conversion system
     fn set_raw_adc_offsets(&mut self, i_u_offset: u16, i_v_offset: u16, i_w_offset: u16) {
         self.offset.Iu = i_u_offset as f32;

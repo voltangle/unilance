@@ -63,3 +63,7 @@ pub async fn main_task(state: &mut State, link: &mut impl CoreLink) {
 pub fn pwm_isr(state: &mut State) {
     state.motor.foc_update();
 }
+
+pub fn adc_isr(state: &mut State) {
+    state.motor.foc_update();
+}

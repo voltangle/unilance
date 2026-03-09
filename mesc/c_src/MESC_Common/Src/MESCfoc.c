@@ -228,12 +228,12 @@ void MESCfoc_Init(MESC_motor_typedef* _motor) {
     _motor->FOC.ortega_gain = 1000000.0f;
 
     MESClrobs_Init(_motor);
-// Reconfigure dead times
-// This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
-// FIXME: change to using a flag in the motor struct
-// #ifdef CUSTOM_DEADTIME
-    MESChal_setDeadtimeNs(_motor, 1200);
-// #endif
+    // Reconfigure dead times
+    // This is only useful up to 1500ns for 168MHz clock, 3us for an 84MHz clock
+    // FIXME: change to using a flag in the motor struct
+    // #ifdef CUSTOM_DEADTIME
+    MESChal_setDeadtimeNs(_motor, 700);
+    // #endif
 
     // Set the keybits
     _motor->key_bits = UNINITIALISED_KEY;

@@ -44,7 +44,9 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     spawner.spawn(motor_control_view().expect("Motor control view should start"));
 }
 
+static mut AUX_OPENLOOP_CNT: u32 = 0;
 /// BALANCE_STATE MUST be initialized when this function runs.
+#[allow(static_mut_refs)]
 pub fn aux_loop() {
     // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
     // Fix once some kind of error passing system is implemented.
@@ -54,12 +56,15 @@ pub fn aux_loop() {
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
-    get_state().motor.request_q(3.0);
+    unsafe {
+        if AUX_OPENLOOP_CNT < 1000 {
+            AUX_OPENLOOP_CNT += 1;
+        }
+        get_state()
+            .motor
+            .request_q(6.0 * (AUX_OPENLOOP_CNT as f32 / 1000.0));
+    }
     get_state().motor.foc_aux_update();
-}
-
-pub fn motor_loop() {
-    core_control::pwm_isr(get_state());
 }
 
 #[embassy_executor::task]
@@ -67,7 +72,10 @@ async fn motor_control_view() {
     loop {
         let m = &get_state().motor;
         info!(
-            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}, FOC angle: {}",
+            "RawIu: {}, RawIv: {}, RawIw: {}, Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}, FOC angle: {}",
+            m.Raw.Iu,
+            m.Raw.Iv,
+            m.Raw.Iw,
             m.Conv.Iu,
             m.Conv.Iv,
             m.Conv.Iw,
@@ -103,7 +111,15 @@ pub static mut HW_SETUP: hw_setup_s = hw_setup_s {
     RIphPU: 0.0,
     RIphSR: 0.0,
     OpGain: 0.0,
-    Igain: 0.00377,
+    // Calculated with this: (ADC_Value - 2048) * ((3.3 / 4095) / gain) = ~350
+    // Total current measurement range = 350A
+    // Should show 350A as 2,97V on the output, as BSO6920BSO-50A has 1,65V as zero and each
+    // amp is each 26,7 mV. 1650mV + (26,7mV * 50) = 2,97V, and 1650mV - (26,7mV * 50) = 0,315V.
+    // The sensor itself only sees 50A, as the setup is done with two 3 mΩ shunts in parallel
+    // with a 9mΩ hall effect current sensor, with equivalent series resistance of 1,3mΩ.
+    // Essentially, the sensor only sees 1/7 of the total current going through the phase its
+    // measuring.
+    Igain: 0.21127,
     RawCurrLim: 4096,
     RawVoltLim: 4096,
 };

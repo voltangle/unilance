@@ -1,6 +1,4 @@
 use super::PlatformConfig;
-use crate::Irqs;
-use crate::constants::ADC_CONV_TRIG_TIM8_TRGO;
 use crate::mesc_impl::HCLK_HZ;
 use crate::roles::control;
 use core::mem;
@@ -10,17 +8,14 @@ use cortex_m::prelude::_embedded_hal_Pwm;
 use defmt::{info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
 use embassy_executor::Spawner;
-use embassy_stm32::adc::{
-    Adc, AdcChannel, ConversionTrigger, Exten, RegularConversionMode, RingBufferedAdc,
-    SampleTime,
-};
+use embassy_stm32::adc::{Adc, AdcChannel, Exten, InjectedAdc, SampleTime};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
 use embassy_stm32::interrupt::typelevel::{self, Interrupt};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
-use embassy_stm32::mode::Async;
+use embassy_stm32::mode::{Async, Blocking};
 use embassy_stm32::pac::timer::vals::Urs;
-use embassy_stm32::pac::{DMA2, GPIOB, TIM8};
-use embassy_stm32::peripherals::{ADC1, ADC2, ADC3, TIM2, TIM3, TIM8};
+use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB, TIM8};
+use embassy_stm32::peripherals::{self, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
     AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv, PllSource,
     RtcClockSource, Sysclk,
@@ -30,12 +25,16 @@ use embassy_stm32::spi::mode::Master;
 use embassy_stm32::time::Hertz;
 use embassy_stm32::timer::Channel;
 use embassy_stm32::timer::complementary_pwm::{ComplementaryPwm, ComplementaryPwmPin};
-use embassy_stm32::timer::low_level::{self, CountingMode, MasterMode, RoundTo};
+use embassy_stm32::timer::low_level::{self, CountingMode, RoundTo};
 use embassy_stm32::timer::simple_pwm::{PwmPin, SimplePwm};
+use embassy_stm32::triggers::TIM8_CH4;
 use embassy_stm32::usart::{self, Uart};
-use embassy_stm32::{Config, Peripherals, gpio, interrupt, pac, spi};
+use embassy_stm32::{
+    Config, Peripherals, bind_interrupts, dma, gpio, interrupt, pac, spi,
+};
 use embassy_time::Timer;
 use mesc::{Hal, MESC_motor_typedef, MescMotorExt};
+use micromath::F32Ext;
 use static_cell::StaticCell;
 
 /*
@@ -91,20 +90,16 @@ use static_cell::StaticCell;
 // like LeaperKim, with power + headlight + OK + next, etc etc. I have to figure out
 // how to make it all coexist
 
-pub const STARTUP_DELAY_MS: u64 = 1500;
-
-static mut ADC1_DMA_BUF: [u16; 6] = [0; 6];
-static mut ADC2_DMA_BUF: [u16; 4] = [0; 4];
-static mut ADC3_DMA_BUF: [u16; 4] = [0; 4];
+pub const STARTUP_DELAY_MS: u64 = 1000;
 
 #[allow(unused)]
 pub struct Bsp<'a> {
     poweron: gpio::Output<'a>,
     power_button: gpio::Input<'a>,
     park_button: gpio::Input<'a>,
-    adc1: RingBufferedAdc<'a, ADC1>,
-    adc2: RingBufferedAdc<'a, ADC2>,
-    adc3: RingBufferedAdc<'a, ADC3>,
+    adc1: InjectedAdc<'a, peripherals::ADC1, 3>,
+    adc2: InjectedAdc<'a, peripherals::ADC2, 2>,
+    adc3: InjectedAdc<'a, peripherals::ADC3, 2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
     ws281x_tim: SimplePwm<'a, TIM3>,
     aux_loop_tim: low_level::Timer<'a, TIM2>,
@@ -113,7 +108,13 @@ pub struct Bsp<'a> {
 
 static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
 
-static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Async>> = StaticCell::new();
+static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Blocking>> = StaticCell::new();
+
+bind_interrupts!(struct Irqs {
+    USART1 => usart::InterruptHandler<peripherals::USART1>;
+    DMA1_STREAM2 => dma::InterruptHandler<peripherals::DMA1_CH2>;
+    DMA1_STREAM5 => dma::InterruptHandler<peripherals::DMA1_CH5>;
+});
 
 #[allow(static_mut_refs)]
 fn get_bsp() -> &'static mut Bsp<'static> {
@@ -132,16 +133,7 @@ fn get_bsp() -> &'static mut Bsp<'static> {
 pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let mut serial_config = usart::Config::default();
     serial_config.baudrate = 460_800;
-    let serial = Uart::new(
-        p.USART1,
-        p.PA10,
-        p.PA9,
-        Irqs,
-        p.DMA2_CH7,
-        p.DMA2_CH5,
-        serial_config,
-    )
-    .unwrap();
+    let serial = Uart::new_blocking(p.USART1, p.PA10, p.PA9, serial_config).unwrap();
 
     defmt_serial::defmt_serial(DEFMT_SERIAL.init(serial));
     info!("defmt-serial started");
@@ -158,6 +150,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             p.PB4,
             p.DMA1_CH5,
             p.DMA1_CH2,
+            Irqs,
             imu_spi_conf.clone(),
         ),
         Output::new(p.PA15, Level::High, Speed::VeryHigh),
@@ -193,58 +186,38 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     let vrefint = adc1.enable_vrefint().degrade_adc();
     let core_temp = adc1.enable_temperature().degrade_adc();
 
-    let mut adc1_rb = unsafe {
-        adc1.into_ring_buffered(
-            p.DMA2_CH0,
-            &mut ADC1_DMA_BUF,
-            [
-                (i_phase_a, SampleTime::CYCLES112),
-                (vrefint, SampleTime::CYCLES112),
-                (core_temp, SampleTime::CYCLES112),
-            ]
-            .into_iter(),
-            RegularConversionMode::Triggered(ConversionTrigger {
-                channel: ADC_CONV_TRIG_TIM8_TRGO,
-                // TODO: verify that RISING_EDGE is fine, and I don't need to switch to
-                // BOTH_EDGES
-                edge: Exten::RISING_EDGE,
-            }),
-        )
-    };
-    let mut adc2_rb = unsafe {
-        adc2.into_ring_buffered(
-            p.DMA2_CH3,
-            &mut ADC2_DMA_BUF,
-            [
-                (i_phase_c, SampleTime::CYCLES112),
-                (t_driver, SampleTime::CYCLES112),
-            ]
-            .into_iter(),
-            RegularConversionMode::Triggered(ConversionTrigger {
-                channel: ADC_CONV_TRIG_TIM8_TRGO,
-                edge: Exten::RISING_EDGE,
-            }),
-        )
-    };
-    let mut adc3_rb = unsafe {
-        adc3.into_ring_buffered(
-            p.DMA2_CH1,
-            &mut ADC3_DMA_BUF,
-            [
-                (i_battery, SampleTime::CYCLES112),
-                (v_battery, SampleTime::CYCLES112),
-            ]
-            .into_iter(),
-            RegularConversionMode::Triggered(ConversionTrigger {
-                channel: ADC_CONV_TRIG_TIM8_TRGO,
-                edge: Exten::RISING_EDGE,
-            }),
-        )
-    };
+    let mut adc1 = adc1.setup_injected_conversions(
+        [
+            (i_phase_a, SampleTime::CYCLES112),
+            (vrefint, SampleTime::CYCLES112),
+            (core_temp, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::FALLING_EDGE,
+        true,
+    );
+    let mut adc2 = adc2.setup_injected_conversions(
+        [
+            (i_phase_c, SampleTime::CYCLES112),
+            (t_driver, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::FALLING_EDGE,
+        true,
+    );
+    let mut adc3 = adc3.setup_injected_conversions(
+        [
+            (i_battery, SampleTime::CYCLES112),
+            (v_battery, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::FALLING_EDGE,
+        true,
+    );
 
-    adc1_rb.start();
-    adc2_rb.start();
-    adc3_rb.start();
+    adc1.start_injected_conversions();
+    adc2.start_injected_conversions();
+    adc3.start_injected_conversions();
 
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
@@ -266,8 +239,6 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     // Enable the TIM8 update interrupt
     pac::TIM8.dier().modify(|w| w.set_uie(true));
-    // Enable TIM8_TRGO updates, so the ADCs can see the updates
-    pac::TIM8.cr2().modify(|w| w.set_mms(MasterMode::COMPARE_OC4));
     typelevel::TIM8_UP_TIM13::unpend();
     unsafe {
         typelevel::TIM8_UP_TIM13::enable();
@@ -308,9 +279,9 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
             power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
             park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
-            adc1: adc1_rb,
-            adc2: adc2_rb,
-            adc3: adc3_rb,
+            adc1,
+            adc2,
+            adc3,
             motor_tim,
             ws281x_tim,
             aux_loop_tim,
@@ -389,14 +360,29 @@ impl PlatformConfig for Config {
  */
 
 #[interrupt]
+fn ADC() {
+    rtos_trace::trace::isr_enter();
+
+    if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
+        // Clear end of conversion flags
+        ADC1.sr().modify(|w| w.set_jeoc(false));
+        ADC2.sr().modify(|w| w.set_jeoc(false));
+        ADC3.sr().modify(|w| w.set_jeoc(false));
+
+        core_control::adc_isr(control::get_state());
+    }
+
+    rtos_trace::trace::isr_exit();
+}
+
+#[interrupt]
 fn TIM8_UP_TIM13() {
     rtos_trace::trace::isr_enter();
 
-    adc_dma_read();
-    control::motor_loop();
-
     // Clear update flag
     pac::TIM8.sr().modify(|w| w.set_uif(false));
+
+    core_control::pwm_isr(control::get_state());
 
     rtos_trace::trace::isr_exit();
 }
@@ -415,40 +401,6 @@ fn TIM2() {
 }
 
 /*
- * BSP-specific functions
- */
-
-fn adc_dma_ready_buf_slice(stream: usize, buf: &[u16]) -> &[u16] {
-    let ndtr = DMA2.st(stream).ndtr().read().0 as usize;
-    let half = buf.len() / 2;
-
-    // if the amount of data to write is smaller than half the buffer, then DMA is
-    // writing to the second half of the buffer
-    if ndtr < half {
-        &buf[..half]
-    } else {
-        &buf[half..]
-    }
-}
-
-#[allow(static_mut_refs)]
-fn adc_dma_read() {
-    unsafe {
-        let adc1_buf = adc_dma_ready_buf_slice(0, &ADC1_DMA_BUF);
-        let adc2_buf = adc_dma_ready_buf_slice(3, &ADC2_DMA_BUF);
-        let adc3_buf = adc_dma_ready_buf_slice(1, &ADC3_DMA_BUF);
-
-        // Phase A current sensor is actually inverted
-        control::get_state().motor.set_raw_adc(
-            4095 - adc1_buf[0], // I_phaseA
-            2048,        // Phase B doesn't have a sensor attached
-            adc2_buf[0], // I_phaseC
-            adc3_buf[1], // V_battery
-        );
-    }
-}
-
-/*
  * MESC hooks
  */
 
@@ -462,7 +414,17 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn refresh_adc() {
-        // Empty, as ADC read is implemented through DMA
+        let adc1 = get_bsp().adc1.read_injected_samples();
+        let adc2 = get_bsp().adc2.read_injected_samples();
+        let adc3 = get_bsp().adc3.read_injected_samples();
+
+        // Phase A current sensor is actually inverted
+        control::get_state().motor.set_raw_adc(
+            4095 - adc1[0], // I_phaseA
+            2048,           // Phase B doesn't have a sensor attached
+            adc2[0],        // I_phaseC
+            adc3[1],        // V_battery
+        );
     }
 
     #[inline(always)]
@@ -587,7 +549,9 @@ impl Hal for MotorHal {
         // how many nanoseconds equal to one timer counter tick
         let tick_ns = ns_in_sec / tim_clk;
 
-        get_bsp().motor_tim.set_dead_time(ns / tick_ns as u16);
+        let dead_time_ticks = ((ns as f32) / tick_ns).round() as u16;
+
+        get_bsp().motor_tim.set_dead_time(dead_time_ticks);
     }
 }
 
