@@ -15,7 +15,7 @@ use core::ptr::read_volatile;
 use core::sync::atomic::Ordering;
 use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};
-use defmt::{error, info};
+use defmt::{debug, error, info};
 use embassy_executor::Spawner;
 use embassy_stm32::{Config, pac};
 #[for_role("combined")]
@@ -28,9 +28,21 @@ use panic_probe as _;
 static CTRL_TO_SUPV_CHANNEL: CoreChannel = Channel::new();
 static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 
-fn log_and_clear_reset_flags() {
+#[embassy_executor::main]
+async fn main(spawner: Spawner) -> ! {
+    let p = embassy_stm32::init(Config::for_platform());
+    let clocks = embassy_stm32::rcc::clocks(&p.RCC);
+    mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
+
+    let startup_timer = Timer::after_millis(tsp::STARTUP_DELAY_MS);
+    Timer::after_millis(2000).await;
+
+    // TODO: log out firmware information right here
+    tsp::init(p, &spawner).await;
+    info!("TSP init finished");
+
     let csr = pac::RCC.csr().read();
-    info!(
+    debug!(
         "Reset flags: raw={:#010x} bor={} pin={} por={} sft={} wdg={} wwdg={} lpwr={}",
         csr.0,
         csr.borrstf(),
@@ -42,20 +54,15 @@ fn log_and_clear_reset_flags() {
         csr.lpwrrstf(),
     );
     pac::RCC.csr().read().set_rmvf(true);
-}
 
-#[embassy_executor::main]
-async fn main(spawner: Spawner) -> ! {
-    let p = embassy_stm32::init(Config::for_platform());
-    let clocks = embassy_stm32::rcc::clocks(&p.RCC);
-    mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
+    debug!(
+        "Version: {}, tag: {}, ref: {}, build date: {}",
+        build_info::PKG_VERSION,
+        build_info::GIT_VERSION,
+        build_info::GIT_HEAD_REF,
+        build_info::BUILT_TIME_UTC
+    );
 
-    let startup_timer = Timer::after_millis(tsp::STARTUP_DELAY_MS);
-    Timer::after_millis(2000).await;
-
-    tsp::init(p, &spawner).await;
-    info!("BSP init finished");
-    log_and_clear_reset_flags();
     #[cfg(feature = "role_supervisor")]
     roles::supervisor::init();
     #[cfg(feature = "role_control")]
@@ -120,4 +127,8 @@ unsafe fn HardFault(frame: &ExceptionFrame) -> ! {
         );
         loop {}
     }
+}
+
+pub mod build_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

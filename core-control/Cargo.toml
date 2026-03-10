@@ -1,7 +1,7 @@
 [package]
 edition = "2024"
 name = "core-control"
-version = "0.1.0"
+version = "0.1.0-alpha"
 
 [dependencies]
 mesc = { path = "../mesc" }
@@ -18,3 +18,6 @@ defmt = "1.0.1"
 nalgebra = { version = "0.34.1", default-features = false }
 
 [features]
+
+[build-dependencies]
+built = { version = "0.8.0", features = ["git2", "chrono", "semver"] }

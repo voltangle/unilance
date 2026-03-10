@@ -2,7 +2,7 @@ use heapless::Vec;
 use proto::corelink::control::ControlValueKey;
 use proto::corelink::{CoreLink, Message, ValueNackReason};
 
-use crate::{State, info};
+use crate::{State, build_info};
 
 pub(crate) async fn handle_corelink(state: &mut State, link: &mut impl CoreLink) {
     match link.core_recv().await {
@@ -12,14 +12,14 @@ pub(crate) async fn handle_corelink(state: &mut State, link: &mut impl CoreLink)
             system_time: _,
             stored_total_mileage: _,
         } => {
-            if firmware_version != info::FW_VERSION {
+            if firmware_version != build_info::PKG_VERSION {
                 // TODO: Make it do an error response or something
                 panic!("Firmware version differ, unable to proceed");
             }
         }
         Message::IntroduceYourselves => {
             link.core_send(Message::Hello {
-                firmware_version: info::FW_VERSION.into(),
+                firmware_version: build_info::PKG_VERSION.into(),
                 // TODO: temp variables here
                 serial_number: "".into(),
                 system_time: 0,

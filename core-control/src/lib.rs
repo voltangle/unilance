@@ -1,6 +1,5 @@
 #![no_std]
 
-use defmt::info;
 use embassy_time::{Duration, Ticker};
 use mesc::{MESC_motor_typedef, MescMotorExt};
 use proto::corelink::CoreLink;
@@ -12,7 +11,6 @@ use crate::corelink::handle_corelink;
 pub mod ahrs;
 pub mod balance;
 mod corelink;
-mod info;
 
 // TODO: start filling something in here
 
@@ -66,4 +64,8 @@ pub fn pwm_isr(state: &mut State) {
 
 pub fn adc_isr(state: &mut State) {
     state.motor.foc_update();
+}
+
+pub mod build_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

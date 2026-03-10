@@ -1,7 +1,7 @@
 [package]
 edition = "2024"
 name = "port-stm32"
-version = "0.1.0"
+version = "0.1.0-alpha"
 license = "MIT OR Apache-2.0"
 publish = false
 
@@ -79,6 +79,7 @@ target_naegi = [
 
 [build-dependencies]
 bindgen = "0.72.1"
+built = { version = "0.8.0", features = ["git2", "chrono", "semver"] }
 cc = "1.2.56"
 
 [package.metadata.bear]
