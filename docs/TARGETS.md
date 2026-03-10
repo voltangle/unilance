@@ -130,7 +130,35 @@ Compatible models:
 | Phase voltage sensing | absent |
 | Input current sensing | present |
 | Motor driver temperature sensor | present (NTC) |
-| Motor temperature sensor | absent |
+| Motor temperature sensor input | absent |
 | FETs | x48 HYG100N20 in DPAK packaging |
 | Current sensors | CC6920BSO-50A + dual 0.3 Ohm parallel shunts |
 | FET drivers | EG2186 |
+
+## `kirigiri`
+
+Hardware: REDSHIFT
+
+| Key | Spec sheet |
+| --- | ----- |
+| Architecture | combined role |
+| MCU | STM32F405RG |
+| Phase current sensing | tri-sensor |
+| Phase voltage sensing | present |
+| Input current sensing | present |
+| Motor driver temperature sensor | present (NTC) |
+| Motor temperature sensor input | present |
+
+## `maizono`
+
+Hardware: Arvenora Sentinel
+
+| Key | Spec sheet |
+| --- | ----- |
+| Architecture | combined role(?) |
+| MCU | STM32F405RG |
+| Phase current sensing | tri-sensor |
+| Phase voltage sensing | present |
+| Input current sensing | present |
+| Motor driver temperature sensor | present (NTC) |
+| Motor temperature sensor input | present |

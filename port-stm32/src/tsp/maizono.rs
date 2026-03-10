@@ -16,7 +16,7 @@ use defmt_rtt as _;
 use crate::tsp::PlatformConfig;
 
 /*
- * TSP for the EX30 drop-in board by Jotham.
+ * TSP for the Arvenora Sentinel.
  * Codename: maizono
  *
  * MCU: STM32F405RG
