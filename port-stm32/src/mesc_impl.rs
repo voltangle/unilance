@@ -1,14 +1,9 @@
 use crate::cpu_usage;
 use core::ffi::c_str::CStr;
 use core::ffi::{c_char, c_double, c_uint};
-use core::sync::atomic::{AtomicU32, Ordering};
 use defmt::{debug, error, info, trace, warn};
 use embassy_time::Duration;
 use mesc::CoreHal;
-
-// FIXME: this method of getting the main clock is ass. Just use the PAC or something
-// Set from main.rs
-pub static HCLK_HZ: AtomicU32 = AtomicU32::new(0);
 
 struct MescImpl;
 
@@ -17,11 +12,6 @@ impl CoreHal for MescImpl {
         // Blocking delay implemented by Embassy's time driver.
         // This does not require async/await at the call site.
         embassy_time::block_for(Duration::from_millis(ms as u64));
-    }
-
-    fn get_timer_hz() -> u32 {
-        // FIXME: Doesn't take into account the timer prescaler
-        HCLK_HZ.load(Ordering::Relaxed)
     }
 
     fn get_cpu_cycles() -> u32 {

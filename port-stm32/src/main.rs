@@ -12,7 +12,6 @@ mod tsp;
 use crate::roles::{CoreChannel, MemChannelCoreLink};
 use crate::tsp::PlatformConfig;
 use core::ptr::read_volatile;
-use core::sync::atomic::Ordering;
 use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};
 use defmt::{debug, error, info};
@@ -31,10 +30,7 @@ static SUPV_TO_CTRL_CHANNEL: CoreChannel = Channel::new();
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
     let p = embassy_stm32::init(Config::for_platform());
-    let clocks = embassy_stm32::rcc::clocks(&p.RCC);
-    mesc_impl::HCLK_HZ.store(clocks.hclk1.to_hertz().unwrap().0, Ordering::Relaxed);
-
-    let startup_timer = Timer::after_millis(tsp::STARTUP_DELAY_MS);
+    let startup_timer = Timer::after_millis(1000);
     Timer::after_millis(2000).await;
 
     // TODO: log out firmware information right here

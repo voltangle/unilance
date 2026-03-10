@@ -141,8 +141,6 @@ pub trait Hal {
 
 pub trait CoreHal {
     fn delay_ms(ms: u32);
-    // TODO: this one is also useless, replace with something more platform-agnostic
-    fn get_timer_hz() -> u32;
     // TODO: remove any usage of CPU cycles from MESC, use rtos_trace in consumer code
     // instead
     fn get_cpu_cycles() -> u32;

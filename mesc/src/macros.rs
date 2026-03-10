@@ -133,11 +133,6 @@ macro_rules! global_core_hal {
         }
 
         #[unsafe(no_mangle)]
-        extern "C" fn MESChal_getTimerHz() -> u32 {
-            <$ident as $crate::CoreHal>::get_timer_hz()
-        }
-
-        #[unsafe(no_mangle)]
         extern "C" fn MESChal_getCPUCycles() -> u32 {
             <$ident as $crate::CoreHal>::get_cpu_cycles()
         }
