@@ -7,7 +7,8 @@ David Molony.
 ## Status
 
 The project is in a very early alpha (even before 0.1.0). The balancing algorithm works,
-a lot of internal plumbing was done, but motor control is still not working as it should. 
+a lot of internal plumbing was done, but motor control is still not working as it should
+(well, it *can* spin the motor, just roughly and with intermittent brownouts/overcurrents).
 I'm working on making it work, as all the issues are basically ADC/Timer misconfigurations
 and bad setups.
 
