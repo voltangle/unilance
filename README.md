@@ -19,7 +19,7 @@ and bad setups.
 - littlefs as the filesystem
 - postcard as the wire message and (sometimes) storage format
 - MESC as the FOC implementation
-- Madgwick algorithm as AHRS
+- Customized Mahony filter as AHRS
 - Compose Multiplatform for the LANCEmate app
 
 ## Building
