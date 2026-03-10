@@ -83,6 +83,17 @@ target_kirigiri = [
     "embassy-stm32/time-driver-tim5",
     "dep:defmt-rtt"
 ]
+# TODO: this board will most likely be a split-MCU board. Once a concrete schematic arrives,
+# adjust to be compliant with it
+target_maizono = [
+    "role_supervisor",
+    "role_control",
+    "stm32f405rg",
+    # FIXME: not for this board, just a temporary thing
+    "drivers/bmi160",
+    "embassy-stm32/time-driver-tim5",
+    "dep:defmt-rtt"
+]
 
 [build-dependencies]
 bindgen = "0.72.1"
@@ -92,4 +103,5 @@ cc = "1.2.56"
 [package.metadata.bear]
 naegi = { combined = "thumbv7em-none-eabihf" }
 kirigiri = { combined = "thumbv7em-none-eabihf" }
+maizono = { combined = "thumbv7em-none-eabihf" }
 

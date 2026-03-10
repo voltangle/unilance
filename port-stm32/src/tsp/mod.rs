@@ -8,6 +8,11 @@ mod kirigiri;
 #[cfg(feature = "target_kirigiri")]
 pub use kirigiri::*;
 
+#[cfg(feature = "target_maizono")]
+mod maizono;
+#[cfg(feature = "target_maizono")]
+pub use maizono::*;
+
 // NOTE: No idea if it actually makes sense to do an extension trait, but shit, it looks
 // nice when used
 pub trait PlatformConfig {
