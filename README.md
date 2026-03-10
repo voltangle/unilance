@@ -34,6 +34,7 @@ To check out all available targets, run `bear target list`. To build for a targe
 just run `bear` or `bear -h`, and it will show all functionality it has.
 
 The naming convention for target names is just Danganronpa character surnames. That's it.
+To learn more about targets, check out the [doc page](docs/TARGETS.md).
 
 ## Resource sharing between the Rust and C sections
 
@@ -56,16 +57,16 @@ could be either a family of chips (stm32), or a specific one (stm32f405), depend
 on the port itself. Each port has:
 
 - Its own bin crate
-- `bsp` module inside `src`
+- `Bsp` module inside `src`
 - MESC hook implementations that point to according BSP functions.
 
-Each port has its own BSPs or Board Support Packages, which are basically different
+Each port has its own TSPs or Target Support Packages, which are basically different
 configurations of the same port for different target hardware. Each BSP has:
 
 - `[package.metadata.bear]` entry for target metadata
-- Feature flags in its port that looks like `board_<bsp_name>`
-- Its own module in `src/bsp` of its port, named `<bsp_name>.rs` if a single file or just
-`<bsp_name>` if it's a folder.
+- Feature flags in its port that looks like `target_<tsp_name>`
+- Its own module in `src/tsp` of its port, named `<tsp_name>.rs` if a single file or just
+`<tsp_name>` if it's a folder.
 
 ## System architecture
 

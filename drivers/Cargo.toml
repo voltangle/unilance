@@ -14,3 +14,7 @@ mpu6500 = [
     "dep:nalgebra",
     "dep:int-enum",
 ]
+bmi160 = [
+    "dep:nalgebra",
+    "dep:int-enum",
+]
