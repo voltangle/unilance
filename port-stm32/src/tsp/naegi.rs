@@ -2,16 +2,17 @@ use super::PlatformConfig;
 use crate::roles::control;
 use core::mem;
 use core::mem::MaybeUninit;
+use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::prelude::_embedded_hal_Pwm;
-use defmt::{info, trace};
+use defmt::{debug, info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, AdcChannel, Exten, InjectedAdc, SampleTime};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
-use embassy_stm32::interrupt::typelevel::{ADC, Interrupt, TIM8_UP_TIM13};
+use embassy_stm32::interrupt::typelevel::{ADC, Interrupt, TIM8_CC, TIM8_UP_TIM13};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::{Async, Blocking};
-use embassy_stm32::pac::timer::vals::Urs;
+use embassy_stm32::pac::timer::vals::{Ocm, Urs};
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB, TIM8};
 use embassy_stm32::peripherals::{self, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
@@ -103,6 +104,7 @@ pub struct Tsp<'a> {
 }
 
 static mut TSP_PERIPH: MaybeUninit<Tsp<'static>> = MaybeUninit::uninit();
+static TIM8_CC4_COUNT: AtomicU32 = AtomicU32::new(0);
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Blocking>> = StaticCell::new();
 
@@ -193,6 +195,15 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     unsafe {
         TIM8_UP_TIM13::enable();
     }
+    pac::TIM8.dier().modify(|w| w.set_ccie(3, true));
+    TIM8_CC::unpend();
+    unsafe {
+        TIM8_CC::enable();
+    }
+    TIM8.ccmr_output(1).modify(|w| {
+        w.set_ocm(1, Ocm::FROZEN);
+        w.set_ocpe(1, false);
+    });
     // mirrored from MESCfoc.c/calculateGains
     motor_tim.set_duty(Channel::Ch4, motor_tim.get_max_duty() - 5);
     trace!("Motor timer max duty: {}", motor_tim.get_max_duty());
@@ -224,7 +235,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             (core_temp, SampleTime::CYCLES112),
         ],
         TIM8_CH4,
-        Exten::RISING_EDGE,
+        Exten::BOTH_EDGES,
         true,
     );
     let adc2 = adc2.setup_injected_conversions(
@@ -233,7 +244,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             (t_driver, SampleTime::CYCLES112),
         ],
         TIM8_CH4,
-        Exten::RISING_EDGE,
+        Exten::BOTH_EDGES,
         true,
     );
     let adc3 = adc3.setup_injected_conversions(
@@ -242,7 +253,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
             (v_battery, SampleTime::CYCLES112),
         ],
         TIM8_CH4,
-        Exten::RISING_EDGE,
+        Exten::BOTH_EDGES,
         true,
     );
     unsafe {
@@ -251,15 +262,6 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     }
     trace!(
         "After init: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
-        ADC1.cr1().read().scan(),
-        ADC1.cr2().read().adon(),
-        ADC1.sr().read().jstrt()
-    );
-    ADC1.cr1().modify(|w| w.set_scan(true));
-    ADC2.cr1().modify(|w| w.set_scan(true));
-    ADC3.cr1().modify(|w| w.set_scan(true));
-    trace!(
-        "After manual: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
         ADC1.cr1().read().scan(),
         ADC1.cr2().read().adon(),
         ADC1.sr().read().jstrt()
@@ -380,19 +382,70 @@ impl PlatformConfig for Config {
  */
 
 #[interrupt]
-unsafe fn ADC() {
+fn ADC() {
     rtos_trace::trace::isr_enter();
 
     trace!("ADC");
 
     // if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
     // Clear end of conversion flags
-    ADC1.sr().modify(|w| w.set_jeoc(false));
-    ADC2.sr().modify(|w| w.set_jeoc(false));
-    ADC3.sr().modify(|w| w.set_jeoc(false));
+    debug!(
+        "ADC1->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
+        ADC1.sr().read().jstrt(),
+        ADC1.sr().read().jeoc(),
+        ADC1.cr2().read().jexten(),
+        ADC1.cr2().read().jextsel()
+    );
+    debug!(
+        "ADC2->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
+        ADC2.sr().read().jstrt(),
+        ADC2.sr().read().jeoc(),
+        ADC2.cr2().read().jexten(),
+        ADC2.cr2().read().jextsel()
+    );
+    debug!(
+        "ADC3->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
+        ADC3.sr().read().jstrt(),
+        ADC3.sr().read().jeoc(),
+        ADC3.cr2().read().jexten(),
+        ADC3.cr2().read().jextsel()
+    );
+    ADC1.sr().modify(|w| {
+        w.set_jeoc(false);
+        w.set_jstrt(false);
+    });
+    ADC2.sr().modify(|w| {
+        w.set_jeoc(false);
+        w.set_jstrt(false);
+    });
+    ADC3.sr().modify(|w| {
+        w.set_jeoc(false);
+        w.set_jstrt(false);
+    });
 
     core_control::adc_isr(control::get_state());
     // }
+    debug!(
+        "After adc_isr: ADC1->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
+        ADC1.sr().read().jstrt(),
+        ADC1.sr().read().jeoc(),
+        ADC1.cr2().read().jexten(),
+        ADC1.cr2().read().jextsel()
+    );
+    debug!(
+        "After adc_isr: ADC2->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
+        ADC2.sr().read().jstrt(),
+        ADC2.sr().read().jeoc(),
+        ADC2.cr2().read().jexten(),
+        ADC2.cr2().read().jextsel()
+    );
+    debug!(
+        "After adc_isr: ADC3->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
+        ADC3.sr().read().jstrt(),
+        ADC3.sr().read().jeoc(),
+        ADC3.cr2().read().jexten(),
+        ADC3.cr2().read().jextsel()
+    );
 
     rtos_trace::trace::isr_exit();
 }
@@ -405,6 +458,29 @@ fn TIM8_UP_TIM13() {
     pac::TIM8.sr().modify(|w| w.set_uif(false));
 
     core_control::pwm_isr(control::get_state());
+
+    rtos_trace::trace::isr_exit();
+}
+
+#[interrupt]
+fn TIM8_CC() {
+    rtos_trace::trace::isr_enter();
+
+    if pac::TIM8.sr().read().ccif(3) {
+        pac::TIM8.sr().modify(|w| w.set_ccif(3, false));
+
+        let count = TIM8_CC4_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+        if count <= 10 || count % 1000 == 0 {
+            debug!(
+                "TIM8_CC4 count={}, CNT={}, CCR4={}, CMS={}, DIR={}",
+                count,
+                pac::TIM8.cnt().read().cnt(),
+                pac::TIM8.ccr(3).read(),
+                pac::TIM8.cr1().read().cms(),
+                pac::TIM8.cr1().read().dir()
+            );
+        }
+    }
 
     rtos_trace::trace::isr_exit();
 }
