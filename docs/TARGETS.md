@@ -10,17 +10,17 @@ example, `port-stm32` supports the STM32 family, and a future `port-nrf` would s
 nRF family.
 
 Ports should not contain runtime application logic. Their job is to do bootstrapping,
-low-level initialization, and generally provide the environment in which BSPs (Board
+low-level initialization, and generally provide the environment in which TSPs (Target
 Support Packages) are implemented.
 
-## BSPs
+## TSPs
 
-BSPs are components inside a port that define how a specific hardware setup should be used.
-A BSP is responsible for implementing the MESC HAL, configuring peripherals such as timers
+TSPs are components inside a port that define how a specific hardware setup should be used.
+A TSP is responsible for implementing the MESC HAL, configuring peripherals such as timers
 and I/O, setting up drivers for components such as IMUs and displays, and exposing binding
 functions that the rest of the system uses to interact with that hardware.
 
-Each BSP is tied to exactly one target, although BSPs can absolutely reuse shared code when
+Each TSP is tied to exactly one target, although TSPs can absolutely reuse shared code when
 multiple targets have common hardware support requirements.
 
 ## Targets
@@ -48,9 +48,9 @@ STM32F405, so it belongs to the STM32 port. In that case, the flow looks somethi
 this:
 
 - Choose a target name, for example `komaeda`
-- Create a BSP file in `port-stm32/src/tsp/komaeda.rs`
-- Add the file to `port-stm32/src/bsp/mod.rs`, and gate the `mod` and `pub use` statements
-with your target feature flag
+- Create a TSP file in `port-stm32/src/tsp/komaeda.rs`
+- Add the file to `port-stm32/src/tsp/mod.rs`, and gate the `mod` statement with your
+target feature flag
 - Add a `[package.metadata.bear]` entry:
 
 ```toml
@@ -108,7 +108,7 @@ part that matters.
 - Target variants depend on the target and use case, but they usually look like `naegi/panther`
 
 So, TL;DR: ports provide support for MCU families, targets describe concrete hardware through
-BSPs inside those ports, and target variants provide configuration differences on top of a
+TSPs inside those ports, and target variants provide configuration differences on top of a
 target without introducing build-time variation. Simple enough.
 
 # List of available targets

@@ -1,5 +1,5 @@
 use crate::roles::MemChannelCoreLink;
-use crate::bsp;
+use crate::tsp;
 use core::mem::MaybeUninit;
 use core_control::State;
 use defmt::info;
@@ -50,7 +50,7 @@ static mut AUX_OPENLOOP_CNT: u32 = 0;
 pub fn aux_loop() {
     // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
     // Fix once some kind of error passing system is implemented.
-    let imu = bsp::get_imu_data().unwrap();
+    let imu = tsp::get_imu_data().unwrap();
     let _spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
     // TODO: Reenable when I finish testing motor control
     // get_state()
