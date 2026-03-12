@@ -14,9 +14,8 @@ use crate::input::input_handler;
 mod input;
 mod storage;
 
+pub use input::{ButtonRole, InputMethods};
 pub use proc_macros::global_input;
-pub use input::InputMethods;
-pub use input::ButtonRole;
 
 mod build_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));

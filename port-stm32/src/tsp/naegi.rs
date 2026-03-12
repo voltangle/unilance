@@ -2,7 +2,7 @@ use super::PlatformConfig;
 use crate::roles::control;
 use core::mem;
 use core::mem::MaybeUninit;
-use core_supervisor::{ButtonRole, InputMethods};
+use core_supervisor::{ButtonRole, InputMethods, global_input};
 use cortex_m::prelude::_embedded_hal_Pwm;
 use defmt::{info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
@@ -34,7 +34,6 @@ use embassy_stm32::{
 use embassy_time::Timer;
 use mesc::{Hal, MESC_motor_typedef, MescMotorExt};
 use micromath::F32Ext;
-use proc_macros::global_input;
 use static_cell::StaticCell;
 
 /*
@@ -591,7 +590,15 @@ impl InputMethods for Input {
         match role {
             ButtonRole::Power => get_periph().power_button.is_high(),
             ButtonRole::Aux => get_periph().park_button.is_high(),
-            _ => false
+            _ => false,
         }
+    }
+
+    fn dial_relative_distance() -> i16 {
+        0 // no dial
+    }
+
+    fn dial_absolute_position() -> i32 {
+        0 // no dial
     }
 }

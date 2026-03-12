@@ -1,4 +1,5 @@
 use core::mem::MaybeUninit;
+use core_supervisor::{ButtonRole, InputMethods, global_input};
 use drivers::bmi160::Vector3;
 use embassy_executor::Spawner;
 use embassy_stm32::gpio::{Level, Output, Speed};
@@ -204,5 +205,26 @@ impl Hal for MotorHal {
 
     fn set_deadtime(motor: &mut MESC_motor_typedef, ns: u16) {
         todo!()
+    }
+}
+
+/*
+ * Input methods
+ */
+
+#[global_input]
+struct Input;
+
+impl InputMethods for Input {
+    fn is_pressed(role: ButtonRole) -> bool {
+        todo!()
+    }
+
+    fn dial_relative_distance() -> i16 {
+        // no dial
+    }
+
+    fn dial_absolute_position() -> i32 {
+        // no dial
     }
 }

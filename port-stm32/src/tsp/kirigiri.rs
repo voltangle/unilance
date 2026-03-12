@@ -205,3 +205,24 @@ impl Hal for MotorHal {
         todo!()
     }
 }
+
+/*
+ * Input methods
+ */
+
+#[global_input]
+struct Input;
+
+impl InputMethods for Input {
+    fn is_pressed(role: ButtonRole) -> bool {
+        todo!()
+    }
+
+    fn dial_relative_distance() -> i16 {
+        // no dial
+    }
+
+    fn dial_absolute_position() -> i32 {
+        // no dial
+    }
+}
