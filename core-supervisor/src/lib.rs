@@ -8,11 +8,12 @@ use littlefs2::driver::Storage;
 use littlefs2::fs::Filesystem;
 use proto::corelink::{CoreLink, Message};
 
-use crate::info::FW_VERSION;
-
-mod info;
 mod input;
 mod storage;
+
+mod build_info {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
 
 // Random entries just so its filled with something
 #[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]
@@ -57,7 +58,7 @@ pub async fn main_task(
                 // For now, there is nothing to "boot" per se, so immediately send a hello
                 // to control
                 link.core_send(Message::Hello {
-                    firmware_version: FW_VERSION.into(),
+                    firmware_version: build_info::PKG_VERSION.into(),
                     // No serial numbers (of course)
                     serial_number: "".into(),
                     // RTC not yet configured
