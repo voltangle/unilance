@@ -91,7 +91,6 @@ def run_cargo(target: BuildTarget, release: bool, features):
 
 
 def build(args):
-    logger.info("Getting cargo metadata...")
     meta = get_cargo_meta()
     targets = get_port_targets(meta)
     target = list(
@@ -101,23 +100,21 @@ def build(args):
         logger.error(f"No target {args.target} exists")
         exit(1)
     target = target[0]
-    logger.info("Building firmware...")
-    run_cargo(target, args.release, args.features)
-    logger.info("Creating artifacts...")
+    run_cargo(target, not args.debug, args.features)
     out_path = Path("./out") / args.target
     out_path.mkdir(parents=True, exist_ok=True)
     cargo_elf_path = Path(f"./target/{target.arch}")
-    if args.release:
-        cargo_elf_path = cargo_elf_path / "release"
-    else:
+    if args.debug:
         cargo_elf_path = cargo_elf_path / "debug"
+    else:
+        cargo_elf_path = cargo_elf_path / "release"
     cargo_elf_path = cargo_elf_path / target.port
     # TODO: if it's a split role, use the role name
     name_suffix = ""
-    if args.release:
-        name_suffix = "rel"
-    else:
+    if args.debug:
         name_suffix = "dev"
+    else:
+        name_suffix = "rel"
     target_elf_path = out_path / f"{args.target}-{name_suffix}.elf"
     target_elf_path.write_bytes(cargo_elf_path.read_bytes())
 
@@ -131,7 +128,6 @@ def build(args):
         ],
         check=True,
     )
-    logger.info("Done!")
 
 
 def fmt(args):
@@ -150,10 +146,10 @@ def fmt(args):
 def flash(args):
     logger.info("Running stm32flash...")
     fw_path = Path(f"./out/{args.target}")
-    if args.release:
-        fw_path = fw_path / f"{args.target}-rel.bin"
-    else:
+    if args.debug:
         fw_path = fw_path / f"{args.target}-dev.bin"
+    else:
+        fw_path = fw_path / f"{args.target}-rel.bin"
     subprocess.run(
         ["stm32flash", "-w", fw_path, "-b" "115200", args.device], check=True
     )
@@ -162,10 +158,10 @@ def flash(args):
 
 def log(args):
     fw_path = Path(f"./out/{args.target}")
-    if args.release:
-        fw_path = fw_path / f"{args.target}-rel.elf"
-    else:
+    if args.debug:
         fw_path = fw_path / f"{args.target}-dev.elf"
+    else:
+        fw_path = fw_path / f"{args.target}-rel.elf"
     cmd = "(stty speed 460800 >/dev/null && cat) <"
     cmd += args.device
     cmd += "| defmt-print -e "
@@ -211,10 +207,10 @@ parser_fmt.set_defaults(func=fmt)
 parser_build = subparsers.add_parser("build", help="Build firmware image(s)")
 parser_build.add_argument("target", type=str, help="Who is to be executed")
 parser_build.add_argument(
-    "-r",
-    "--release",
+    "-d",
+    "--debug",
     action=argparse.BooleanOptionalAction,
-    help="Build in release mode",
+    help="Build in debug mode. Yes, by default, Bear builds the firmware in release mode.",
 )
 parser_build.add_argument(
     "-f",
@@ -229,10 +225,10 @@ parser_flash = subparsers.add_parser(
 )
 parser_flash.add_argument("target", type=str, help="Who is to be sent for execution")
 parser_flash.add_argument(
-    "-r",
-    "--release",
+    "-D",
+    "--debug",
     action=argparse.BooleanOptionalAction,
-    help="Build in release mode",
+    help="Flash firmware built in debug mode",
 )
 # NOTE: Only stm32flash is supported for now
 # TODO: Also support SWD flashing using probe-rs
@@ -247,10 +243,10 @@ parser_log = subparsers.add_parser(
 parser_log.add_argument("target", type=str, help="Who is to be checked on")
 parser_log.add_argument("device", type=str, help="Which device to check on")
 parser_log.add_argument(
-    "-r",
-    "--release",
+    "-d",
+    "--debug",
     action=argparse.BooleanOptionalAction,
-    help="Was the firmware built in release mode?",
+    help="Was the firmware built in debug mode?",
 )
 parser_log.set_defaults(func=log)
 
