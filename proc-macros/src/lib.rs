@@ -68,10 +68,42 @@ fn validate_registration_item(item: &ItemStruct, macro_name: &str) -> Result<()>
     Ok(())
 }
 
+/// Binds an input method handler using the [::core_supervisor::InputMethods] trait.
+///
+/// Apply this to the marker struct that implements that trait. Use it **only once**.
+///
+/// ```ignore
+/// #[global_input]
+/// struct Input;
+///
+/// impl InputMethods for Input {
+///     // ...
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn global_input(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let _ = parse_macro_input!(attr as Nothing);
+    let item_ast = parse_macro_input!(item as ItemStruct);
+
+    if let Err(error) = validate_registration_item(&item_ast, "global_input") {
+        return error.to_compile_error().into();
+    }
+
+    let ident = &item_ast.ident;
+
+    quote! {
+        #item_ast
+
+        #[unsafe(no_mangle)]
+        extern "Rust" fn unilance_input_is_pressed(button: ::core_supervisor::ButtonRole) -> bool {
+            <#ident as ::core_supervisor::InputMethods>::is_pressed(button)
+        }
+    }.into()
+}
+
 /// Bind a MESC [`::mesc::Hal`] implementation to the exported C hooks.
 ///
-/// Apply this to the marker struct that implements [`::mesc::Hal`]. The macro keeps the
-/// struct in place and emits the required `#[unsafe(no_mangle)] extern "C"` wrappers.
+/// Apply this to the marker struct that implements [`::mesc::Hal`]. Use it only **once**.
 ///
 /// ```ignore
 /// #[mesc::global_hal]
@@ -234,6 +266,7 @@ pub fn global_hal(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// Apply this to the marker struct that implements [`::mesc::CoreHal`]. The macro keeps the
 /// struct in place and emits the required `#[unsafe(no_mangle)] extern "C"` wrappers.
+/// Use it only **once**.
 ///
 /// ```ignore
 /// #[mesc::global_core_hal]

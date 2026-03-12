@@ -1,7 +1,5 @@
 #![no_std]
 
-extern crate self as mesc;
-
 mod bindings;
 mod types;
 

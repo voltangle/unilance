@@ -1,5 +1,6 @@
 #![no_std]
 
+use defmt::Format;
 use embassy_futures::select::{Either, select};
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::mutex::Mutex;
@@ -8,15 +9,21 @@ use littlefs2::driver::Storage;
 use littlefs2::fs::Filesystem;
 use proto::corelink::{CoreLink, Message};
 
+use crate::input::input_handler;
+
 mod input;
 mod storage;
+
+pub use proc_macros::global_input;
+pub use input::InputMethods;
+pub use input::ButtonRole;
 
 mod build_info {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 // Random entries just so its filled with something
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Format, Default)]
 pub enum SystemState {
     #[default]
     Booting,
@@ -26,11 +33,18 @@ pub enum SystemState {
     FaultManage,
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Debug, Default)]
+#[derive(Clone, Format, Default)]
 pub struct State {
     state: SystemState,
+    input: input::State,
     control_running: bool,
     file_transmission_next_sequence_id: u32,
+}
+
+impl State {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 pub async fn corelink_heartbeat<T: RawMutex>(
@@ -85,6 +99,18 @@ pub async fn main_task(
             SystemState::ShutdownRequested => todo!(),
             SystemState::FaultManage => todo!(),
         }
+        ticker.next().await;
+    }
+}
+
+pub async fn input_task(
+    state: &'static Mutex<impl RawMutex, State>,
+    _link: &'static impl CoreLink,
+) {
+    let mut ticker = Ticker::every(Duration::from_hz(100));
+
+    loop {
+        input_handler(state).await;
         ticker.next().await;
     }
 }

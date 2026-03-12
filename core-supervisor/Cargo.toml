@@ -6,6 +6,7 @@ version = "0.1.0-alpha"
 [dependencies]
 mesc = { path = "../mesc" }
 proto = { path = "../proto" }
+proc-macros = { path = "../proc-macros" }
 embassy-time = { version = "0.5.0", features = ["defmt"]}
 embassy-futures = "0.1.2"
 embassy-sync = { version = "0.7.2", features = ["defmt"] }
@@ -18,6 +19,6 @@ built = { version = "0.8.0", features = ["git2", "chrono", "semver"] }
 
 [features]
 # Has only two buttons, the power button and the park button. Mainly exists on Begode
-# wheels.
-control_scheme_power_park = []
+# wheels, but can work on any wheel that has just two buttons for input.
+control_scheme_power_aux = []
 

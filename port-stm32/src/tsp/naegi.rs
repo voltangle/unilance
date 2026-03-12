@@ -2,6 +2,7 @@ use super::PlatformConfig;
 use crate::roles::control;
 use core::mem;
 use core::mem::MaybeUninit;
+use core_supervisor::{ButtonRole, InputMethods};
 use cortex_m::prelude::_embedded_hal_Pwm;
 use defmt::{info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
@@ -33,6 +34,7 @@ use embassy_stm32::{
 use embassy_time::Timer;
 use mesc::{Hal, MESC_motor_typedef, MescMotorExt};
 use micromath::F32Ext;
+use proc_macros::global_input;
 use static_cell::StaticCell;
 
 /*
@@ -574,5 +576,22 @@ impl Hal for MotorHal {
         let dead_time_ticks = ((ns as f32) / tick_ns).ceil() as u16;
 
         get_periph().motor_tim.set_dead_time(dead_time_ticks);
+    }
+}
+
+/*
+ * Input methods
+ */
+
+#[global_input]
+struct Input;
+
+impl InputMethods for Input {
+    fn is_pressed(role: ButtonRole) -> bool {
+        match role {
+            ButtonRole::Power => get_periph().power_button.is_high(),
+            ButtonRole::Aux => get_periph().park_button.is_high(),
+            _ => false
+        }
     }
 }
