@@ -14,7 +14,7 @@ use mesc::{Hal, MESC_motor_typedef};
 // TODO: temporarily here, yet to be properly set up
 use defmt_rtt as _;
 
-use crate::bsp::PlatformConfig;
+use crate::tsp::PlatformConfig;
 
 /*
  * BSP for the Arvenora Sentinel.

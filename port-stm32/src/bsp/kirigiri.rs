@@ -14,7 +14,7 @@ use mesc::{Hal, MESC_motor_typedef};
 // TODO: temporarily here, yet to be properly set up
 use defmt_rtt as _;
 
-use crate::bsp::PlatformConfig;
+use crate::tsp::PlatformConfig;
 
 /*
  * BSP for REDSHIFT.
@@ -32,7 +32,7 @@ pub struct Bsp<'a> {
 static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
 
 #[allow(static_mut_refs)]
-fn get_periph() -> &'static mut Bsp<'static> {
+fn get_periph() -> &'static mut Tsp<'static> {
     unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
