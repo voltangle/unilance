@@ -1,12 +1,28 @@
 #![no_std]
 
+extern crate self as mesc;
+
 mod bindings;
-pub mod macros;
 mod types;
 
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
 use defmt::trace;
 use micromath::F32Ext;
+/// Bind a [`Hal`] implementation to MESC's exported C hooks.
+///
+/// ```ignore
+/// #[mesc::global_hal]
+/// struct MotorHal;
+/// ```
+pub use proc_macros::global_hal;
+
+/// Bind a [`CoreHal`] implementation to MESC's exported C hooks.
+///
+/// ```ignore
+/// #[mesc::global_core_hal]
+/// struct MescImpl;
+/// ```
+pub use proc_macros::global_core_hal;
 pub use types::*;
 
 use crate::bindings::{

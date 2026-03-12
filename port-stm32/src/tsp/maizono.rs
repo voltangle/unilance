@@ -114,6 +114,7 @@ impl PlatformConfig for Config {
  * MESC hooks
  */
 
+#[mesc::global_hal]
 struct MotorHal;
 
 impl Hal for MotorHal {
@@ -205,5 +206,3 @@ impl Hal for MotorHal {
         todo!()
     }
 }
-
-mesc::global_hal!(MotorHal);

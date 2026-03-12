@@ -426,6 +426,7 @@ fn TIM2() {
  * MESC hooks
  */
 
+#[mesc::global_hal]
 struct MotorHal;
 
 impl Hal for MotorHal {
@@ -575,5 +576,3 @@ impl Hal for MotorHal {
         get_periph().motor_tim.set_dead_time(dead_time_ticks);
     }
 }
-
-mesc::global_hal!(MotorHal);

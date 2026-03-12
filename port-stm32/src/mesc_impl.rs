@@ -1,10 +1,9 @@
 use crate::cpu_usage;
-use core::ffi::c_str::CStr;
-use core::ffi::{c_char, c_double, c_uint};
 use defmt::{debug, error, info, trace, warn};
 use embassy_time::Duration;
 use mesc::CoreHal;
 
+#[mesc::global_core_hal]
 struct MescImpl;
 
 impl CoreHal for MescImpl {
@@ -46,5 +45,3 @@ impl CoreHal for MescImpl {
         error!("{:?}", msg);
     }
 }
-
-mesc::global_core_hal!(MescImpl);
