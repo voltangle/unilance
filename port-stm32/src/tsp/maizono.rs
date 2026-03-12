@@ -221,10 +221,10 @@ impl InputMethods for Input {
     }
 
     fn dial_relative_distance() -> i16 {
-        // no dial
+        0 // no dial
     }
 
     fn dial_absolute_position() -> i32 {
-        // no dial
+        0 // no dial
     }
 }

@@ -1,4 +1,5 @@
 use core::mem::MaybeUninit;
+use core_supervisor::{ButtonRole, InputMethods, global_input};
 use drivers::bmi160::Vector3;
 use embassy_executor::Spawner;
 use embassy_stm32::gpio::{Level, Output, Speed};
@@ -219,10 +220,10 @@ impl InputMethods for Input {
     }
 
     fn dial_relative_distance() -> i16 {
-        // no dial
+        0 // no dial
     }
 
     fn dial_absolute_position() -> i32 {
-        // no dial
+        0 // no dial
     }
 }
