@@ -1,11 +1,11 @@
 use crate::roles::MemChannelCoreLink;
-use crate::tsp;
+use crate::bsp;
 use core::mem::MaybeUninit;
 use core_control::State;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::Timer;
-use mesc::{MescMotorExt, hw_setup_s};
+use mesc::{MescMotorExt, MotorState, hw_setup_s};
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -50,19 +50,21 @@ static mut AUX_OPENLOOP_CNT: u32 = 0;
 pub fn aux_loop() {
     // FIXME: THIS SHOULD NEVER PANIC!!!!!!!!
     // Fix once some kind of error passing system is implemented.
-    let imu = tsp::get_imu_data().unwrap();
+    let imu = bsp::get_imu_data().unwrap();
     let _spacial = get_state().ahrs.update(&imu.0, &imu.1).unwrap();
     // TODO: Reenable when I finish testing motor control
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
     unsafe {
-        if AUX_OPENLOOP_CNT < 1000 {
-            AUX_OPENLOOP_CNT += 1;
+        if get_state().motor.get_state() != MotorState::Detecting {
+            if AUX_OPENLOOP_CNT < 1000 {
+                AUX_OPENLOOP_CNT += 1;
+            }
+            get_state()
+                .motor
+                .request_q(6.0 * (AUX_OPENLOOP_CNT as f32 / 1000.0));
         }
-        get_state()
-            .motor
-            .request_q(6.0 * (AUX_OPENLOOP_CNT as f32 / 1000.0));
     }
     get_state().motor.foc_aux_update();
 }

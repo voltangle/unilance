@@ -37,12 +37,12 @@ use micromath::F32Ext;
 use static_cell::StaticCell;
 
 /*
- * TSP for the Begode ET Max (and Panther, kind of) electric unicycle motherboard.
+ * BSP for the Begode ET Max (and Panther, kind of) electric unicycle motherboard.
  * Codename: naegi
  *
  * MCU: STM32F405RG
  *
- * Peripherals used in this TSP:
+ * Peripherals used in this BSP:
  * - TIM8 on PC6,7,8, PA7, PB0,1: motor control
  * - TIM3 on PA6: Tail light WS281x
  * - TIM4 on PB9: Passive buzzer
@@ -90,7 +90,7 @@ use static_cell::StaticCell;
 // how to make it all coexist
 
 #[allow(unused)]
-pub struct Tsp<'a> {
+pub struct Bsp<'a> {
     poweron: gpio::Output<'a>,
     power_button: gpio::Input<'a>,
     park_button: gpio::Input<'a>,
@@ -103,7 +103,7 @@ pub struct Tsp<'a> {
     imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
 }
 
-static mut TSP_PERIPH: MaybeUninit<Tsp<'static>> = MaybeUninit::uninit();
+static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Blocking>> = StaticCell::new();
 
@@ -114,8 +114,8 @@ bind_interrupts!(struct Irqs {
 });
 
 #[allow(static_mut_refs)]
-fn get_periph() -> &'static mut Tsp<'static> {
-    unsafe { &mut (*TSP_PERIPH.as_mut_ptr()) }
+fn get_periph() -> &'static mut Bsp<'static> {
+    unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
 /*
@@ -274,7 +274,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     pac::Interrupt::TIM2.set_priority(Priority::P2);
 
     unsafe {
-        TSP_PERIPH.write(Tsp {
+        BSP_PERIPH.write(Bsp {
             poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
             power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
             park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
@@ -291,7 +291,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     // FIXME: temporary test
     get_periph().poweron.set_high();
 
-    info!("TSP peripherals initialized");
+    info!("BSP peripherals initialized");
 }
 
 pub fn startup_successful() {

@@ -60,7 +60,7 @@ on the port itself. Each port has:
 - `Bsp` module inside `src`
 - MESC hook implementations that point to according BSP functions.
 
-Each port has its own TSPs or Target Support Packages, which are basically different
+Each port has its own BSPs or Board Support Packages, which are basically different
 configurations of the same port for different target hardware. Each BSP has:
 
 - `[package.metadata.bear]` entry for target metadata

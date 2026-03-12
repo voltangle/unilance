@@ -73,8 +73,9 @@ impl MescMotorExt for MESC_motor_typedef {
             MESCfoc_Init(self);
             trace!("Vmax: {}, Vmin: {}", g_hw_setup.Vmax, g_hw_setup.Vmin);
         }
-        self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
-        self.FOC.openloop_step = 15;
+        self.MotorState = MotorState::Detecting.into();
+        // self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
+        // self.FOC.openloop_step = 15;
     }
 
     // TODO: do proper documentation

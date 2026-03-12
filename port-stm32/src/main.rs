@@ -6,11 +6,11 @@ mod cpu_usage;
 mod driver;
 mod mesc_impl;
 mod roles;
-mod tsp;
+mod bsp;
 
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use crate::tsp::PlatformConfig;
+use crate::bsp::PlatformConfig;
 use core::ptr::read_volatile;
 use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};
@@ -34,8 +34,8 @@ async fn main(spawner: Spawner) -> ! {
     Timer::after_millis(2000).await;
 
     // TODO: log out firmware information right here
-    tsp::init(p, &spawner).await;
-    info!("TSP init finished");
+    bsp::init(p, &spawner).await;
+    info!("BSP init finished");
 
     let csr = pac::RCC.csr().read();
     debug!(
@@ -74,7 +74,7 @@ async fn main(spawner: Spawner) -> ! {
     // the timer starts "counting" right after it was created (it just saves a timestamp of
     // when it's supposed to elapse), so .await will "let go" exactly after STARTUP_DELAY_MS
     startup_timer.await;
-    tsp::startup_successful();
+    bsp::startup_successful();
     info!("Hello from UniLANCE!");
 
     unsafe {

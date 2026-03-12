@@ -89,7 +89,6 @@ pub async fn main_task(
                         Message::BootSuccessful => {
                             state.lock().await.control_running = true;
                         }
-                        // TODO: Do a file transfer implementation here
                         _ => {}
                     },
                 }

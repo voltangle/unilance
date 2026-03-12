@@ -17,7 +17,7 @@ use defmt_rtt as _;
 use crate::tsp::PlatformConfig;
 
 /*
- * TSP for REDSHIFT.
+ * BSP for REDSHIFT.
  * Codename: kirigiri
  *
  * MCU: STM32F405RG
@@ -25,15 +25,15 @@ use crate::tsp::PlatformConfig;
  */
 
 #[allow(unused)]
-pub struct Tsp<'a> {
+pub struct Bsp<'a> {
     poweron: Output<'a>,
 }
 
-static mut TSP_PERIPH: MaybeUninit<Tsp<'static>> = MaybeUninit::uninit();
+static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
 
 #[allow(static_mut_refs)]
-fn get_periph() -> &'static mut Tsp<'static> {
-    unsafe { &mut (*TSP_PERIPH.as_mut_ptr()) }
+fn get_periph() -> &'static mut Bsp<'static> {
+    unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
 /*
@@ -47,7 +47,7 @@ fn get_periph() -> &'static mut Tsp<'static> {
 #[allow(static_mut_refs)]
 pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     unsafe {
-        TSP_PERIPH.write(Tsp {
+        BSP_PERIPH.write(Bsp {
             poweron: Output::new(p.PC12, Level::Low, Speed::Low),
         });
     }
