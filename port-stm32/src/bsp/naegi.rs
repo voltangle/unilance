@@ -14,7 +14,7 @@ use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::{Async, Blocking};
 use embassy_stm32::pac::timer::vals::Urs;
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB, TIM8};
-use embassy_stm32::peripherals::{self, TIM2, TIM3, TIM8};
+use embassy_stm32::peripherals::{self, TIM9, TIM3, TIM8};
 use embassy_stm32::rcc::{
     self, AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv,
     PllSource, RtcClockSource, Sysclk,
@@ -47,7 +47,7 @@ use static_cell::StaticCell;
  * - TIM3 on PA6: Tail light WS281x
  * - TIM4 on PB9: Passive buzzer
  * - TIM5: Embassy time source
- * - TIM2: Auxiliary loop
+ * - TIM9: Auxiliary loop
  * - SPI3 on PB3,4,5 + SPI3 SS PA15: MPU6500 IMU
  * - USART1 on PA9,10: BLE module
  * - USART3 on PB10,11: BMS
@@ -79,7 +79,7 @@ use static_cell::StaticCell;
  * - DMA2 Stream 3 on ADC2: I_phaceC, T_driver
  *
  * Custom IRQs:
- * - TIM2: Auxiliary loop
+ * - TIM9: Auxiliary loop
  * - ADC: MESC ADC handler
  * - TIM8_UP_TIM13: MESC PWM handler
  */
@@ -99,7 +99,7 @@ pub struct Bsp<'a> {
     adc3: InjectedAdc<'a, peripherals::ADC3, 2>,
     motor_tim: ComplementaryPwm<'a, TIM8>,
     ws281x_tim: SimplePwm<'a, TIM3>,
-    aux_loop_tim: low_level::Timer<'a, TIM2>,
+    aux_loop_tim: low_level::Timer<'a, TIM9>,
     imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
 }
 
@@ -258,7 +258,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     // them, so idk
     // And I also save some processing power (at the time of writing, CPU usage difference
     // between 1 kHz and 500 Hz is 73% and 65% with rudimentary IMU read logic)
-    let aux_loop_tim = low_level::Timer::new(p.TIM2);
+    let aux_loop_tim = low_level::Timer::new(p.TIM9);
     aux_loop_tim.stop(); // can never be too cautious
     aux_loop_tim.set_frequency(Hertz::hz(500), RoundTo::Slower);
     aux_loop_tim.generate_update_event();
@@ -269,9 +269,9 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         w.set_arpe(true)
     });
     unsafe {
-        cortex_m::peripheral::NVIC::unmask(pac::Interrupt::TIM2);
+        cortex_m::peripheral::NVIC::unmask(pac::Interrupt::TIM1_BRK_TIM9);
     }
-    pac::Interrupt::TIM2.set_priority(Priority::P2);
+    pac::Interrupt::TIM1_BRK_TIM9.set_priority(Priority::P2);
 
     unsafe {
         BSP_PERIPH.write(Bsp {
@@ -404,11 +404,13 @@ fn TIM8_UP_TIM13() {
 /// The balance loop interrupt
 #[allow(static_mut_refs)]
 #[interrupt]
-fn TIM2() {
+fn TIM1_BRK_TIM9() {
     rtos_trace::trace::isr_enter();
 
     // Clear update flag
-    pac::TIM2.sr().modify(|w| w.set_uif(false));
+    // Considering that this is an interrupt for both TIM1 and TIM9, but TIM1 is never
+    // turned on, I can just ignore checking for flags
+    pac::TIM9.sr().modify(|w| w.set_uif(false));
     control::aux_loop();
 
     rtos_trace::trace::isr_exit();
