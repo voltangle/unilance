@@ -6,23 +6,11 @@ mod types;
 pub use bindings::{MESC_motor_typedef, hw_setup_s};
 use defmt::trace;
 use micromath::F32Ext;
-/// Bind a [`Hal`] implementation to MESC's exported C hooks.
-///
-/// ```ignore
-/// #[mesc::global_hal]
-/// struct MotorHal;
-/// ```
 pub use proc_macros::global_hal;
-
-/// Bind a [`CoreHal`] implementation to MESC's exported C hooks.
-///
-/// ```ignore
-/// #[mesc::global_core_hal]
-/// struct MescImpl;
-/// ```
 pub use proc_macros::global_core_hal;
 pub use types::*;
 
+use crate::bindings::MotorState;
 use crate::bindings::{
     MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop, g_hw_setup,
     motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
@@ -51,7 +39,7 @@ impl MescMotorExt for MESC_motor_typedef {
     #[allow(static_mut_refs)]
     fn init(&mut self) {
         trace!("Running motor init");
-        // Specs for the Sherman-L motor
+        // Specs for the Sherman-L motor, close enough to the ET Max
         self.m.Imax = 200.0;
         self.m.Pmax = 4000.0;
         self.m.IBatmax = 200.0;
@@ -73,8 +61,10 @@ impl MescMotorExt for MESC_motor_typedef {
             MESCfoc_Init(self);
             trace!("Vmax: {}, Vmin: {}", g_hw_setup.Vmax, g_hw_setup.Vmin);
         }
-        self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
-        self.FOC.openloop_step = 15;
+        // populate hall table
+        self.MotorState = MotorState::Detecting.into();
+        // self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
+        // self.FOC.openloop_step = 15;
     }
 
     // TODO: do proper documentation

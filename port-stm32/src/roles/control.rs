@@ -5,7 +5,7 @@ use core_control::State;
 use defmt::info;
 use embassy_executor::Spawner;
 use embassy_time::Timer;
-use mesc::{MescMotorExt, hw_setup_s};
+use mesc::{hw_setup_s, MescMotorExt, MotorState};
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -57,12 +57,14 @@ pub fn aux_loop() {
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
     unsafe {
-        if AUX_OPENLOOP_CNT < 1000 {
-            AUX_OPENLOOP_CNT += 1;
+        if get_state().motor.get_state() != MotorState::Detecting {
+            if AUX_OPENLOOP_CNT < 1000 {
+                AUX_OPENLOOP_CNT += 1;
+            }
+            get_state()
+                .motor
+                .request_q(6.0 * (AUX_OPENLOOP_CNT as f32 / 1000.0));
         }
-        get_state()
-            .motor
-            .request_q(6.0 * (AUX_OPENLOOP_CNT as f32 / 1000.0));
     }
     get_state().motor.foc_aux_update();
 }
