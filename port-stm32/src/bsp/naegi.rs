@@ -4,7 +4,7 @@ use core::mem;
 use core::mem::MaybeUninit;
 use core_supervisor::{ButtonRole, InputMethods, global_input};
 use cortex_m::prelude::_embedded_hal_Pwm;
-use defmt::{debug, info, trace};
+use defmt::{info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, AdcChannel, Exten, InjectedAdc, SampleTime};
@@ -37,12 +37,12 @@ use micromath::F32Ext;
 use static_cell::StaticCell;
 
 /*
- * TSP for the Begode ET Max (and Panther, kind of) electric unicycle motherboard.
+ * BSP for the Begode ET Max (and Panther, kind of) electric unicycle motherboard.
  * Codename: naegi
  *
  * MCU: STM32F405RG
  *
- * Peripherals used in this TSP:
+ * Peripherals used in this BSP:
  * - TIM8 on PC6,7,8, PA7, PB0,1: motor control
  * - TIM3 on PA6: Tail light WS281x
  * - TIM4 on PB9: Passive buzzer
@@ -90,7 +90,7 @@ use static_cell::StaticCell;
 // how to make it all coexist
 
 #[allow(unused)]
-pub struct Tsp<'a> {
+pub struct Bsp<'a> {
     poweron: gpio::Output<'a>,
     power_button: gpio::Input<'a>,
     park_button: gpio::Input<'a>,
@@ -103,7 +103,7 @@ pub struct Tsp<'a> {
     imu: MPU6500Driver<Spi<'a, Async, Master>, gpio::Output<'a>>,
 }
 
-static mut TSP_PERIPH: MaybeUninit<Tsp<'static>> = MaybeUninit::uninit();
+static mut BSP_PERIPH: MaybeUninit<Bsp<'static>> = MaybeUninit::uninit();
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Blocking>> = StaticCell::new();
 
@@ -114,8 +114,8 @@ bind_interrupts!(struct Irqs {
 });
 
 #[allow(static_mut_refs)]
-fn get_periph() -> &'static mut Tsp<'static> {
-    unsafe { &mut (*TSP_PERIPH.as_mut_ptr()) }
+fn get_periph() -> &'static mut Bsp<'static> {
+    unsafe { &mut (*BSP_PERIPH.as_mut_ptr()) }
 }
 
 /*
@@ -134,53 +134,6 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     defmt_serial::defmt_serial(DEFMT_SERIAL.init(serial));
     info!("defmt-serial started");
-
-    let i_battery = p.PC0.degrade_adc();
-    let t_driver = p.PC1.degrade_adc();
-    let v_battery = p.PA0.degrade_adc();
-    let i_phase_a = p.PA4.degrade_adc();
-    let i_phase_c = p.PA5.degrade_adc();
-
-    let adc1 = Adc::new(p.ADC1);
-    let adc2 = Adc::new(p.ADC2);
-    let adc3 = Adc::new(p.ADC3);
-
-    let vrefint = adc1.enable_vrefint().degrade_adc();
-    let core_temp = adc1.enable_temperature().degrade_adc();
-
-    let adc1 = adc1.setup_injected_conversions(
-        [
-            (i_phase_a, SampleTime::CYCLES112),
-            (vrefint, SampleTime::CYCLES112),
-            (core_temp, SampleTime::CYCLES112),
-        ],
-        // Doesn't do anything, as the trigger is disabled
-        TIM8_CH4,
-        Exten::DISABLED,
-        true,
-    );
-    let adc2 = adc2.setup_injected_conversions(
-        [
-            (i_phase_c, SampleTime::CYCLES112),
-            (t_driver, SampleTime::CYCLES112),
-        ],
-        TIM8_CH4,
-        Exten::DISABLED,
-        true,
-    );
-    let adc3 = adc3.setup_injected_conversions(
-        [
-            (i_battery, SampleTime::CYCLES112),
-            (v_battery, SampleTime::CYCLES112),
-        ],
-        TIM8_CH4,
-        Exten::DISABLED,
-        true,
-    );
-    unsafe {
-        // Enable ADC interrupt
-        ADC::enable();
-    }
 
     let mut imu_spi_conf = spi::Config::default();
     imu_spi_conf.mode = spi::MODE_0;
@@ -210,12 +163,12 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     Timer::after_millis(150).await;
 
-    debug!("IMU whoami response: {}", imu.whoami().unwrap());
+    info!("IMU whoami response: {}", imu.whoami().unwrap());
     // Begode pushes 20 MHz SPI in their firmware and I'm yet to see a wheel with an IMU
     // error, so should be safe for me to do this too
     imu_spi_conf.frequency = Hertz::mhz(20);
     imu.spi.set_config(&imu_spi_conf).unwrap();
-    debug!("IMU whoami response @20MHz: {}", imu.whoami().unwrap());
+    info!("IMU whoami response @20MHz: {}", imu.whoami().unwrap());
 
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
@@ -231,6 +184,9 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
+    // TODO: no idea if it actually does anything, but its used as the ADC sampling
+    // trigger by MESC
+    // motor_tim.enable(Channel::Ch4);
 
     // Enable the TIM8 update interrupt
     pac::TIM8.dier().modify(|w| w.set_uie(true));
@@ -238,11 +194,77 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     unsafe {
         TIM8_UP_TIM13::enable();
     }
-
     // mirrored from MESCfoc.c/calculateGains
     motor_tim.set_duty(Channel::Ch4, motor_tim.get_max_duty() - 5);
     trace!("Motor timer max duty: {}", motor_tim.get_max_duty());
     trace!("Motor timer CCR4: {}", motor_tim.get_duty(Channel::Ch4));
+
+    let i_battery = p.PC0.degrade_adc();
+    let t_driver = p.PC1.degrade_adc();
+    let v_battery = p.PA0.degrade_adc();
+    let i_phase_a = p.PA4.degrade_adc();
+    let i_phase_c = p.PA5.degrade_adc();
+
+    let adc1 = Adc::new(p.ADC1);
+    let adc2 = Adc::new(p.ADC2);
+    let adc3 = Adc::new(p.ADC3);
+
+    let vrefint = adc1.enable_vrefint().degrade_adc();
+    let core_temp = adc1.enable_temperature().degrade_adc();
+
+    trace!(
+        "Before init: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
+        ADC1.cr1().read().scan(),
+        ADC1.cr2().read().adon(),
+        ADC1.sr().read().jstrt()
+    );
+    let adc1 = adc1.setup_injected_conversions(
+        [
+            (i_phase_a, SampleTime::CYCLES112),
+            (vrefint, SampleTime::CYCLES112),
+            (core_temp, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::RISING_EDGE,
+        true,
+    );
+    let adc2 = adc2.setup_injected_conversions(
+        [
+            (i_phase_c, SampleTime::CYCLES112),
+            (t_driver, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::RISING_EDGE,
+        true,
+    );
+    let adc3 = adc3.setup_injected_conversions(
+        [
+            (i_battery, SampleTime::CYCLES112),
+            (v_battery, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::RISING_EDGE,
+        true,
+    );
+    unsafe {
+        // Enable ADC interrupt
+        ADC::enable();
+    }
+    trace!(
+        "After init: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
+        ADC1.cr1().read().scan(),
+        ADC1.cr2().read().adon(),
+        ADC1.sr().read().jstrt()
+    );
+    ADC1.cr1().modify(|w| w.set_scan(true));
+    ADC2.cr1().modify(|w| w.set_scan(true));
+    ADC3.cr1().modify(|w| w.set_scan(true));
+    trace!(
+        "After manual: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
+        ADC1.cr1().read().scan(),
+        ADC1.cr2().read().adon(),
+        ADC1.sr().read().jstrt()
+    );
 
     let ws281x_tim = SimplePwm::new(
         p.TIM3,
@@ -274,7 +296,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     pac::Interrupt::TIM2.set_priority(Priority::P2);
 
     unsafe {
-        TSP_PERIPH.write(Tsp {
+        BSP_PERIPH.write(Bsp {
             poweron: gpio::Output::new(p.PB14, gpio::Level::Low, gpio::Speed::Medium),
             power_button: gpio::Input::new(p.PB15, gpio::Pull::Down),
             park_button: gpio::Input::new(p.PA12, gpio::Pull::Down),
@@ -291,7 +313,7 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     // FIXME: temporary test
     get_periph().poweron.set_high();
 
-    info!("TSP peripherals initialized");
+    info!("BSP peripherals initialized");
 }
 
 pub fn startup_successful() {
@@ -359,26 +381,19 @@ impl PlatformConfig for Config {
  */
 
 #[interrupt]
-fn ADC() {
+unsafe fn ADC() {
     rtos_trace::trace::isr_enter();
 
-    if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
-        // Clear end of conversion flags
-        ADC1.sr().modify(|w| {
-            w.set_jeoc(false);
-            w.set_jstrt(false);
-        });
-        ADC2.sr().modify(|w| {
-            w.set_jeoc(false);
-            w.set_jstrt(false);
-        });
-        ADC3.sr().modify(|w| {
-            w.set_jeoc(false);
-            w.set_jstrt(false);
-        });
+    trace!("ADC");
 
-        core_control::adc_isr(control::get_state());
-    }
+    // if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
+    // Clear end of conversion flags
+    ADC1.sr().modify(|w| w.set_jeoc(false));
+    ADC2.sr().modify(|w| w.set_jeoc(false));
+    ADC3.sr().modify(|w| w.set_jeoc(false));
+
+    core_control::adc_isr(control::get_state());
+    // }
 
     rtos_trace::trace::isr_exit();
 }
@@ -391,12 +406,6 @@ fn TIM8_UP_TIM13() {
     pac::TIM8.sr().modify(|w| w.set_uif(false));
 
     core_control::pwm_isr(control::get_state());
-    // TODO: maybe switch to using just one ADC for mission-critical ADC channels (like
-    // current sensor readings), and use DMA for everything else, still have to consider
-    // pros and cons
-    get_periph().adc1.start_injected_conversions();
-    get_periph().adc2.start_injected_conversions();
-    get_periph().adc3.start_injected_conversions();
 
     rtos_trace::trace::isr_exit();
 }
