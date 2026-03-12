@@ -2,6 +2,7 @@ use super::PlatformConfig;
 use crate::roles::control;
 use core::mem;
 use core::mem::MaybeUninit;
+use core_supervisor::{ButtonRole, InputMethods, global_input};
 use cortex_m::prelude::_embedded_hal_Pwm;
 use defmt::{debug, info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
@@ -417,6 +418,7 @@ fn TIM2() {
  * MESC hooks
  */
 
+#[mesc::global_hal]
 struct MotorHal;
 
 impl Hal for MotorHal {
@@ -567,4 +569,27 @@ impl Hal for MotorHal {
     }
 }
 
-mesc::global_hal!(MotorHal);
+/*
+ * Input methods
+ */
+
+#[global_input]
+struct Input;
+
+impl InputMethods for Input {
+    fn is_pressed(role: ButtonRole) -> bool {
+        match role {
+            ButtonRole::Power => get_periph().power_button.is_high(),
+            ButtonRole::Aux => get_periph().park_button.is_high(),
+            _ => false,
+        }
+    }
+
+    fn dial_relative_distance() -> i16 {
+        0 // no dial
+    }
+
+    fn dial_absolute_position() -> i32 {
+        0 // no dial
+    }
+}

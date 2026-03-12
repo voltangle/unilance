@@ -28,7 +28,7 @@ const BLOCK_COUNT: usize = 2; // small for example
 /// Start all control stuff. This function HAS to return, as its supposed to only spawn
 /// tasks.
 pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
-    let state = SUPERVISOR_STATE.init(Mutex::new(State::default()));
+    let state = SUPERVISOR_STATE.init(Mutex::new(State::new()));
     let corelink = SUPERVISOR_CORELINK.init(link);
 
     // 128 blocks × 4096 bytes = 512 KiB RAM filesystem
@@ -42,12 +42,19 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     let fs_ref = LITTLEFS.init(Mutex::new(fs));
 
     spawner.spawn(
-        corelink_heartbeat(state, corelink).expect("Unable to start CORElink heartbeat"),
+        corelink_heartbeat(state, corelink)
+            .expect("CORElink heartbeat should be able to start"),
     );
-    spawner.spawn(main_task(state, fs_ref, corelink).expect("Unable to start main task"));
+    spawner.spawn(
+        main_task(state, fs_ref, corelink).expect("Main task should be able to start"),
+    );
+    spawner
+        .spawn(input_task(state, corelink).expect("Input task should be able to start"));
 }
 
-pub fn init() {}
+pub fn init() {
+    // Nothing to do
+}
 
 #[for_role("combined")]
 #[embassy_executor::task]
@@ -66,6 +73,14 @@ async fn main_task(
     link: &'static MemChannelCoreLink<'static>,
 ) {
     core_supervisor::main_task(state, fs, link).await;
+}
+
+#[embassy_executor::task]
+async fn input_task(
+    state: &'static Mutex<NoopRawMutex, State>,
+    link: &'static MemChannelCoreLink<'static>,
+) {
+    core_supervisor::input_task(state, link).await;
 }
 
 // WARNING: This shit was pasted in from ChatGPT, because I didn't give enough fucks to

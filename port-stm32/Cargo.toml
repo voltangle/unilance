@@ -57,9 +57,6 @@ micromath = "2.1.0"
 defmt-rtt = { version = "1.1.0", optional = true }
 
 [features]
-# These only exist here for LSP ease-of-use. When building, ALWAYS use
-default = ["target_naegi"]
-# --no-default-features, and ideally, just use Bear to build the firmware.
 # Roles
 role_control = ["dep:core-control"]
 role_supervisor = ["dep:core-supervisor"]
@@ -74,6 +71,7 @@ target_naegi = [
     "drivers/mpu6500",
     "mesc/missing_vcurrsensor",
     "embassy-stm32/time-driver-tim5",
+    "core-supervisor/control_scheme_power_aux"
 ]
 target_kirigiri = [
     "role_supervisor",
@@ -81,7 +79,8 @@ target_kirigiri = [
     "stm32f405rg",
     "drivers/bmi160",
     "embassy-stm32/time-driver-tim5",
-    "dep:defmt-rtt"
+    "dep:defmt-rtt",
+    "core-supervisor/control_scheme_power_aux"
 ]
 # TODO: this board will most likely be a split-MCU board. Once a concrete schematic arrives,
 # adjust to be compliant with it
@@ -89,10 +88,11 @@ target_maizono = [
     "role_supervisor",
     "role_control",
     "stm32f405rg",
-    # FIXME: not for this board, just a temporary thing
+    # FIXME: not for this board, temporarily here to satisfy the compiler
     "drivers/bmi160",
     "embassy-stm32/time-driver-tim5",
-    "dep:defmt-rtt"
+    "dep:defmt-rtt",
+    "core-supervisor/control_scheme_power_aux"
 ]
 
 [build-dependencies]
