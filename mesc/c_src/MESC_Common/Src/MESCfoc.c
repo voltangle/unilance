@@ -717,9 +717,11 @@ void ADCConversion(MESC_motor_typedef* _motor) {
             handleError(_motor, ERROR_OVERCURRENT_PHC);
         }
         if (_motor->Conv.Vbus > g_hw_setup.Vmax) {
+            MESChal_logTraceDouble("Overvoltage: ", _motor->Conv.Vbus);
             handleError(_motor, ERROR_OVERVOLTAGE);
         }
         if (_motor->Conv.Vbus < g_hw_setup.Vmin) {
+            MESChal_logTraceDouble("Undervoltage: ", _motor->Conv.Vbus);
             handleError(_motor, ERROR_UNDERVOLTAGE);
         }
     }
@@ -1303,9 +1305,12 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
     // are trapped. This should be more convenient for working with PSUs and batteries
     // interchangeably
     if (fabsf(_motor->FOC.Idq_req.q) < 1.0f) {
-        g_hw_setup.Vmax =
-            0.995f * g_hw_setup.Vmax +
-            0.005f * (_motor->Conv.Vbus + 0.15f * _motor->limits.abs_max_bus_voltage);
+        g_hw_setup.Vmax = _motor->limits.abs_max_bus_voltage;
+        // FIXME: this for some reason gives me like 90V of Vmax on boot, even thought
+        // I set it to 170. What happened? No idea, but have to investigate that
+        // g_hw_setup.Vmax =
+        //     0.995f * g_hw_setup.Vmax +
+        //     0.005f * (_motor->Conv.Vbus + 0.15f * _motor->limits.abs_max_bus_voltage);
     }
     if (g_hw_setup.Vmax > _motor->limits.abs_max_bus_voltage) {
         g_hw_setup.Vmax = _motor->limits.abs_max_bus_voltage;

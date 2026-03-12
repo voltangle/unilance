@@ -2,17 +2,16 @@ use super::PlatformConfig;
 use crate::roles::control;
 use core::mem;
 use core::mem::MaybeUninit;
-use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::prelude::_embedded_hal_Pwm;
 use defmt::{debug, info, trace};
 use drivers::mpu6500::{AccelRange, GyroRange, MPU6500Driver, Vector3};
 use embassy_executor::Spawner;
 use embassy_stm32::adc::{Adc, AdcChannel, Exten, InjectedAdc, SampleTime};
 use embassy_stm32::gpio::{Level, Output, OutputType, Speed};
-use embassy_stm32::interrupt::typelevel::{ADC, Interrupt, TIM8_CC, TIM8_UP_TIM13};
+use embassy_stm32::interrupt::typelevel::{ADC, Interrupt, TIM8_UP_TIM13};
 use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::{Async, Blocking};
-use embassy_stm32::pac::timer::vals::{Ocm, Urs};
+use embassy_stm32::pac::timer::vals::Urs;
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB, TIM8};
 use embassy_stm32::peripherals::{self, TIM2, TIM3, TIM8};
 use embassy_stm32::rcc::{
@@ -104,7 +103,6 @@ pub struct Tsp<'a> {
 }
 
 static mut TSP_PERIPH: MaybeUninit<Tsp<'static>> = MaybeUninit::uninit();
-static TIM8_CC4_COUNT: AtomicU32 = AtomicU32::new(0);
 
 static DEFMT_SERIAL: StaticCell<embassy_stm32::usart::Uart<Blocking>> = StaticCell::new();
 
@@ -136,6 +134,53 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     defmt_serial::defmt_serial(DEFMT_SERIAL.init(serial));
     info!("defmt-serial started");
 
+    let i_battery = p.PC0.degrade_adc();
+    let t_driver = p.PC1.degrade_adc();
+    let v_battery = p.PA0.degrade_adc();
+    let i_phase_a = p.PA4.degrade_adc();
+    let i_phase_c = p.PA5.degrade_adc();
+
+    let adc1 = Adc::new(p.ADC1);
+    let adc2 = Adc::new(p.ADC2);
+    let adc3 = Adc::new(p.ADC3);
+
+    let vrefint = adc1.enable_vrefint().degrade_adc();
+    let core_temp = adc1.enable_temperature().degrade_adc();
+
+    let adc1 = adc1.setup_injected_conversions(
+        [
+            (i_phase_a, SampleTime::CYCLES112),
+            (vrefint, SampleTime::CYCLES112),
+            (core_temp, SampleTime::CYCLES112),
+        ],
+        // Doesn't do anything, as the trigger is disabled
+        TIM8_CH4,
+        Exten::DISABLED,
+        true,
+    );
+    let adc2 = adc2.setup_injected_conversions(
+        [
+            (i_phase_c, SampleTime::CYCLES112),
+            (t_driver, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::DISABLED,
+        true,
+    );
+    let adc3 = adc3.setup_injected_conversions(
+        [
+            (i_battery, SampleTime::CYCLES112),
+            (v_battery, SampleTime::CYCLES112),
+        ],
+        TIM8_CH4,
+        Exten::DISABLED,
+        true,
+    );
+    unsafe {
+        // Enable ADC interrupt
+        ADC::enable();
+    }
+
     let mut imu_spi_conf = spi::Config::default();
     imu_spi_conf.mode = spi::MODE_0;
     imu_spi_conf.frequency = Hertz::mhz(1);
@@ -164,12 +209,12 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
 
     Timer::after_millis(150).await;
 
-    info!("IMU whoami response: {}", imu.whoami().unwrap());
+    debug!("IMU whoami response: {}", imu.whoami().unwrap());
     // Begode pushes 20 MHz SPI in their firmware and I'm yet to see a wheel with an IMU
     // error, so should be safe for me to do this too
     imu_spi_conf.frequency = Hertz::mhz(20);
     imu.spi.set_config(&imu_spi_conf).unwrap();
-    info!("IMU whoami response @20MHz: {}", imu.whoami().unwrap());
+    debug!("IMU whoami response @20MHz: {}", imu.whoami().unwrap());
 
     let mut motor_tim = ComplementaryPwm::new(
         p.TIM8,
@@ -185,9 +230,6 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
         CountingMode::CenterAlignedBothInterrupts,
     );
     motor_tim.set_master_output_enable(false);
-    // TODO: no idea if it actually does anything, but its used as the ADC sampling
-    // trigger by MESC
-    // motor_tim.enable(Channel::Ch4);
 
     // Enable the TIM8 update interrupt
     pac::TIM8.dier().modify(|w| w.set_uie(true));
@@ -195,77 +237,11 @@ pub async fn init<'a>(p: Peripherals, _spawner: &Spawner) {
     unsafe {
         TIM8_UP_TIM13::enable();
     }
-    pac::TIM8.dier().modify(|w| w.set_ccie(3, true));
-    TIM8_CC::unpend();
-    unsafe {
-        TIM8_CC::enable();
-    }
-    TIM8.ccmr_output(1).modify(|w| {
-        w.set_ocm(1, Ocm::FROZEN);
-        w.set_ocpe(1, false);
-    });
+
     // mirrored from MESCfoc.c/calculateGains
     motor_tim.set_duty(Channel::Ch4, motor_tim.get_max_duty() - 5);
     trace!("Motor timer max duty: {}", motor_tim.get_max_duty());
     trace!("Motor timer CCR4: {}", motor_tim.get_duty(Channel::Ch4));
-
-    let i_battery = p.PC0.degrade_adc();
-    let t_driver = p.PC1.degrade_adc();
-    let v_battery = p.PA0.degrade_adc();
-    let i_phase_a = p.PA4.degrade_adc();
-    let i_phase_c = p.PA5.degrade_adc();
-
-    let adc1 = Adc::new(p.ADC1);
-    let adc2 = Adc::new(p.ADC2);
-    let adc3 = Adc::new(p.ADC3);
-
-    let vrefint = adc1.enable_vrefint().degrade_adc();
-    let core_temp = adc1.enable_temperature().degrade_adc();
-
-    trace!(
-        "Before init: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
-        ADC1.cr1().read().scan(),
-        ADC1.cr2().read().adon(),
-        ADC1.sr().read().jstrt()
-    );
-    let adc1 = adc1.setup_injected_conversions(
-        [
-            (i_phase_a, SampleTime::CYCLES112),
-            (vrefint, SampleTime::CYCLES112),
-            (core_temp, SampleTime::CYCLES112),
-        ],
-        TIM8_CH4,
-        Exten::BOTH_EDGES,
-        true,
-    );
-    let adc2 = adc2.setup_injected_conversions(
-        [
-            (i_phase_c, SampleTime::CYCLES112),
-            (t_driver, SampleTime::CYCLES112),
-        ],
-        TIM8_CH4,
-        Exten::BOTH_EDGES,
-        true,
-    );
-    let adc3 = adc3.setup_injected_conversions(
-        [
-            (i_battery, SampleTime::CYCLES112),
-            (v_battery, SampleTime::CYCLES112),
-        ],
-        TIM8_CH4,
-        Exten::BOTH_EDGES,
-        true,
-    );
-    unsafe {
-        // Enable ADC interrupt
-        ADC::enable();
-    }
-    trace!(
-        "After init: ADC1->CR1.SCAN: {}, CR2.ADON: {}, SR.JSTRT: {}",
-        ADC1.cr1().read().scan(),
-        ADC1.cr2().read().adon(),
-        ADC1.sr().read().jstrt()
-    );
 
     let ws281x_tim = SimplePwm::new(
         p.TIM3,
@@ -385,67 +361,23 @@ impl PlatformConfig for Config {
 fn ADC() {
     rtos_trace::trace::isr_enter();
 
-    trace!("ADC");
+    if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
+        // Clear end of conversion flags
+        ADC1.sr().modify(|w| {
+            w.set_jeoc(false);
+            w.set_jstrt(false);
+        });
+        ADC2.sr().modify(|w| {
+            w.set_jeoc(false);
+            w.set_jstrt(false);
+        });
+        ADC3.sr().modify(|w| {
+            w.set_jeoc(false);
+            w.set_jstrt(false);
+        });
 
-    // if ADC1.sr().read().jeoc() && ADC2.sr().read().jeoc() && ADC3.sr().read().jeoc() {
-    // Clear end of conversion flags
-    debug!(
-        "ADC1->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
-        ADC1.sr().read().jstrt(),
-        ADC1.sr().read().jeoc(),
-        ADC1.cr2().read().jexten(),
-        ADC1.cr2().read().jextsel()
-    );
-    debug!(
-        "ADC2->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
-        ADC2.sr().read().jstrt(),
-        ADC2.sr().read().jeoc(),
-        ADC2.cr2().read().jexten(),
-        ADC2.cr2().read().jextsel()
-    );
-    debug!(
-        "ADC3->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
-        ADC3.sr().read().jstrt(),
-        ADC3.sr().read().jeoc(),
-        ADC3.cr2().read().jexten(),
-        ADC3.cr2().read().jextsel()
-    );
-    ADC1.sr().modify(|w| {
-        w.set_jeoc(false);
-        w.set_jstrt(false);
-    });
-    ADC2.sr().modify(|w| {
-        w.set_jeoc(false);
-        w.set_jstrt(false);
-    });
-    ADC3.sr().modify(|w| {
-        w.set_jeoc(false);
-        w.set_jstrt(false);
-    });
-
-    core_control::adc_isr(control::get_state());
-    // }
-    debug!(
-        "After adc_isr: ADC1->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
-        ADC1.sr().read().jstrt(),
-        ADC1.sr().read().jeoc(),
-        ADC1.cr2().read().jexten(),
-        ADC1.cr2().read().jextsel()
-    );
-    debug!(
-        "After adc_isr: ADC2->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
-        ADC2.sr().read().jstrt(),
-        ADC2.sr().read().jeoc(),
-        ADC2.cr2().read().jexten(),
-        ADC2.cr2().read().jextsel()
-    );
-    debug!(
-        "After adc_isr: ADC3->SR.JSTRT: {}, SR.JEOC: {}, CR2.JEXTEN: {}, CR2.JEXTSEL: {}",
-        ADC3.sr().read().jstrt(),
-        ADC3.sr().read().jeoc(),
-        ADC3.cr2().read().jexten(),
-        ADC3.cr2().read().jextsel()
-    );
+        core_control::adc_isr(control::get_state());
+    }
 
     rtos_trace::trace::isr_exit();
 }
@@ -458,29 +390,12 @@ fn TIM8_UP_TIM13() {
     pac::TIM8.sr().modify(|w| w.set_uif(false));
 
     core_control::pwm_isr(control::get_state());
-
-    rtos_trace::trace::isr_exit();
-}
-
-#[interrupt]
-fn TIM8_CC() {
-    rtos_trace::trace::isr_enter();
-
-    if pac::TIM8.sr().read().ccif(3) {
-        pac::TIM8.sr().modify(|w| w.set_ccif(3, false));
-
-        let count = TIM8_CC4_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
-        if count <= 10 || count % 1000 == 0 {
-            debug!(
-                "TIM8_CC4 count={}, CNT={}, CCR4={}, CMS={}, DIR={}",
-                count,
-                pac::TIM8.cnt().read().cnt(),
-                pac::TIM8.ccr(3).read(),
-                pac::TIM8.cr1().read().cms(),
-                pac::TIM8.cr1().read().dir()
-            );
-        }
-    }
+    // TODO: maybe switch to using just one ADC for mission-critical ADC channels (like
+    // current sensor readings), and use DMA for everything else, still have to consider
+    // pros and cons
+    get_periph().adc1.start_injected_conversions();
+    get_periph().adc2.start_injected_conversions();
+    get_periph().adc3.start_injected_conversions();
 
     rtos_trace::trace::isr_exit();
 }

@@ -12,12 +12,12 @@ codegen-units = 1
 # NOTE: debug = true is okay - debuginfo isn't flashed to the device!
 debug = true
 
-# NOTE: Done temporarily while Embassy releases their scheduler-deadline feature for
-# embassy-executor and my triggered ADC DMA conversion change in embassy-stm32. When
-# released, remove vendor and replace with normal version
+# NOTE: Done temporarily until Embassy releases my patches to embassy-stm32 (triggered
+# ADC DMA conversions and injected ADC support) in an official release. When that will
+# be done, remove this patch section and update the version everywhere
 [patch.crates-io]
-embassy-stm32 = { git = "https://github.com/voltangle/embassy.git", rev = "5e1986a" }
-embassy-executor = { git = "https://github.com/voltangle/embassy.git", rev = "5e1986a" }
-embassy-sync = { git = "https://github.com/voltangle/embassy.git", rev = "5e1986a" }
-embassy-time = { git = "https://github.com/voltangle/embassy.git", rev = "5e1986a" }
-embassy-futures = { git = "https://github.com/voltangle/embassy.git", rev = "5e1986a" }
+embassy-stm32 = { git = "https://github.com/voltangle/embassy.git", rev = "c1cb941" }
+embassy-executor = { git = "https://github.com/voltangle/embassy.git", rev = "c1cb941" }
+embassy-sync = { git = "https://github.com/voltangle/embassy.git", rev = "c1cb941" }
+embassy-time = { git = "https://github.com/voltangle/embassy.git", rev = "c1cb941" }
+embassy-futures = { git = "https://github.com/voltangle/embassy.git", rev = "c1cb941" }

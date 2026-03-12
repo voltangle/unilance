@@ -10,7 +10,7 @@ use micromath::F32Ext;
 pub use types::*;
 
 use crate::bindings::{
-    MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop,
+    MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop, g_hw_setup,
     motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
 };
 
@@ -34,6 +34,7 @@ pub trait MescMotorExt {
 }
 
 impl MescMotorExt for MESC_motor_typedef {
+    #[allow(static_mut_refs)]
     fn init(&mut self) {
         trace!("Running motor init");
         // Specs for the Sherman-L motor
@@ -56,9 +57,10 @@ impl MescMotorExt for MESC_motor_typedef {
         self.limits.abs_max_bus_voltage = 170.0;
         unsafe {
             MESCfoc_Init(self);
+            trace!("Vmax: {}, Vmin: {}", g_hw_setup.Vmax, g_hw_setup.Vmin);
         }
         self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
-        self.FOC.openloop_step = 7;
+        self.FOC.openloop_step = 15;
     }
 
     // TODO: do proper documentation
