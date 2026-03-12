@@ -58,7 +58,7 @@ In code:
 
 - `core-control/src/lib.rs`
 - `port-stm32/src/roles/control.rs`
-- `port-stm32/src/tsp/naegi.rs`
+- `port-stm32/src/bsp/naegi.rs`
 - `mesc/src/lib.rs`
 
 ### C side
