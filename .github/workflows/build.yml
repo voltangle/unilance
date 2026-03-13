@@ -39,9 +39,9 @@ jobs:
   build:
     name: Build target
     runs-on: ubuntu-latest
-    continue-on-error: true
     needs: define-matrix
     strategy:
+      fail-fast: false
       matrix:
         target: ${{ fromJSON(needs.define-matrix.outputs.targets) }}
 
