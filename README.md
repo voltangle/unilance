@@ -64,9 +64,9 @@ Each port has its own BSPs or Board Support Packages, which are basically differ
 configurations of the same port for different target hardware. Each BSP has:
 
 - `[package.metadata.bear]` entry for target metadata
-- Feature flags in its port that looks like `target_<tsp_name>`
-- Its own module in `src/tsp` of its port, named `<tsp_name>.rs` if a single file or just
-`<tsp_name>` if it's a folder.
+- Feature flags in its port that looks like `target_<bsp_name>`
+- Its own module in `src/bsp` of its port, named `<bsp_name>.rs` if a single file or just
+`<bsp_name>` if it's a folder.
 
 ## System architecture
 

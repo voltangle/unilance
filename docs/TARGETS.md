@@ -48,8 +48,8 @@ STM32F405, so it belongs to the STM32 port. In that case, the flow looks somethi
 this:
 
 - Choose a target name, for example `komaeda`
-- Create a BSP file in `port-stm32/src/tsp/komaeda.rs`
-- Add the file to `port-stm32/src/tsp/mod.rs`, and gate the `mod` statement with your
+- Create a BSP file in `port-stm32/src/bsp/komaeda.rs`
+- Add the file to `port-stm32/src/bsp/mod.rs`, and gate the `mod` statement with your
 target feature flag
 - Add a `[package.metadata.bear]` entry:
 
