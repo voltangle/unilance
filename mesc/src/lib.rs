@@ -51,16 +51,16 @@ impl MescMotorExt for MESC_motor_typedef {
     #[allow(static_mut_refs)]
     fn init(&mut self) {
         trace!("Running motor init");
-        // Specs for the Sherman-L motor
+        // Specs for the Master C38 motor
         self.m.Imax = 200.0;
         self.m.Pmax = 4000.0;
         self.m.IBatmax = 200.0;
         self.m.pole_pairs = 27;
-        self.m.L_D = 0.00026978;
-        self.m.L_Q = 0.00034389;
+        self.m.L_D = 0.00011595;
+        self.m.L_Q = 0.00013428;
         self.m.L_QD = self.m.L_Q - self.m.L_D;
-        self.m.R = 0.1225;
-        self.m.flux_linkage = 0.0533;
+        self.m.R = 0.1082;
+        self.m.flux_linkage = 0.0325;
         self.m.flux_linkage_min = self.m.flux_linkage * 0.7;
         self.m.flux_linkage_max = self.m.flux_linkage * 2.0;
         self.m.flux_linkage_gain = self.m.flux_linkage.sqrt() * 10.0;
