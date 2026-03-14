@@ -360,6 +360,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
                             // it results in vibrations at standstill, although it smooths
                             // the transition. Therefore, start it a bit later.
                             //						}else{
+                            HallFluxMonitor(_motor);
                             _motor->FOC.FOCAngle =
                                 (uint16_t)(32768.0f +
                                            10430.0f * fast_atan2(_motor->FOC.flux_b,
@@ -376,6 +377,7 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
                             MESCfluxobs_run(_motor);
                         } else {
                             MESCfluxobs_run(_motor);
+                            HallFluxMonitor(_motor);
                         }
                     } else {
                         MESCfluxobs_run(_motor);
@@ -386,6 +388,12 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
                     _motor->HFI.inject = 0;
                     hallAngleEstimator(_motor);
                     angleObserver(_motor);
+                    // NOTE: Temporarily here to test manuall transition from hall
+                    // to sensorless
+                    uint16_t hall_angle = _motor->FOC.FOCAngle;
+                    MESCfluxobs_run(_motor);
+                    _motor->FOC.FOCAngle = hall_angle;
+                    HallFluxMonitor(_motor);
                     MESCFOC(_motor);
                     break;
                 case MOTOR_SENSOR_MODE_OPENLOOP:
