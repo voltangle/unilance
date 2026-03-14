@@ -14,7 +14,7 @@ use embassy_stm32::interrupt::{InterruptExt, Priority};
 use embassy_stm32::mode::{Async, Blocking};
 use embassy_stm32::pac::timer::vals::Urs;
 use embassy_stm32::pac::{ADC1, ADC2, ADC3, GPIOB, TIM8};
-use embassy_stm32::peripherals::{self, TIM9, TIM3, TIM8};
+use embassy_stm32::peripherals::{self, TIM3, TIM8, TIM9};
 use embassy_stm32::rcc::{
     self, AHBPrescaler, APBPrescaler, Hse, HseMode, Pll, PllMul, PllPDiv, PllPreDiv,
     PllSource, RtcClockSource, Sysclk,
@@ -451,7 +451,7 @@ impl Hal for MotorHal {
 
     #[inline(always)]
     fn set_irq(_motor: &mut MESC_motor_typedef, state: bool) {
-        TIM8.dier().read().set_uie(state);
+        TIM8.dier().modify(|w| w.set_uie(state));
     }
 
     #[inline(always)]

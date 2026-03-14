@@ -1,11 +1,12 @@
-use crate::roles::MemChannelCoreLink;
 use crate::bsp;
+use crate::roles::MemChannelCoreLink;
 use core::mem::MaybeUninit;
+use core::sync::atomic::{AtomicU8, Ordering};
 use core_control::State;
-use defmt::info;
+use defmt::{error, info};
 use embassy_executor::Spawner;
 use embassy_time::Timer;
-use mesc::{MescMotorExt, MotorState, hw_setup_s};
+use mesc::{MescMotorExt, MotorState, SensorMode, StartupSensor, hw_setup_s};
 use proc_macros::for_role;
 use static_cell::StaticCell;
 
@@ -44,7 +45,6 @@ pub fn start(spawner: &Spawner, link: MemChannelCoreLink<'static>) {
     spawner.spawn(motor_control_view().expect("Motor control view should start"));
 }
 
-static mut AUX_OPENLOOP_CNT: u32 = 0;
 /// BALANCE_STATE MUST be initialized when this function runs.
 #[allow(static_mut_refs)]
 pub fn aux_loop() {
@@ -56,16 +56,7 @@ pub fn aux_loop() {
     // get_state()
     //     .motor
     //     .request_q(get_state().balance.update(spacial));
-    unsafe {
-        if get_state().motor.get_state() != MotorState::Detecting {
-            if AUX_OPENLOOP_CNT < 1000 {
-                AUX_OPENLOOP_CNT += 1;
-            }
-            get_state()
-                .motor
-                .request_q(6.0 * (AUX_OPENLOOP_CNT as f32 / 1000.0));
-        }
-    }
+    get_state().motor.request_q(2.0);
     get_state().motor.foc_aux_update();
 }
 
@@ -74,10 +65,7 @@ async fn motor_control_view() {
     loop {
         let m = &get_state().motor;
         info!(
-            "RawIu: {}, RawIv: {}, RawIw: {}, Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}, FOC angle: {}",
-            m.Raw.Iu,
-            m.Raw.Iv,
-            m.Raw.Iw,
+            "Iu: {}, Iv: {}, Iw: {}, Vbus: {}, Iq: {}, key bits: {}, motor state: {}, FOC angle: {}, hall initialised: {}, hall start now: {}",
             m.Conv.Iu,
             m.Conv.Iv,
             m.Conv.Iw,
@@ -86,8 +74,10 @@ async fn motor_control_view() {
             m.key_bits,
             m.get_state(),
             m.FOC.FOCAngle,
+            m.FOC.hall_initialised,
+            m.FOC.hall_start_now
         );
-        Timer::after_millis(100).await;
+        Timer::after_millis(300).await;
     }
 }
 

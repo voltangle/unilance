@@ -6,7 +6,16 @@ use crate::bindings::{
     motor_control_mode_e_MOTOR_CONTROL_MODE_MEASURING,
     motor_control_mode_e_MOTOR_CONTROL_MODE_POSITION,
     motor_control_mode_e_MOTOR_CONTROL_MODE_SPEED,
-    motor_control_mode_e_MOTOR_CONTROL_MODE_TORQUE, motor_state_e,
+    motor_control_mode_e_MOTOR_CONTROL_MODE_TORQUE, motor_sensor_mode_e,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_HALL,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS, motor_startup_sensor_e,
+    motor_startup_sensor_e_STARTUP_SENSOR_HALL,
+    motor_startup_sensor_e_STARTUP_SENSOR_HFI,
+    motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP,
+    motor_startup_sensor_e_STARTUP_SENSOR_PWM_ENCODER, motor_state_e,
     motor_state_e_MOTOR_STATE_ALIGN, motor_state_e_MOTOR_STATE_DETECTING,
     motor_state_e_MOTOR_STATE_ERROR, motor_state_e_MOTOR_STATE_GET_KV,
     motor_state_e_MOTOR_STATE_IDLE, motor_state_e_MOTOR_STATE_INITIALISING,
@@ -144,6 +153,83 @@ impl From<motor_state_e> for MotorState {
             motor_state_e_MOTOR_STATE_SLAMBRAKE => MotorState::SlamBrake,
             motor_state_e_MOTOR_STATE_IDLE => MotorState::Idle,
             _ => MotorState::Undefined,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Format)]
+pub enum SensorMode {
+    Sensorless,
+    Hall,
+    Openloop,
+    AbsoluteEncoder,
+    IncrementalEncoder,
+}
+
+impl Into<motor_sensor_mode_e> for SensorMode {
+    fn into(self) -> motor_sensor_mode_e {
+        match self {
+            SensorMode::Sensorless => motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS,
+            SensorMode::Hall => motor_sensor_mode_e_MOTOR_SENSOR_MODE_HALL,
+            SensorMode::Openloop => motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
+            SensorMode::AbsoluteEncoder => {
+                motor_sensor_mode_e_MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER
+            }
+            SensorMode::IncrementalEncoder => {
+                motor_sensor_mode_e_MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER
+            }
+        }
+    }
+}
+
+impl From<motor_sensor_mode_e> for SensorMode {
+    fn from(value: motor_sensor_mode_e) -> Self {
+        match value {
+            motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS => SensorMode::Sensorless,
+            motor_sensor_mode_e_MOTOR_SENSOR_MODE_HALL => SensorMode::Hall,
+            motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP => SensorMode::Openloop,
+            motor_sensor_mode_e_MOTOR_SENSOR_MODE_ABSOLUTE_ENCODER => {
+                SensorMode::AbsoluteEncoder
+            }
+            motor_sensor_mode_e_MOTOR_SENSOR_MODE_INCREMENTAL_ENCODER => {
+                SensorMode::IncrementalEncoder
+            }
+            _ => SensorMode::Openloop,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Format)]
+pub enum StartupSensor {
+    Openloop,
+    Hall,
+    PWMEncoder,
+    HFI,
+}
+
+impl Into<motor_startup_sensor_e> for StartupSensor {
+    fn into(self) -> motor_startup_sensor_e {
+        match self {
+            StartupSensor::Openloop => motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP,
+            StartupSensor::Hall => motor_startup_sensor_e_STARTUP_SENSOR_HALL,
+            StartupSensor::PWMEncoder => {
+                motor_startup_sensor_e_STARTUP_SENSOR_PWM_ENCODER
+            }
+            StartupSensor::HFI => motor_startup_sensor_e_STARTUP_SENSOR_HFI,
+        }
+    }
+}
+
+impl From<motor_startup_sensor_e> for StartupSensor {
+    fn from(value: motor_startup_sensor_e) -> Self {
+        match value {
+            motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP => StartupSensor::Openloop,
+            motor_startup_sensor_e_STARTUP_SENSOR_HALL => StartupSensor::Hall,
+            motor_startup_sensor_e_STARTUP_SENSOR_PWM_ENCODER => {
+                StartupSensor::PWMEncoder
+            }
+            motor_startup_sensor_e_STARTUP_SENSOR_HFI => StartupSensor::HFI,
+            _ => StartupSensor::Openloop,
         }
     }
 }

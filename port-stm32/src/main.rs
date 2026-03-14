@@ -1,16 +1,16 @@
 #![no_std]
 #![no_main]
 
+mod bsp;
 mod constants;
 mod cpu_usage;
 mod driver;
 mod mesc_impl;
 mod roles;
-mod bsp;
 
+use crate::bsp::PlatformConfig;
 #[for_role("combined")]
 use crate::roles::{CoreChannel, MemChannelCoreLink};
-use crate::bsp::PlatformConfig;
 use core::ptr::read_volatile;
 use cortex_m::Peripherals;
 use cortex_m_rt::{ExceptionFrame, exception};

@@ -26,6 +26,9 @@ pub use types::*;
 use crate::bindings::{
     MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop, g_hw_setup,
     motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
+    motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS,
+    motor_startup_sensor_e_STARTUP_SENSOR_HALL,
+    motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP,
 };
 
 // NOTE: High size usage by MESC_motor_typedef is because of the logging struct inside it.
@@ -40,7 +43,12 @@ pub trait MescMotorExt {
     fn foc_update(&mut self);
     fn timer_write(&mut self);
     fn foc_aux_update(&mut self);
+    fn get_sensor_mode(&mut self) -> SensorMode;
+    fn set_sensor_mode(&mut self, mode: SensorMode);
+    fn get_startup_sensor(&mut self) -> StartupSensor;
+    fn set_startup_sensor(&mut self, sensor: StartupSensor);
     fn get_state(&self) -> MotorState;
+    fn set_state(&mut self, new: MotorState);
     fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16);
     fn set_raw_adc_offsets(&mut self, i_u_offset: u16, i_v_offset: u16, i_w_offset: u16);
     fn request_q(&mut self, i_q: f32);
@@ -73,7 +81,12 @@ impl MescMotorExt for MESC_motor_typedef {
             MESCfoc_Init(self);
             trace!("Vmax: {}, Vmin: {}", g_hw_setup.Vmax, g_hw_setup.Vmin);
         }
-        self.MotorState = MotorState::Detecting.into();
+        // self.MotorState = MotorState::Detecting.into();
+        // self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS;
+        // self.SLStartupSensor = motor_startup_sensor_e_STARTUP_SENSOR_HALL;
+        self.SLStartupSensor = motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP;
+        self.options.use_hall_start = true;
+        self.FOC.hall_transition_V = 8.0;
         // self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP;
         // self.FOC.openloop_step = 15;
     }
@@ -102,8 +115,28 @@ impl MescMotorExt for MESC_motor_typedef {
         }
     }
 
+    fn get_sensor_mode(&mut self) -> SensorMode {
+        SensorMode::from(self.MotorSensorMode)
+    }
+
+    fn set_sensor_mode(&mut self, mode: SensorMode) {
+        self.MotorSensorMode = mode.into();
+    }
+
+    fn get_startup_sensor(&mut self) -> StartupSensor {
+        StartupSensor::from(self.SLStartupSensor)
+    }
+
+    fn set_startup_sensor(&mut self, sensor: StartupSensor) {
+        self.SLStartupSensor = sensor.into();
+    }
+
     fn get_state(&self) -> MotorState {
         MotorState::from(self.MotorState)
+    }
+
+    fn set_state(&mut self, new: MotorState) {
+        self.MotorState = new.into();
     }
 
     fn set_raw_adc(&mut self, i_u: u16, i_v: u16, i_w: u16, v_bus: u16) {
