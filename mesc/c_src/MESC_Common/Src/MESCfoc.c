@@ -670,16 +670,16 @@ void MESCfoc_fastLoop(MESC_motor_typedef* _motor) {
 void VICheck(
     MESC_motor_typedef* _motor) {  // Check currents, voltages are within panic limits
 
-    if (_motor->Raw.Iu > g_hw_setup.RawCurrLim) {
+    if (_motor->Raw.Iu > _motor->limits.rawCurrentLimit) {
         handleError(_motor, ERROR_OVERCURRENT_PHA);
     }
-    if (_motor->Raw.Iv > g_hw_setup.RawCurrLim) {
+    if (_motor->Raw.Iv > _motor->limits.rawCurrentLimit) {
         handleError(_motor, ERROR_OVERCURRENT_PHB);
     }
-    if (_motor->Raw.Iw > g_hw_setup.RawCurrLim) {
+    if (_motor->Raw.Iw > _motor->limits.rawCurrentLimit) {
         handleError(_motor, ERROR_OVERCURRENT_PHC);
     }
-    if (_motor->Raw.Vbus > g_hw_setup.RawVoltLim) {
+    if (_motor->Raw.Vbus > _motor->limits.rawVoltageLimit) {
         handleError(_motor, ERROR_OVERVOLTAGE);
     }
 }
@@ -695,32 +695,35 @@ void ADCConversion(MESC_motor_typedef* _motor) {
     // Here we take the raw ADC values, offset, cast to (float) and use the
     // hardware gain values to create volt and amp variables
     // Convert the currents to real amps in SI units
-    _motor->Conv.Iu = ((float)_motor->Raw.Iu - _motor->offset.Iu) * g_hw_setup.Igain;
-    _motor->Conv.Iv = ((float)_motor->Raw.Iv - _motor->offset.Iv) * g_hw_setup.Igain;
-    _motor->Conv.Iw = ((float)_motor->Raw.Iw - _motor->offset.Iw) * g_hw_setup.Igain;
-    _motor->Conv.Vbus = (float)_motor->Raw.Vbus * g_hw_setup.VBGain;  // Vbus
+    _motor->Conv.Iu =
+        ((float)_motor->Raw.Iu - _motor->offset.Iu) * _motor->hw_setup.gainIphaseA;
+    _motor->Conv.Iv =
+        ((float)_motor->Raw.Iv - _motor->offset.Iv) * _motor->hw_setup.gainIphaseB;
+    _motor->Conv.Iw =
+        ((float)_motor->Raw.Iw - _motor->offset.Iw) * _motor->hw_setup.gainIphaseC;
+    _motor->Conv.Vbus = (float)_motor->Raw.Vbus * _motor->hw_setup.gainVbus;
 
     // Check for over limit conditions. We want this after the conversion so that the
     // correct overcurrent values are logged
     // VICheck(_motor); //This uses the "raw" values, and requires an extra function call
     if (_motor->MotorState == MOTOR_STATE_RUN) {
-        if (_motor->Conv.Iu > g_hw_setup.Imax) {
+        if (_motor->Conv.Iu > _motor->limits.absMaxIphase) {
             MESChal_logTraceDouble("Phase A overcurrent: ", _motor->Conv.Iu);
             handleError(_motor, ERROR_OVERCURRENT_PHA);
         }
-        if (_motor->Conv.Iv > g_hw_setup.Imax) {
+        if (_motor->Conv.Iv > _motor->limits.absMaxIphase) {
             MESChal_logTraceDouble("Phase B overcurrent: ", _motor->Conv.Iu);
             handleError(_motor, ERROR_OVERCURRENT_PHB);
         }
-        if (_motor->Conv.Iw > g_hw_setup.Imax) {
+        if (_motor->Conv.Iw > _motor->limits.absMaxIphase) {
             MESChal_logTraceDouble("Phase C overcurrent: ", _motor->Conv.Iu);
             handleError(_motor, ERROR_OVERCURRENT_PHC);
         }
-        if (_motor->Conv.Vbus > g_hw_setup.Vmax) {
+        if (_motor->Conv.Vbus > _motor->limits.absMaxVbus) {
             MESChal_logTraceDouble("Overvoltage: ", _motor->Conv.Vbus);
             handleError(_motor, ERROR_OVERVOLTAGE);
         }
-        if (_motor->Conv.Vbus < g_hw_setup.Vmin) {
+        if (_motor->Conv.Vbus < _motor->limits.absMinVbus) {
             MESChal_logTraceDouble("Undervoltage: ", _motor->Conv.Vbus);
             handleError(_motor, ERROR_UNDERVOLTAGE);
         }
@@ -800,9 +803,9 @@ void ADCConversion(MESC_motor_typedef* _motor) {
 void ADCPhaseConversion(MESC_motor_typedef* _motor) {
     // To save clock cycles in the main run loop we only want to convert the phase
     // voltages while tracking. Convert the voltages to volts in real SI units
-    _motor->Conv.Vu = (float)_motor->Raw.Vu * g_hw_setup.VBGain;
-    _motor->Conv.Vv = (float)_motor->Raw.Vv * g_hw_setup.VBGain;
-    _motor->Conv.Vw = (float)_motor->Raw.Vw * g_hw_setup.VBGain;
+    _motor->Conv.Vu = (float)_motor->Raw.Vu * _motor->hw_setup.gainVphaseA;
+    _motor->Conv.Vv = (float)_motor->Raw.Vv * _motor->hw_setup.gainVphaseB;
+    _motor->Conv.Vw = (float)_motor->Raw.Vw * _motor->hw_setup.gainVphaseC;
 }
 
 // fast_atan2 based on https://math.stackexchange.com/a/1105038/81278
@@ -1286,34 +1289,6 @@ void calculateVoltageGain(MESC_motor_typedef* _motor) {
                 _motor->HFI.toggle_voltage = HFI_THRESHOLD;
             }
             break;
-    }
-    //////Set the fault limits
-    // Set the overcurrent limit according to the requested current.
-    // This is important since using the board ABS_MAX may mean the motor DC resistance is
-    // high enough that a fault never trips it.
-    g_hw_setup.Imax = _motor->input_vars.max_request_Idq.q * 1.5f;
-    if ((g_hw_setup.Imax * 0.5f) < (0.1f * _motor->limits.abs_max_phase_current)) {
-        g_hw_setup.Imax = _motor->input_vars.max_request_Idq.q +
-                          0.1f * _motor->limits.abs_max_phase_current;
-    }
-    if (g_hw_setup.Imax >
-        _motor->limits
-            .abs_max_phase_current) {  // Clamp the current limit to the board max
-        g_hw_setup.Imax = _motor->limits.abs_max_phase_current;
-    }
-    // Set the over voltage limit dynamically, so that rapid spikes above the bus voltage
-    // are trapped. This should be more convenient for working with PSUs and batteries
-    // interchangeably
-    if (fabsf(_motor->FOC.Idq_req.q) < 1.0f) {
-        g_hw_setup.Vmax = _motor->limits.abs_max_bus_voltage;
-        // FIXME: this for some reason gives me like 90V of Vmax on boot, even thought
-        // I set it to 170. What happened? No idea, but have to investigate that
-        // g_hw_setup.Vmax =
-        //     0.995f * g_hw_setup.Vmax +
-        //     0.005f * (_motor->Conv.Vbus + 0.15f * _motor->limits.abs_max_bus_voltage);
-    }
-    if (g_hw_setup.Vmax > _motor->limits.abs_max_bus_voltage) {
-        g_hw_setup.Vmax = _motor->limits.abs_max_bus_voltage;
     }
 }
 

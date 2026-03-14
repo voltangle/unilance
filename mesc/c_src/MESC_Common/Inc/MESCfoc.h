@@ -711,11 +711,6 @@ typedef enum MESC_ObserverCentering {
 } MESC_ObserverCentering_t;
 
 typedef struct {
-    float abs_max_phase_current;
-    float abs_max_bus_voltage;
-} MESC_limits_t;
-
-typedef struct {
     bool use_hall_start;
     bool use_lr_observer;
     bool use_phase_sensors;
@@ -737,6 +732,35 @@ typedef struct {
     // FIXME: remove when refactoring MESCfoc_slowLoop
     uint8_t MESC_APP_type;
 } MESC_OptionFlags_s;
+
+typedef float hardware_vars_t;  // Let's have all the hardware and everything in float for
+                                // now, until we start running out of clock cycles?
+
+// Copied from hw_setup_s
+typedef struct {
+    hardware_vars_t gainVbus;     // Bus voltage ADC value gain
+    hardware_vars_t gainVphaseA;  // Phase A voltage ADC value gain
+    hardware_vars_t gainVphaseB;  // Phase B voltage ADC value gain
+    hardware_vars_t gainVphaseC;  // Phase C voltage ADC value gain
+    hardware_vars_t gainIphaseA;  // Phase A current sensor gain
+    hardware_vars_t gainIphaseB;  // Phase B current sensor gain
+    hardware_vars_t gainIphaseC;  // Phase C current sensor gain
+} MESC_HardwareSetup_t;
+
+typedef struct {
+    hardware_vars_t absMaxIphase;  // Max phase current allowable
+    hardware_vars_t absMaxVbus;    // Max board voltage allowable
+    hardware_vars_t absMinVbus;    // Min voltage at which we turn off the PWM to avoid
+                                   // brownouts, nastiness.
+    uint16_t rawCurrentLimit;      // current limit that will trigger a software
+                                   // generated break from adc. actual current equal to
+                                   // (rawcurrlim-imid)*3.3/4096/gain/rshunt //example
+                                   // (4096-2048)*3.3/(4096*16*0.001)= 103a
+    uint16_t rawVoltageLimit;      // voltage limit that will trigger a software
+                                   //  generated break from adc. actual voltage equal to
+                                   // rawvoltlim*3.3*divider/4096
+                                   // example 2303*3.3/4096*(r1k5+r47k/r1k5)=60v
+} MESC_Limits_t;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////Main typedef for starting a motor instance////////////////////////
@@ -772,7 +796,9 @@ typedef struct {
     input_vars_t input_vars;
     MESClrobs_s lrobs;
     MESC_OptionFlags_s options;
-    MESC_limits_t limits;
+    // Effectively moves g_hw_setup here. Didn't do any ore refactoring than that
+    MESC_HardwareSetup_t hw_setup;
+    MESC_Limits_t limits;
     bool conf_is_valid;
 } MESC_motor_typedef;
 

@@ -183,6 +183,7 @@ impl Into<motor_sensor_mode_e> for SensorMode {
 }
 
 impl From<motor_sensor_mode_e> for SensorMode {
+    #[allow(non_upper_case_globals)]
     fn from(value: motor_sensor_mode_e) -> Self {
         match value {
             motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS => SensorMode::Sensorless,
@@ -221,6 +222,7 @@ impl Into<motor_startup_sensor_e> for StartupSensor {
 }
 
 impl From<motor_startup_sensor_e> for StartupSensor {
+    #[allow(non_upper_case_globals)]
     fn from(value: motor_startup_sensor_e) -> Self {
         match value {
             motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP => StartupSensor::Openloop,

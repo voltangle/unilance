@@ -3,31 +3,14 @@
 mod bindings;
 mod types;
 
-pub use bindings::{MESC_motor_typedef, hw_setup_s};
+pub use bindings::{MESC_HardwareSetup_t, MESC_Limits_t, MESC_motor_typedef};
 use defmt::trace;
 use micromath::F32Ext;
-/// Bind a [`Hal`] implementation to MESC's exported C hooks.
-///
-/// ```ignore
-/// #[mesc::global_hal]
-/// struct MotorHal;
-/// ```
-pub use proc_macros::global_hal;
-
-/// Bind a [`CoreHal`] implementation to MESC's exported C hooks.
-///
-/// ```ignore
-/// #[mesc::global_core_hal]
-/// struct MescImpl;
-/// ```
-pub use proc_macros::global_core_hal;
+pub use proc_macros::{global_core_hal, global_hal};
 pub use types::*;
 
 use crate::bindings::{
-    MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop, g_hw_setup,
-    motor_sensor_mode_e_MOTOR_SENSOR_MODE_OPENLOOP,
-    motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS,
-    motor_startup_sensor_e_STARTUP_SENSOR_HALL,
+    MESC_PWM_IRQ_handler, MESCfoc_Init, MESCfoc_fastLoop, MESCfoc_slowLoop,
     motor_startup_sensor_e_STARTUP_SENSOR_OPENLOOP,
 };
 
@@ -39,7 +22,7 @@ use crate::bindings::{
 /// You can always use all fields inside [MESC_motor_typedef], but it's recommended you
 /// use these "safe" functions for interacting with MESC insides.
 pub trait MescMotorExt {
-    fn init(&mut self);
+    fn init(&mut self, hw_setup: MESC_HardwareSetup_t, limits: MESC_Limits_t);
     fn foc_update(&mut self);
     fn timer_write(&mut self);
     fn foc_aux_update(&mut self);
@@ -57,8 +40,10 @@ pub trait MescMotorExt {
 
 impl MescMotorExt for MESC_motor_typedef {
     #[allow(static_mut_refs)]
-    fn init(&mut self) {
+    fn init(&mut self, hw_setup: MESC_HardwareSetup_t, limits: MESC_Limits_t) {
         trace!("Running motor init");
+        self.hw_setup = hw_setup;
+        self.limits = limits;
         // Specs for the Master C38 motor
         self.m.Imax = 200.0;
         self.m.Pmax = 4000.0;
@@ -75,11 +60,8 @@ impl MescMotorExt for MESC_motor_typedef {
         self.m.non_linear_centering_gain = 5000.0;
         self.input_vars.max_request_Idq.q = 100.0;
         self.input_vars.min_request_Idq.q = -100.0;
-        self.limits.abs_max_phase_current = 200.0;
-        self.limits.abs_max_bus_voltage = 170.0;
         unsafe {
             MESCfoc_Init(self);
-            trace!("Vmax: {}, Vmin: {}", g_hw_setup.Vmax, g_hw_setup.Vmin);
         }
         // self.MotorState = MotorState::Detecting.into();
         // self.MotorSensorMode = motor_sensor_mode_e_MOTOR_SENSOR_MODE_SENSORLESS;
